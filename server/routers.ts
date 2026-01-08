@@ -5,7 +5,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import * as db from "./db";
-import * as financialDataService from "./services/financialData";
+import * as httpFinancialData from "./services/httpFinancialData";
 import * as aiAnalysisEngine from "./services/aiAnalysisEngine";
 import type { AnalysisOutput, OpportunityOutput, TickerSnapshot } from "@shared/types";
 
@@ -46,17 +46,17 @@ export const appRouter = router({
         }
         
         // Search in financial data service
-        const serviceResults = await financialDataService.searchTickerData(input.query);
+        const serviceResults = await httpFinancialData.searchTickers(input.query);
         
         // Upsert found tickers to database
         for (const ticker of serviceResults) {
           await db.upsertTicker({
             symbol: ticker.symbol,
-            companyName: ticker.companyName || null,
-            sector: ticker.sector || null,
-            industry: ticker.industry || null,
-            marketCap: ticker.marketCap?.toString() || null,
-            exchange: ticker.exchange || null,
+            companyName: ticker.name || null,
+            sector: null,
+            industry: null,
+            marketCap: null,
+            exchange: null,
             description: null,
             lastDataUpdate: new Date(),
             isActive: true,
@@ -73,7 +73,17 @@ export const appRouter = router({
         
         if (!ticker) {
           // Try to fetch from financial data service
-          const snapshot = await financialDataService.getTickerSnapshot(input.symbol);
+          const financialData = await httpFinancialData.getStockDataViaYahoo(input.symbol);
+          const snapshot = {
+            symbol: input.symbol,
+            companyName: input.symbol,
+            sector: financialData.profile?.sector,
+            industry: financialData.profile?.industry,
+            price: financialData.price?.current,
+            marketCap: 0,
+            exchange: 'NASDAQ',
+            lastDataUpdate: new Date()
+          };
           if (snapshot) {
             const tickerId = await db.upsertTicker({
               symbol: snapshot.symbol,
@@ -96,7 +106,7 @@ export const appRouter = router({
     getFinancialData: publicProcedure
       .input(z.object({ symbol: z.string() }))
       .query(async ({ input }) => {
-        return await financialDataService.getFinancialData(input.symbol);
+        return await httpFinancialData.getStockDataViaYahoo(input.symbol);
       }),
   }),
 
@@ -112,7 +122,16 @@ export const appRouter = router({
         // Get or create ticker
         let ticker = await db.getTickerBySymbol(input.symbol);
         if (!ticker) {
-          const snapshot = await financialDataService.getTickerSnapshot(input.symbol);
+          const financialData = await httpFinancialData.getStockDataViaYahoo(input.symbol);
+          const snapshot = {
+            symbol: input.symbol,
+            companyName: input.symbol,
+            sector: financialData.profile?.sector,
+            industry: financialData.profile?.industry,
+            price: financialData.price?.current,
+            marketCap: 0,
+            lastDataUpdate: new Date()
+          };
           if (!snapshot) {
             throw new Error(`Ticker ${input.symbol} not found`);
           }
@@ -122,7 +141,7 @@ export const appRouter = router({
             sector: snapshot.sector || null,
             industry: snapshot.industry || null,
             marketCap: snapshot.marketCap?.toString() || null,
-            exchange: snapshot.exchange || null,
+            exchange: null,
             description: null,
             lastDataUpdate: new Date(),
             isActive: true,
@@ -133,7 +152,7 @@ export const appRouter = router({
         if (!ticker) throw new Error("Failed to create ticker");
         
         // Get financial data
-        const financialData = await financialDataService.getFinancialData(input.symbol);
+        const financialData = await httpFinancialData.getStockDataViaYahoo(input.symbol);
         if (!financialData) {
           throw new Error(`No financial data available for ${input.symbol}`);
         }
@@ -419,7 +438,8 @@ export const appRouter = router({
         const persona = await db.getPersonaByPersonaId(input.personaId);
         if (!persona) throw new Error("Persona not found");
         
-        const availableTickers = financialDataService.getAllAvailableTickers();
+        const tickers = await httpFinancialData.searchTickers('');
+        const availableTickers = tickers.map(t => t.symbol);
         const scanDate = new Date();
         scanDate.setHours(0, 0, 0, 0);
         
@@ -430,7 +450,7 @@ export const appRouter = router({
           const ticker = await db.getTickerBySymbol(symbol);
           if (!ticker) continue;
           
-          const financialData = await financialDataService.getFinancialData(symbol);
+          const financialData = await httpFinancialData.getStockDataViaYahoo(symbol);
           if (!financialData) continue;
           
           // Prepare analysis input (similar to runAnalysis)
