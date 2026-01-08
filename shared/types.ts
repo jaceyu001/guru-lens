@@ -95,6 +95,76 @@ export interface JobStatus {
   updatedAt: Date;
 }
 
+export interface StockPrice {
+  symbol: string;
+  current: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+  previousClose: number;
+  change: number;
+  changePercent: number;
+  timestamp: Date;
+}
+
+export interface CompanyProfile {
+  symbol: string;
+  companyName: string;
+  sector: string;
+  industry: string;
+  description: string;
+  ceo?: string;
+  employees?: number;
+  founded?: number;
+  headquarters?: string;
+  website?: string;
+  marketCap: number;
+}
+
+export interface FinancialStatement {
+  period: string;
+  periodType: "quarterly" | "annual";
+  fiscalYear: number;
+  revenue: number;
+  costOfRevenue: number;
+  grossProfit: number;
+  operatingExpenses: number;
+  operatingIncome: number;
+  netIncome: number;
+  eps: number;
+  ebitda: number;
+  freeCashFlow: number;
+  totalAssets: number;
+  totalLiabilities: number;
+  shareholderEquity: number;
+  cashAndEquivalents: number;
+  totalDebt: number;
+}
+
+export interface KeyRatios {
+  symbol: string;
+  peRatio: number;
+  pbRatio: number;
+  psRatio: number;
+  pegRatio: number;
+  dividendYield: number;
+  payoutRatio: number;
+  roe: number;
+  roa: number;
+  roic: number;
+  currentRatio: number;
+  quickRatio: number;
+  debtToEquity: number;
+  interestCoverage: number;
+  grossMargin: number;
+  operatingMargin: number;
+  netMargin: number;
+  assetTurnover: number;
+  inventoryTurnover: number;
+}
+
 export interface FinancialData {
   price?: {
     current: number;
