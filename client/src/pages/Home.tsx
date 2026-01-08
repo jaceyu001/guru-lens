@@ -23,7 +23,7 @@ export default function Home() {
   };
 
   const searchMutation = trpc.tickers.search.useQuery(
-    { query: searchQuery },
+    { query: searchQuery || "A" }, // Provide default to satisfy min(1) validation
     { enabled: false }
   );
 
