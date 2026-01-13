@@ -206,31 +206,31 @@ export default function Ticker() {
                 </div>
               </div>
             )}
-            {ratios?.pe && (
+            {ratios?.pe !== undefined && (
               <div>
                 <div className="text-xs text-muted-foreground mb-1">P/E Ratio</div>
                 <div className="font-semibold font-mono-numbers">{ratios.pe.toFixed(2)}</div>
               </div>
             )}
-            {ratios?.pb && (
+            {ratios?.pb !== undefined && (
               <div>
                 <div className="text-xs text-muted-foreground mb-1">P/B Ratio</div>
                 <div className="font-semibold font-mono-numbers">{ratios.pb.toFixed(2)}</div>
               </div>
             )}
-            {ratios?.roe && (
+            {ratios?.roe !== undefined && (
               <div>
                 <div className="text-xs text-muted-foreground mb-1">ROE</div>
                 <div className="font-semibold font-mono-numbers">{(ratios.roe * 100).toFixed(2)}%</div>
               </div>
             )}
-            {ratios?.debtToEquity && (
+            {ratios?.debtToEquity !== undefined && (
               <div>
                 <div className="text-xs text-muted-foreground mb-1">Debt/Equity</div>
                 <div className="font-semibold font-mono-numbers">{ratios.debtToEquity.toFixed(2)}</div>
               </div>
             )}
-            {ratios?.netMargin && (
+            {ratios?.netMargin !== undefined && (
               <div>
                 <div className="text-xs text-muted-foreground mb-1">Net Margin</div>
                 <div className="font-semibold font-mono-numbers">{(ratios.netMargin * 100).toFixed(2)}%</div>

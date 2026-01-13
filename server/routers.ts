@@ -5,7 +5,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import * as db from "./db";
-import * as realFinancialData from './services/polygonFinancialData';
+import * as realFinancialData from './services/realFinancialData';
 import * as aiAnalysisEngine from "./services/aiAnalysisEngine";
 import type { AnalysisOutput, OpportunityOutput, TickerSnapshot } from "@shared/types";
 
@@ -110,6 +110,7 @@ export const appRouter = router({
           console.log(`[getFinancialData] Fetching data for ${input.symbol}`);
           const financialData = await realFinancialData.getStockData(input.symbol);
           console.log(`[getFinancialData] Success for ${input.symbol}`);
+          console.log('[getFinancialData] Ratios:', JSON.stringify(financialData.ratios, null, 2));
           return financialData;
         } catch (error) {
           console.error(`[getFinancialData] Error for ${input.symbol}:`, error);
