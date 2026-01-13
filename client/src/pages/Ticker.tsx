@@ -19,9 +19,18 @@ export default function Ticker() {
   const [selectedAnalysis, setSelectedAnalysis] = useState<AnalysisOutput | null>(null);
   const [isRunning, setIsRunning] = useState(false);
 
-  const ticker = trpc.tickers.getBySymbol.useQuery({ symbol: symbol?.toUpperCase() || "" });
-  const financialData = trpc.tickers.getFinancialData.useQuery({ symbol: symbol?.toUpperCase() || "" });
-  const analyses = trpc.analyses.getLatestForTicker.useQuery({ symbol: symbol?.toUpperCase() || "" });
+  const ticker = trpc.tickers.getBySymbol.useQuery(
+    { symbol: symbol?.toUpperCase() || "" },
+    { enabled: !!symbol }
+  );
+  const financialData = trpc.tickers.getFinancialData.useQuery(
+    { symbol: symbol?.toUpperCase() || "" },
+    { enabled: !!symbol }
+  );
+  const analyses = trpc.analyses.getLatestForTicker.useQuery(
+    { symbol: symbol?.toUpperCase() || "" },
+    { enabled: !!symbol }
+  );
   const inWatchlist = trpc.watchlist.isInWatchlist.useQuery(
     { symbol: symbol?.toUpperCase() || "" },
     { enabled: isAuthenticated }
@@ -76,6 +85,10 @@ export default function Ticker() {
     if (score >= 50) return "text-yellow-600";
     return "text-negative";
   };
+
+  // Debug logging
+  console.log('Ticker query:', { isLoading: ticker.isLoading, data: ticker.data, error: ticker.error });
+  console.log('Financial data query:', { isLoading: financialData.isLoading, data: financialData.data, error: financialData.error });
 
   if (ticker.isLoading || financialData.isLoading) {
     return (
