@@ -5,7 +5,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import * as db from "./db";
-import * as realFinancialData from "./services/realFinancialData";
+import * as realFinancialData from './services/polygonFinancialData';
 import * as aiAnalysisEngine from "./services/aiAnalysisEngine";
 import type { AnalysisOutput, OpportunityOutput, TickerSnapshot } from "@shared/types";
 
