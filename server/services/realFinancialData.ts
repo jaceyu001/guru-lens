@@ -5,7 +5,7 @@
  * for any US-listed stock. No API keys required.
  */
 
-import { execSync } from "child_process";
+import { spawn } from "child_process";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -71,63 +71,93 @@ interface YFinanceResponse {
 }
 
 export async function getStockData(symbol: string): Promise<FinancialData> {
-  try {
-    // Call Python yfinance wrapper
-    const scriptPath = path.join(__dirname, "yfinanceWrapper.py");
-    const result = execSync(`env -u PYTHONPATH -u PYTHONHOME /usr/bin/python3 "${scriptPath}" ${symbol}`, {
-      encoding: "utf-8",
-      timeout: 30000,
-    });
+  return new Promise((resolve, reject) => {
+    try {
+      const scriptPath = path.join(__dirname, "yfinanceWrapper.py");
+      const python = spawn("/usr/bin/python3", [scriptPath, symbol], {
+        env: {
+          ...process.env,
+          PYTHONPATH: undefined,
+          PYTHONHOME: undefined,
+        },
+        timeout: 30000,
+      });
 
-    const data: YFinanceResponse = JSON.parse(result);
+      let output = "";
+      let errorOutput = "";
 
-    if (data.error) {
-      throw new Error(`yfinance error: ${data.error}`);
+      python.stdout.on("data", (data) => {
+        output += data.toString();
+      });
+
+      python.stderr.on("data", (data) => {
+        errorOutput += data.toString();
+      });
+
+      python.on("close", (code) => {
+        if (code !== 0) {
+          reject(new Error(`Python process exited with code ${code}: ${errorOutput}`));
+          return;
+        }
+
+        try {
+          const data: YFinanceResponse = JSON.parse(output);
+
+          if (data.error) {
+            reject(new Error(`yfinance error: ${data.error}`));
+            return;
+          }
+
+          resolve({
+            price: {
+              current: data.price.current,
+              change: data.price.change,
+              changePercent: data.price.changePercent,
+              open: data.price.open,
+              high: data.price.high,
+              low: data.price.low,
+              volume: data.price.volume,
+              timestamp: new Date(data.price.timestamp),
+            },
+            profile: {
+              sector: data.profile.sector,
+              industry: data.profile.industry,
+              description: data.profile.description,
+              employees: data.profile.employees,
+              website: data.profile.website,
+            },
+            financials: data.financials.map((f) => ({
+              period: f.period,
+              fiscalYear: f.fiscalYear,
+              revenue: f.revenue,
+              netIncome: f.netIncome,
+              eps: f.eps,
+            })),
+            ratios: {
+              pe: data.ratios.pe,
+              pb: data.ratios.pb,
+              ps: data.ratios.ps,
+              roe: data.ratios.roe,
+              roic: data.ratios.roic,
+              debtToEquity: data.ratios.debtToEquity,
+              currentRatio: data.ratios.currentRatio,
+              grossMargin: data.ratios.grossMargin,
+              operatingMargin: data.ratios.operatingMargin,
+              netMargin: data.ratios.netMargin,
+            },
+          });
+        } catch (parseError) {
+          reject(new Error(`Failed to parse yfinance output: ${parseError}`));
+        }
+      });
+
+      python.on("error", (error) => {
+        reject(error);
+      });
+    } catch (error) {
+      reject(error);
     }
-
-    // Transform yfinance response to our types
-    return {
-      price: {
-        current: data.price.current,
-        change: data.price.change,
-        changePercent: data.price.changePercent,
-        open: data.price.open,
-        high: data.price.high,
-        low: data.price.low,
-        volume: data.price.volume,
-        timestamp: new Date(data.price.timestamp),
-      },
-      profile: {
-        sector: data.profile.sector,
-        industry: data.profile.industry,
-        description: data.profile.description,
-        employees: data.profile.employees,
-        website: data.profile.website,
-      },
-      financials: data.financials.map((f) => ({
-        period: f.period,
-        fiscalYear: f.fiscalYear,
-        revenue: f.revenue,
-        netIncome: f.netIncome,
-        eps: f.eps,
-      })),
-      ratios: {
-        pe: data.ratios.pe,
-        pb: data.ratios.pb,
-        ps: data.ratios.ps,
-        roe: data.ratios.roe,
-        roic: data.ratios.roic,
-        debtToEquity: data.ratios.debtToEquity,
-        currentRatio: data.ratios.currentRatio,
-        grossMargin: data.ratios.grossMargin,
-        operatingMargin: data.ratios.operatingMargin,
-        netMargin: data.ratios.netMargin,
-      },
-    };
-  } catch (error) {
-    console.error(`[Real Financial Data] Error fetching ${symbol}:`, error);
-    throw error;
-  }
+  });
 }
 
 /**
@@ -148,36 +178,21 @@ export async function searchTickers(query: string): Promise<
     { symbol: "AMZN", name: "Amazon.com Inc." },
     { symbol: "NVDA", name: "NVIDIA Corporation" },
     { symbol: "TSLA", name: "Tesla Inc." },
-    { symbol: "META", name: "Meta Platforms Inc." },
     { symbol: "JPM", name: "JPMorgan Chase & Co." },
     { symbol: "JNJ", name: "Johnson & Johnson" },
-    { symbol: "V", name: "Visa Inc." },
     { symbol: "WMT", name: "Walmart Inc." },
-    { symbol: "PG", name: "Procter & Gamble Co." },
+    { symbol: "V", name: "Visa Inc." },
     { symbol: "KO", name: "The Coca-Cola Company" },
-    { symbol: "DIS", name: "The Walt Disney Company" },
+    { symbol: "BIDU", name: "Baidu Inc." },
     { symbol: "NFLX", name: "Netflix Inc." },
-    { symbol: "BA", name: "The Boeing Company" },
-    { symbol: "IBM", name: "International Business Machines" },
-    { symbol: "INTC", name: "Intel Corporation" },
-    { symbol: "AMD", name: "Advanced Micro Devices" },
-    { symbol: "CSCO", name: "Cisco Systems Inc." },
+    { symbol: "META", name: "Meta Platforms Inc." },
+    { symbol: "UBER", name: "Uber Technologies Inc." },
   ];
 
-  const queryUpper = query.toUpperCase();
+  const lowerQuery = query.toLowerCase();
   return popularTickers.filter(
-    (t) => t.symbol.includes(queryUpper) || t.name.toUpperCase().includes(queryUpper)
+    (t) =>
+      t.symbol.toLowerCase().includes(lowerQuery) ||
+      t.name.toLowerCase().includes(lowerQuery)
   );
-}
-
-/**
- * Validate if a ticker exists and is tradeable
- */
-export async function validateTicker(symbol: string): Promise<boolean> {
-  try {
-    const data = await getStockData(symbol);
-    return data.profile?.sector !== "Unknown" && data.profile?.sector !== "";
-  } catch {
-    return false;
-  }
 }
