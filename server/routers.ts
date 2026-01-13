@@ -110,7 +110,10 @@ export const appRouter = router({
           console.log(`[getFinancialData] Fetching data for ${input.symbol}`);
           const financialData = await realFinancialData.getStockData(input.symbol);
           console.log(`[getFinancialData] Success for ${input.symbol}`);
-          console.log('[getFinancialData] Ratios:', JSON.stringify(financialData.ratios, null, 2));
+          
+          
+          
+          
           return financialData;
         } catch (error) {
           console.error(`[getFinancialData] Error for ${input.symbol}:`, error);
