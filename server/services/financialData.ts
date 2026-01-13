@@ -20,7 +20,7 @@ const MOCK_STOCKS: Record<string, TickerSnapshot & { basePrice: number }> = {
     industry: "Consumer Electronics",
     exchange: "NASDAQ",
     basePrice: 178.50,
-    marketCap: 2800000000000,
+    marketCap: 2800000000000 as number,
   },
   MSFT: {
     symbol: "MSFT",
@@ -29,7 +29,7 @@ const MOCK_STOCKS: Record<string, TickerSnapshot & { basePrice: number }> = {
     industry: "Software",
     exchange: "NASDAQ",
     basePrice: 380.00,
-    marketCap: 2820000000000,
+    marketCap: 2820000000000 as number,
   },
   GOOGL: {
     symbol: "GOOGL",
@@ -38,7 +38,7 @@ const MOCK_STOCKS: Record<string, TickerSnapshot & { basePrice: number }> = {
     industry: "Internet Services",
     exchange: "NASDAQ",
     basePrice: 140.50,
-    marketCap: 1750000000000,
+    marketCap: 1750000000000 as number,
   },
   NVDA: {
     symbol: "NVDA",
@@ -47,7 +47,7 @@ const MOCK_STOCKS: Record<string, TickerSnapshot & { basePrice: number }> = {
     industry: "Semiconductors",
     exchange: "NASDAQ",
     basePrice: 495.00,
-    marketCap: 1220000000000,
+    marketCap: 1220000000000 as number,
   },
   TSLA: {
     symbol: "TSLA",
@@ -56,7 +56,7 @@ const MOCK_STOCKS: Record<string, TickerSnapshot & { basePrice: number }> = {
     industry: "Auto Manufacturers",
     exchange: "NASDAQ",
     basePrice: 248.00,
-    marketCap: 788000000000,
+    marketCap: 788000000000 as number,
   },
   JPM: {
     symbol: "JPM",
@@ -65,7 +65,7 @@ const MOCK_STOCKS: Record<string, TickerSnapshot & { basePrice: number }> = {
     industry: "Banks",
     exchange: "NYSE",
     basePrice: 158.00,
-    marketCap: 450000000000,
+    marketCap: 450000000000 as number,
   },
   JNJ: {
     symbol: "JNJ",
@@ -74,7 +74,7 @@ const MOCK_STOCKS: Record<string, TickerSnapshot & { basePrice: number }> = {
     industry: "Drug Manufacturers",
     exchange: "NYSE",
     basePrice: 162.00,
-    marketCap: 395000000000,
+    marketCap: 395000000000 as number,
   },
   WMT: {
     symbol: "WMT",
@@ -83,7 +83,7 @@ const MOCK_STOCKS: Record<string, TickerSnapshot & { basePrice: number }> = {
     industry: "Discount Stores",
     exchange: "NYSE",
     basePrice: 68.50,
-    marketCap: 535000000000,
+    marketCap: 535000000000 as number,
   },
   V: {
     symbol: "V",
@@ -92,7 +92,7 @@ const MOCK_STOCKS: Record<string, TickerSnapshot & { basePrice: number }> = {
     industry: "Credit Services",
     exchange: "NYSE",
     basePrice: 275.00,
-    marketCap: 560000000000,
+    marketCap: 560000000000 as number,
   },
   KO: {
     symbol: "KO",
@@ -101,7 +101,34 @@ const MOCK_STOCKS: Record<string, TickerSnapshot & { basePrice: number }> = {
     industry: "Beverages",
     exchange: "NYSE",
     basePrice: 62.50,
-    marketCap: 270000000000,
+    marketCap: 270000000000 as number,
+  },
+  BIDU: {
+    symbol: "BIDU",
+    companyName: "Baidu Inc.",
+    sector: "Technology",
+    industry: "Internet Services",
+    exchange: "NASDAQ",
+    basePrice: 102.50,
+    marketCap: 18000000000 as number,
+  },
+  AMZN: {
+    symbol: "AMZN",
+    companyName: "Amazon.com Inc.",
+    sector: "Consumer Cyclical",
+    industry: "Internet Retail",
+    exchange: "NASDAQ",
+    basePrice: 195.00,
+    marketCap: 2050000000000 as number,
+  },
+  META: {
+    symbol: "META",
+    companyName: "Meta Platforms Inc.",
+    sector: "Technology",
+    industry: "Internet Services",
+    exchange: "NASDAQ",
+    basePrice: 475.00,
+    marketCap: 1520000000000 as number,
   },
 };
 
@@ -146,6 +173,17 @@ export async function getFinancialData(symbol: string): Promise<FinancialData | 
   const change = stock.basePrice * priceVariation;
   const changePercent = priceVariation * 100;
   
+  // Get realistic financials based on market cap
+  const marketCap = stock.marketCap!;
+  const marketCapInBillions = marketCap / 1000000000;
+  const revenueMultiplier = Math.random() * 0.5 + 1.5; // 1.5x to 2x market cap
+  const netIncomeMargin = Math.random() * 0.15 + 0.05; // 5-20% net margin
+  
+  const revenue = marketCap * revenueMultiplier;
+  const netIncome = revenue * netIncomeMargin;
+  const eps = netIncome / (marketCap / currentPrice); // Shares outstanding
+  const pe = currentPrice / eps;
+  
   return {
     price: {
       current: Number(currentPrice.toFixed(2)),
@@ -166,31 +204,31 @@ export async function getFinancialData(symbol: string): Promise<FinancialData | 
     },
     financials: [
       {
-        revenue: Math.floor(Math.random() * 100000000000) + 50000000000,
-        netIncome: Math.floor(Math.random() * 20000000000) + 5000000000,
-        eps: Number((Math.random() * 10 + 2).toFixed(2)),
+        revenue: Number(revenue.toFixed(0)),
+        netIncome: Number(netIncome.toFixed(0)),
+        eps: Number(eps.toFixed(2)),
         period: "Q4",
         fiscalYear: 2024,
       },
       {
-        revenue: Math.floor(Math.random() * 95000000000) + 48000000000,
-        netIncome: Math.floor(Math.random() * 18000000000) + 4500000000,
-        eps: Number((Math.random() * 9 + 1.8).toFixed(2)),
+        revenue: Number((revenue * 0.95).toFixed(0)),
+        netIncome: Number((netIncome * 0.92).toFixed(0)),
+        eps: Number((eps * 0.92).toFixed(2)),
         period: "Q3",
         fiscalYear: 2024,
       },
     ],
     ratios: {
-      pe: Number((Math.random() * 30 + 15).toFixed(2)),
+      pe: Number(pe.toFixed(2)),
       pb: Number((Math.random() * 8 + 2).toFixed(2)),
-      ps: Number((Math.random() * 6 + 1).toFixed(2)),
-      roe: Number((Math.random() * 0.25 + 0.10).toFixed(4)),
+      ps: Number((revenue / marketCap).toFixed(2)),
+      roe: Number((netIncome / (marketCap * 0.3)).toFixed(4)),
       roic: Number((Math.random() * 0.20 + 0.08).toFixed(4)),
       debtToEquity: Number((Math.random() * 1.5 + 0.3).toFixed(2)),
       currentRatio: Number((Math.random() * 2 + 1).toFixed(2)),
       grossMargin: Number((Math.random() * 0.40 + 0.30).toFixed(4)),
       operatingMargin: Number((Math.random() * 0.30 + 0.15).toFixed(4)),
-      netMargin: Number((Math.random() * 0.25 + 0.10).toFixed(4)),
+      netMargin: Number(netIncomeMargin.toFixed(4)),
     },
   };
 }

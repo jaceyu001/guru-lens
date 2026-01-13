@@ -5,7 +5,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import * as db from "./db";
-import * as httpFinancialData from "./services/httpFinancialData";
+import * as realFinancialData from "./services/realFinancialData";
 import * as aiAnalysisEngine from "./services/aiAnalysisEngine";
 import type { AnalysisOutput, OpportunityOutput, TickerSnapshot } from "@shared/types";
 
@@ -46,7 +46,7 @@ export const appRouter = router({
         }
         
         // Search in financial data service
-        const serviceResults = await httpFinancialData.searchTickers(input.query);
+        const serviceResults = await realFinancialData.searchTickers(input.query);
         
         // Upsert found tickers to database
         for (const ticker of serviceResults) {
@@ -73,7 +73,7 @@ export const appRouter = router({
         
         if (!ticker) {
           // Try to fetch from financial data service
-          const financialData = await httpFinancialData.getStockDataViaYahoo(input.symbol);
+          const financialData = await realFinancialData.getStockData(input.symbol);
           const snapshot = {
             symbol: input.symbol,
             companyName: input.symbol,
@@ -106,7 +106,8 @@ export const appRouter = router({
     getFinancialData: publicProcedure
       .input(z.object({ symbol: z.string() }))
       .query(async ({ input }) => {
-        return await httpFinancialData.getStockDataViaYahoo(input.symbol);
+        const financialData = await realFinancialData.getStockData(input.symbol);
+        return financialData;
       }),
   }),
 
@@ -122,7 +123,7 @@ export const appRouter = router({
         // Get or create ticker
         let ticker = await db.getTickerBySymbol(input.symbol);
         if (!ticker) {
-          const financialData = await httpFinancialData.getStockDataViaYahoo(input.symbol);
+          const financialData = await realFinancialData.getStockData(input.symbol);
           const snapshot = {
             symbol: input.symbol,
             companyName: input.symbol,
@@ -152,7 +153,7 @@ export const appRouter = router({
         if (!ticker) throw new Error("Failed to create ticker");
         
         // Get financial data
-        const financialData = await httpFinancialData.getStockDataViaYahoo(input.symbol);
+        const financialData = await realFinancialData.getStockData(input.symbol);
         if (!financialData) {
           throw new Error(`No financial data available for ${input.symbol}`);
         }
@@ -438,7 +439,7 @@ export const appRouter = router({
         const persona = await db.getPersonaByPersonaId(input.personaId);
         if (!persona) throw new Error("Persona not found");
         
-        const tickers = await httpFinancialData.searchTickers('');
+        const tickers = await realFinancialData.searchTickers('');
         const availableTickers = tickers.map(t => t.symbol);
         const scanDate = new Date();
         scanDate.setHours(0, 0, 0, 0);
@@ -450,7 +451,7 @@ export const appRouter = router({
           const ticker = await db.getTickerBySymbol(symbol);
           if (!ticker) continue;
           
-          const financialData = await httpFinancialData.getStockDataViaYahoo(symbol);
+          const financialData = await realFinancialData.getStockData(symbol);
           if (!financialData) continue;
           
           // Prepare analysis input (similar to runAnalysis)

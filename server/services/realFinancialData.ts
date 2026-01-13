@@ -74,7 +74,7 @@ export async function getStockData(symbol: string): Promise<FinancialData> {
   try {
     // Call Python yfinance wrapper
     const scriptPath = path.join(__dirname, "yfinanceWrapper.py");
-    const result = execSync(`python3 "${scriptPath}" ${symbol}`, {
+    const result = execSync(`env -u PYTHONPATH -u PYTHONHOME /usr/bin/python3 "${scriptPath}" ${symbol}`, {
       encoding: "utf-8",
       timeout: 30000,
     });
