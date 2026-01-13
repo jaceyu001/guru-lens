@@ -6,6 +6,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
 import Ticker from "./pages/Ticker";
+import TickerTest from "./pages/TickerTest";
 import Opportunities from "./pages/Opportunities";
 import Watchlist from "./pages/Watchlist";
 
@@ -14,6 +15,7 @@ function Router() {
     <Switch>
       <Route path={"/"} component={Home} />
       <Route path={"/ticker/:symbol"} component={Ticker} />
+      <Route path={"/ticker-test/:symbol"} component={TickerTest} />
       <Route path={"/opportunities"} component={Opportunities} />
       <Route path={"/opportunities/:personaId"} component={Opportunities} />
       <Route path={"/watchlist"} component={Watchlist} />

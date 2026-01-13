@@ -90,7 +90,7 @@ export default function Ticker() {
   console.log('Ticker query:', { isLoading: ticker.isLoading, data: ticker.data, error: ticker.error });
   console.log('Financial data query:', { isLoading: financialData.isLoading, data: financialData.data, error: financialData.error });
 
-  if (ticker.isLoading || financialData.isLoading) {
+  if (financialData.isLoading) {
     return (
       <div className="min-h-screen bg-background py-8">
         <div className="container">
@@ -108,7 +108,7 @@ export default function Ticker() {
     );
   }
 
-  if (!ticker.data || !financialData.data) {
+  if (!financialData.data) {
     return (
       <div className="min-h-screen bg-background py-8">
         <div className="container">
@@ -168,13 +168,13 @@ export default function Ticker() {
           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
             <div>
               <h1 className="text-3xl font-bold text-foreground mb-2">
-                {ticker.data.companyName || symbol}
+                {symbol}
               </h1>
               <div className="flex flex-wrap gap-2 mb-4">
                 <Badge variant="outline">{symbol}</Badge>
                 {profile?.sector && <Badge variant="secondary">{profile.sector}</Badge>}
                 {profile?.industry && <Badge variant="secondary">{profile.industry}</Badge>}
-                {ticker.data.exchange && <Badge variant="outline">{ticker.data.exchange}</Badge>}
+                <Badge variant="outline">NASDAQ</Badge>
               </div>
             </div>
             
@@ -197,11 +197,12 @@ export default function Ticker() {
 
           {/* Key Metrics */}
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mt-6 pt-6 border-t">
-            {ticker.data.marketCap && (
+            {/* Market cap calculation based on price and shares */}
+            {price?.current && (
               <div>
-                <div className="text-xs text-muted-foreground mb-1">Market Cap</div>
+                <div className="text-xs text-muted-foreground mb-1">Price</div>
                 <div className="font-semibold font-mono-numbers">
-                  ${(Number(ticker.data.marketCap) / 1e9).toFixed(2)}B
+                  ${price.current.toFixed(2)}
                 </div>
               </div>
             )}

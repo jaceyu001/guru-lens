@@ -106,8 +106,15 @@ export const appRouter = router({
     getFinancialData: publicProcedure
       .input(z.object({ symbol: z.string() }))
       .query(async ({ input }) => {
-        const financialData = await realFinancialData.getStockData(input.symbol);
-        return financialData;
+        try {
+          console.log(`[getFinancialData] Fetching data for ${input.symbol}`);
+          const financialData = await realFinancialData.getStockData(input.symbol);
+          console.log(`[getFinancialData] Success for ${input.symbol}`);
+          return financialData;
+        } catch (error) {
+          console.error(`[getFinancialData] Error for ${input.symbol}:`, error);
+          throw error;
+        }
       }),
   }),
 
