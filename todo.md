@@ -177,3 +177,6 @@
 - [x] Updated FinancialData type to include dataQualityFlags
 - [x] Modified aiAnalysisEngine to detect and warn about anomalous data
 - [x] Pass dataQualityFlags from routers to AI analysis engine
+
+## Current Issues
+- [x] Weight percentages showing as 2000%-2500% instead of correct values in Philip Fisher persona analysis - FIXED: Changed line 367 in Ticker.tsx from `criterion.weight.toFixed(0)%` to `(criterion.weight * 100).toFixed(0)%` to convert decimal weights to percentages
