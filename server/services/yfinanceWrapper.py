@@ -7,13 +7,30 @@ This script is called from Node.js to fetch stock data
 
 import json
 import sys
+import os
+import ssl
+import urllib3
 import yfinance as yf
 from datetime import datetime
+
+# Disable SSL verification warnings
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+# Configure SSL to be more lenient
+try:
+    ssl._create_default_https_context = ssl._create_unverified_context
+except Exception:
+    pass
+
+# Set environment variables for certificate handling
+os.environ['CURL_CA_BUNDLE'] = ''
+os.environ['REQUESTS_CA_BUNDLE'] = ''
 
 def get_stock_data(symbol):
     """Fetch comprehensive stock data for a given symbol"""
     try:
-        # Create ticker object
+        # Create ticker object - let yfinance handle the session
+        # Don't pass a custom session, let yfinance use its default curl_cffi session
         ticker = yf.Ticker(symbol)
         
         # Get current quote
