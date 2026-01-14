@@ -180,3 +180,10 @@
 
 ## Current Issues
 - [x] Weight percentages showing as 2000%-2500% instead of correct values in Philip Fisher persona analysis - FIXED: Changed line 367 in Ticker.tsx from `criterion.weight.toFixed(0)%` to `(criterion.weight * 100).toFixed(0)%` to convert decimal weights to percentages
+
+## Anomalous Data Handling (Completed)
+- [x] Add visual indicators in UI for anomalous metrics (TBC/abnormal badge) - Added TBC badges to P/E, P/B, ROE, Debt/Equity, Current Ratio metrics
+- [x] Prevent anomalous metrics from being passed to LLM for persona analysis - Modified aiAnalysisEngine to use getSafeMetricValue() which replaces anomalous values with 'TBC (Data Quality Issue)'
+- [x] Update yfinanceWrapper to properly flag all anomalous metrics - Added comprehensive anomaly detection for debtToEquity, ROIC, interestCoverage, PE, marketCap, PB, ROE, currentRatio
+- [x] Display anomalous metrics with warning styling in Ticker component - Added yellow text highlighting for anomalous metrics
+- [x] Test with BIDU and other anomalous stocks - Verified Ray Dalio analysis correctly identifies market cap error ($0.00B) and negative FCF as data quality issues

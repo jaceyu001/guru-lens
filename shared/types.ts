@@ -207,5 +207,10 @@ export interface FinancialData {
     roicZero?: boolean;
     interestCoverageZero?: boolean;
     peNegative?: boolean;
+    marketCapZero?: boolean;
+    pbAnomalous?: boolean;
+    peAnomalous?: boolean;
+    roeNegative?: boolean;
+    currentRatioAnomalous?: boolean;
   };
 }

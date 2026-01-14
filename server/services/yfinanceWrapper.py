@@ -92,7 +92,12 @@ def get_stock_data(symbol):
                 "debtToEquityAnomalous": float(info.get('debtToEquity', 0)) > 10,
                 "roicZero": float(info.get('returnOnCapital', 0)) == 0,
                 "interestCoverageZero": float(info.get('interestCoverage', 0)) == 0,
-                "peNegative": float(info.get('trailingPE', 0)) < 0 or float(info.get('forwardPE', 0)) < 0
+                "peNegative": float(info.get('trailingPE', 0)) < 0 or float(info.get('forwardPE', 0)) < 0,
+                "marketCapZero": float(info.get('marketCap', 0)) == 0,
+                "pbAnomalous": float(info.get('priceToBook', 0)) > 100 or float(info.get('priceToBook', 0)) < 0,
+                "peAnomalous": float(info.get('trailingPE', 0)) > 200,
+                "roeNegative": float(info.get('returnOnEquity', 0)) < 0,
+                "currentRatioAnomalous": float(info.get('currentRatio', 0)) < 0.5 or float(info.get('currentRatio', 0)) > 50
             },
             "financials": []
         }

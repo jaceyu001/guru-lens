@@ -22,6 +22,11 @@ export interface AnalysisInput {
     roicZero?: boolean;
     interestCoverageZero?: boolean;
     peNegative?: boolean;
+    marketCapZero?: boolean;
+    pbAnomalous?: boolean;
+    peAnomalous?: boolean;
+    roeNegative?: boolean;
+    currentRatioAnomalous?: boolean;
   };
 }
 
@@ -80,9 +85,29 @@ Free Cash Flow: $${(latestFinancials.freeCashFlow / 1e9).toFixed(2)}B`
   if (input.dataQualityFlags?.peNegative) {
     dataQualityWarnings.push(`WARNING: P/E ratio is negative, indicating negative earnings or unusual circumstances.`);
   }
+  if (input.dataQualityFlags?.marketCapZero) {
+    dataQualityWarnings.push(`WARNING: Market Cap is reported as 0. This may indicate missing data or a delisted company.`);
+  }
+  if (input.dataQualityFlags?.pbAnomalous) {
+    dataQualityWarnings.push(`WARNING: P/B ratio appears anomalous (>100 or <0). This may indicate data quality issues.`);
+  }
+  if (input.dataQualityFlags?.peAnomalous) {
+    dataQualityWarnings.push(`WARNING: P/E ratio appears anomalously high (>200). This may indicate data quality issues.`);
+  }
+  if (input.dataQualityFlags?.roeNegative) {
+    dataQualityWarnings.push(`WARNING: ROE is negative, indicating the company is not generating positive returns on equity.`);
+  }
+  if (input.dataQualityFlags?.currentRatioAnomalous) {
+    dataQualityWarnings.push(`WARNING: Current Ratio appears anomalous (<0.5 or >50). This may indicate data quality issues.`);
+  }
   const dataQualityNote = dataQualityWarnings.length > 0 
     ? `\n\nDATA QUALITY NOTES:\n${dataQualityWarnings.join('\n\n')}`
     : '';
+
+  // Helper function to return metric value or TBC if anomalous
+  const getSafeMetricValue = (value: string, isAnomalous: boolean | undefined): string => {
+    return isAnomalous ? 'TBC (Data Quality Issue)' : value;
+  };
 
   // Fill in the analysis template
   const userPrompt = personaPrompt.analysisTemplate
@@ -90,18 +115,18 @@ Free Cash Flow: $${(latestFinancials.freeCashFlow / 1e9).toFixed(2)}B`
     .replace('{companyName}', input.profile.companyName)
     .replace('{sector}', input.profile.sector)
     .replace('{industry}', input.profile.industry)
-    .replace('{marketCap}', `$${(input.profile.marketCap / 1e9).toFixed(2)}B`)
+    .replace('{marketCap}', getSafeMetricValue(`$${(input.profile.marketCap / 1e9).toFixed(2)}B`, input.dataQualityFlags?.marketCapZero))
     .replace('{description}', input.profile.description)
     .replace('{price}', `$${input.price.current.toFixed(2)}`)
-    .replace('{peRatio}', input.ratios.peRatio.toFixed(1))
-    .replace('{pegRatio}', input.ratios.pegRatio.toFixed(2))
-    .replace('{pbRatio}', input.ratios.pbRatio.toFixed(2))
-    .replace('{roe}', input.ratios.roe.toFixed(1))
-    .replace('{roic}', input.ratios.roic.toFixed(1))
+    .replace('{peRatio}', getSafeMetricValue(input.ratios.peRatio.toFixed(1), input.dataQualityFlags?.peAnomalous || input.dataQualityFlags?.peNegative))
+    .replace('{pegRatio}', getSafeMetricValue(input.ratios.pegRatio.toFixed(2), input.dataQualityFlags?.peAnomalous))
+    .replace('{pbRatio}', getSafeMetricValue(input.ratios.pbRatio.toFixed(2), input.dataQualityFlags?.pbAnomalous))
+    .replace('{roe}', getSafeMetricValue(input.ratios.roe.toFixed(1), input.dataQualityFlags?.roeNegative))
+    .replace('{roic}', getSafeMetricValue(input.ratios.roic.toFixed(1), input.dataQualityFlags?.roicZero))
     .replace('{netMargin}', input.ratios.netMargin.toFixed(1))
     .replace('{operatingMargin}', input.ratios.operatingMargin.toFixed(1))
-    .replace('{debtToEquity}', input.ratios.debtToEquity.toFixed(2))
-    .replace('{currentRatio}', input.ratios.currentRatio.toFixed(2))
+    .replace('{debtToEquity}', getSafeMetricValue(input.ratios.debtToEquity.toFixed(2), input.dataQualityFlags?.debtToEquityAnomalous))
+    .replace('{currentRatio}', getSafeMetricValue(input.ratios.currentRatio.toFixed(2), input.dataQualityFlags?.currentRatioAnomalous))
     .replace('{interestCoverage}', input.ratios.interestCoverage.toFixed(1))
     .replace('{dividendYield}', input.ratios.dividendYield.toFixed(2))
     .replace('{financials}', financialSummary)
