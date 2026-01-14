@@ -17,6 +17,12 @@ export interface AnalysisInput {
   profile: CompanyProfile;
   financials: FinancialStatement[];
   ratios: KeyRatios;
+  dataQualityFlags?: {
+    debtToEquityAnomalous?: boolean;
+    roicZero?: boolean;
+    interestCoverageZero?: boolean;
+    peNegative?: boolean;
+  };
 }
 
 export interface AnalysisCriterion {
@@ -60,6 +66,24 @@ EPS: $${latestFinancials.eps.toFixed(2)}
 Free Cash Flow: $${(latestFinancials.freeCashFlow / 1e9).toFixed(2)}B`
     : "Financial data not available";
 
+  // Build data quality warnings
+  const dataQualityWarnings = [];
+  if (input.dataQualityFlags?.debtToEquityAnomalous) {
+    dataQualityWarnings.push(`WARNING: Debt/Equity ratio of ${input.ratios.debtToEquity.toFixed(2)} appears anomalously high. This may indicate data quality issues. Use caution when drawing conclusions.`);
+  }
+  if (input.dataQualityFlags?.roicZero) {
+    dataQualityWarnings.push(`WARNING: ROIC is reported as 0. This may indicate missing data or unusual circumstances.`);
+  }
+  if (input.dataQualityFlags?.interestCoverageZero) {
+    dataQualityWarnings.push(`WARNING: Interest Coverage is reported as 0. This may indicate the company has no debt or missing data.`);
+  }
+  if (input.dataQualityFlags?.peNegative) {
+    dataQualityWarnings.push(`WARNING: P/E ratio is negative, indicating negative earnings or unusual circumstances.`);
+  }
+  const dataQualityNote = dataQualityWarnings.length > 0 
+    ? `\n\nDATA QUALITY NOTES:\n${dataQualityWarnings.join('\n\n')}`
+    : '';
+
   // Fill in the analysis template
   const userPrompt = personaPrompt.analysisTemplate
     .replace('{symbol}', input.symbol)
@@ -83,7 +107,8 @@ Free Cash Flow: $${(latestFinancials.freeCashFlow / 1e9).toFixed(2)}B`
     .replace('{financials}', financialSummary)
     .replace('{revenueGrowth}', '15.2') // TODO: Calculate from financials
     .replace('{rdIntensity}', '8.5') // TODO: Get from data
-    .replace('{freeCashFlow}', latestFinancials ? `$${(latestFinancials.freeCashFlow / 1e9).toFixed(2)}B` : 'N/A');
+    .replace('{freeCashFlow}', latestFinancials ? `$${(latestFinancials.freeCashFlow / 1e9).toFixed(2)}B` : 'N/A')
+    .replace('{dataQualityNote}', dataQualityNote);
 
   // Define the JSON schema for structured output
   const analysisSchema = {

@@ -88,6 +88,12 @@ def get_stock_data(symbol):
                 "dividendYield": float(info.get('dividendYield', 0)) or 0,
                 "interestCoverage": float(info.get('interestCoverage', 0)) or 0
             },
+            "dataQualityFlags": {
+                "debtToEquityAnomalous": float(info.get('debtToEquity', 0)) > 10,
+                "roicZero": float(info.get('returnOnCapital', 0)) == 0,
+                "interestCoverageZero": float(info.get('interestCoverage', 0)) == 0,
+                "peNegative": float(info.get('trailingPE', 0)) < 0 or float(info.get('forwardPE', 0)) < 0
+            },
             "financials": []
         }
         

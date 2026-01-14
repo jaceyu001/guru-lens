@@ -202,4 +202,10 @@ export interface FinancialData {
     operatingMargin?: number;
     netMargin?: number;
   };
+  dataQualityFlags?: {
+    debtToEquityAnomalous?: boolean;
+    roicZero?: boolean;
+    interestCoverageZero?: boolean;
+    peNegative?: boolean;
+  };
 }

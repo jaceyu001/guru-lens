@@ -170,3 +170,10 @@
 - [x] Check AI analysis generation for errors or timeouts - Added error logging and continue on failure
 - [x] Financial metrics (margins, ROE) showing incorrect values in AI analysis - Fixed by converting decimal ratios to percentages in keyRatios calculation
 - [x] TSLA showing ROE 0.4% and Profit Margin 0.2% - Fixed (was cached old analysis, regenerated with correct values)
+- [x] BIDU D/E ratio 33.81 unrealistic - Implemented data quality flagging instead of silent correction
+
+## Data Quality Improvements
+- [x] Added data quality flags to yfinanceWrapper.py (debtToEquityAnomalous, roicZero, interestCoverageZero, peNegative)
+- [x] Updated FinancialData type to include dataQualityFlags
+- [x] Modified aiAnalysisEngine to detect and warn about anomalous data
+- [x] Pass dataQualityFlags from routers to AI analysis engine

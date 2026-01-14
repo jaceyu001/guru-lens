@@ -267,6 +267,7 @@ export const appRouter = router({
             profile: companyProfile,
             financials,
             ratios: keyRatios,
+            dataQualityFlags: financialData.dataQualityFlags,
           };
           
           const result = await aiAnalysisEngine.analyzeStock(analysisInput);
