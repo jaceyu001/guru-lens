@@ -164,3 +164,7 @@
 - [x] Fix yfinance "Ticker Not Found" error on live deployment (SSL certificate verification disabled in yfinanceWrapper.py)
 - [x] Set up Python runtime in Manus deployed environment (added SSL bypass and environment variables)
 - [ ] Verify financial ratios display correctly on live site after deployment
+
+## Critical Bugs
+- [x] LULU only shows Warren Buffett persona rating - Fixed by adding try-catch error handling to runAnalysis loop
+- [x] Check AI analysis generation for errors or timeouts - Added error logging and continue on failure

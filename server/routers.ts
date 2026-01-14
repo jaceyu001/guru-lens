@@ -179,6 +179,7 @@ export const appRouter = router({
         // Run analysis for each persona
         const analyses: AnalysisOutput[] = [];
         for (const persona of validPersonas) {
+          try {
           // Prepare input for AI analysis
           const price = financialData.price!;
           const stockPrice = {
@@ -321,6 +322,9 @@ export const appRouter = router({
             runMetadata,
             runTimestamp: new Date(),
           });
+          } catch (error) {
+            console.error(`[runAnalysis] Error analyzing ${input.symbol} for persona ${persona.name}:`, error);
+          }
         }
         
         return { analyses, jobId: null };
