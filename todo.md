@@ -168,3 +168,4 @@
 ## Critical Bugs
 - [x] LULU only shows Warren Buffett persona rating - Fixed by adding try-catch error handling to runAnalysis loop
 - [x] Check AI analysis generation for errors or timeouts - Added error logging and continue on failure
+- [x] Financial metrics (margins, ROE) showing incorrect values in AI analysis - Fixed by converting decimal ratios to percentages in keyRatios calculation

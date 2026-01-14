@@ -209,6 +209,14 @@ export const appRouter = router({
           };
           
           const ratios = financialData.ratios!;
+          // Convert decimal ratios to percentages (yfinance returns 0.157 for 15.7%)
+          const roePercent = ((ratios.roe || 0) * 100);
+          const roaPercent = ((ratios.roe || 0) * 0.5 * 100);
+          const roicPercent = ((ratios.roic || 0) * 100);
+          const netMarginPercent = ((ratios.netMargin || 0) * 100);
+          const operatingMarginPercent = ((ratios.operatingMargin || 0) * 100);
+          const grossMarginPercent = ((ratios.grossMargin || 0) * 100);
+          
           const keyRatios = {
             symbol: input.symbol,
             peRatio: ratios.pe || 0,
@@ -217,16 +225,16 @@ export const appRouter = router({
             pegRatio: (ratios.pe || 0) / 15,
             dividendYield: 0,
             payoutRatio: 0,
-            roe: ratios.roe || 0,
-            roa: (ratios.roe || 0) * 0.5,
-            roic: ratios.roic || 0,
+            roe: roePercent,
+            roa: roaPercent,
+            roic: roicPercent,
             currentRatio: ratios.currentRatio || 0,
             quickRatio: (ratios.currentRatio || 0) * 0.8,
             debtToEquity: ratios.debtToEquity || 0,
             interestCoverage: 10,
-            grossMargin: ratios.grossMargin || 0,
-            operatingMargin: ratios.operatingMargin || 0,
-            netMargin: ratios.netMargin || 0,
+            grossMargin: grossMarginPercent,
+            operatingMargin: operatingMarginPercent,
+            netMargin: netMarginPercent,
             assetTurnover: 1.0,
             inventoryTurnover: 8.0,
           };
