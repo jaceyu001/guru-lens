@@ -46,6 +46,7 @@ export interface AnalysisOutput {
   criteria: AnalysisCriterion[];
   keyRisks: string[];
   whatWouldChangeMind: string[];
+  dataQualityIssues?: string[]; // Metrics that were unavailable or anomalous
   dataUsed: {
     priceAsOf: Date;
     financialsAsOf: string;
@@ -100,13 +101,17 @@ Free Cash Flow: $${(latestFinancials.freeCashFlow / 1e9).toFixed(2)}B`
   if (input.dataQualityFlags?.currentRatioAnomalous) {
     dataQualityWarnings.push(`WARNING: Current Ratio appears anomalous (<0.5 or >50). This may indicate data quality issues.`);
   }
-  const dataQualityNote = dataQualityWarnings.length > 0 
-    ? `\n\nDATA QUALITY NOTES:\n${dataQualityWarnings.join('\n\n')}`
-    : '';
-
-  // Helper function to return metric value or TBC if anomalous
-  const getSafeMetricValue = (value: string, isAnomalous: boolean | undefined): string => {
-    return isAnomalous ? 'TBC (Data Quality Issue)' : value;
+  
+  // Track which metrics are anomalous
+  const anomalousMetrics: string[] = [];
+  
+  // getSafeMetricValue function
+  const getSafeMetricValue = (value: string, isAnomalous: boolean | undefined, metricName: string): string => {
+    if (isAnomalous) {
+      anomalousMetrics.push(metricName);
+      return '[DATA UNAVAILABLE]';
+    }
+    return value;
   };
 
   // Fill in the analysis template
@@ -115,25 +120,38 @@ Free Cash Flow: $${(latestFinancials.freeCashFlow / 1e9).toFixed(2)}B`
     .replace('{companyName}', input.profile.companyName)
     .replace('{sector}', input.profile.sector)
     .replace('{industry}', input.profile.industry)
-    .replace('{marketCap}', getSafeMetricValue(`$${(input.profile.marketCap / 1e9).toFixed(2)}B`, input.dataQualityFlags?.marketCapZero))
+    .replace('{marketCap}', getSafeMetricValue(`$${(input.profile.marketCap / 1e9).toFixed(2)}B`, input.dataQualityFlags?.marketCapZero, 'Market Cap'))
     .replace('{description}', input.profile.description)
     .replace('{price}', `$${input.price.current.toFixed(2)}`)
-    .replace('{peRatio}', getSafeMetricValue(input.ratios.peRatio.toFixed(1), input.dataQualityFlags?.peAnomalous || input.dataQualityFlags?.peNegative))
-    .replace('{pegRatio}', getSafeMetricValue(input.ratios.pegRatio.toFixed(2), input.dataQualityFlags?.peAnomalous))
-    .replace('{pbRatio}', getSafeMetricValue(input.ratios.pbRatio.toFixed(2), input.dataQualityFlags?.pbAnomalous))
-    .replace('{roe}', getSafeMetricValue(input.ratios.roe.toFixed(1), input.dataQualityFlags?.roeNegative))
-    .replace('{roic}', getSafeMetricValue(input.ratios.roic.toFixed(1), input.dataQualityFlags?.roicZero))
+    .replace('{peRatio}', getSafeMetricValue(input.ratios.peRatio.toFixed(1), input.dataQualityFlags?.peAnomalous || input.dataQualityFlags?.peNegative, 'P/E Ratio'))
+    .replace('{pegRatio}', getSafeMetricValue(input.ratios.pegRatio.toFixed(2), input.dataQualityFlags?.peAnomalous, 'PEG Ratio'))
+    .replace('{pbRatio}', getSafeMetricValue(input.ratios.pbRatio.toFixed(2), input.dataQualityFlags?.pbAnomalous, 'P/B Ratio'))
+    .replace('{roe}', getSafeMetricValue(input.ratios.roe.toFixed(1), input.dataQualityFlags?.roeNegative, 'ROE'))
+    .replace('{roic}', getSafeMetricValue(input.ratios.roic.toFixed(1), input.dataQualityFlags?.roicZero, 'ROIC'))
     .replace('{netMargin}', input.ratios.netMargin.toFixed(1))
     .replace('{operatingMargin}', input.ratios.operatingMargin.toFixed(1))
-    .replace('{debtToEquity}', getSafeMetricValue(input.ratios.debtToEquity.toFixed(2), input.dataQualityFlags?.debtToEquityAnomalous))
-    .replace('{currentRatio}', getSafeMetricValue(input.ratios.currentRatio.toFixed(2), input.dataQualityFlags?.currentRatioAnomalous))
+    .replace('{debtToEquity}', getSafeMetricValue(input.ratios.debtToEquity.toFixed(2), input.dataQualityFlags?.debtToEquityAnomalous, 'Debt/Equity'))
+    .replace('{currentRatio}', getSafeMetricValue(input.ratios.currentRatio.toFixed(2), input.dataQualityFlags?.currentRatioAnomalous, 'Current Ratio'))
     .replace('{interestCoverage}', input.ratios.interestCoverage.toFixed(1))
     .replace('{dividendYield}', input.ratios.dividendYield.toFixed(2))
     .replace('{financials}', financialSummary)
     .replace('{revenueGrowth}', '15.2') // TODO: Calculate from financials
     .replace('{rdIntensity}', '8.5') // TODO: Get from data
     .replace('{freeCashFlow}', latestFinancials ? `$${(latestFinancials.freeCashFlow / 1e9).toFixed(2)}B` : 'N/A')
-    .replace('{dataQualityNote}', dataQualityNote);
+    .replace('{dataQualityNote}', '');
+
+  // Build comprehensive data quality disclaimer
+  let dataQualityNote = '';
+  if (dataQualityWarnings.length > 0 || anomalousMetrics.length > 0) {
+    dataQualityNote = '\n\nIMPORTANT: Analysis performed with incomplete data.\n';
+    if (anomalousMetrics.length > 0) {
+      dataQualityNote += `Unavailable metrics: ${anomalousMetrics.join(', ')}.\n`;
+    }
+    if (dataQualityWarnings.length > 0) {
+      dataQualityNote += `\nWARNINGS:\n${dataQualityWarnings.join('\n\n')}`;
+    }
+  }
+  const finalPrompt = userPrompt.replace('{dataQualityNote}', dataQualityNote);
 
   // Define the JSON schema for structured output
   const analysisSchema = {
@@ -198,7 +216,7 @@ Free Cash Flow: $${(latestFinancials.freeCashFlow / 1e9).toFixed(2)}B`
     const response = await invokeLLM({
       messages: [
         { role: "system", content: personaPrompt.systemPrompt },
-        { role: "user", content: userPrompt },
+        { role: "user", content: finalPrompt },
       ],
       response_format: {
         type: "json_schema",
@@ -222,10 +240,11 @@ Free Cash Flow: $${(latestFinancials.freeCashFlow / 1e9).toFixed(2)}B`
     // Add metadata
     return {
       ...analysis,
+      dataQualityIssues: anomalousMetrics.length > 0 ? anomalousMetrics : undefined,
       dataUsed: {
         priceAsOf: input.price.timestamp,
         financialsAsOf: latestFinancials?.period || "Unknown",
-        sources: ["Mock Financial Data API", "AI Analysis Engine"],
+        sources: ["yfinance", "AI Analysis Engine"],
       },
     };
   } catch (error) {

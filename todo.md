@@ -187,3 +187,12 @@
 - [x] Update yfinanceWrapper to properly flag all anomalous metrics - Added comprehensive anomaly detection for debtToEquity, ROIC, interestCoverage, PE, marketCap, PB, ROE, currentRatio
 - [x] Display anomalous metrics with warning styling in Ticker component - Added yellow text highlighting for anomalous metrics
 - [x] Test with BIDU and other anomalous stocks - Verified Ray Dalio analysis correctly identifies market cap error ($0.00B) and negative FCF as data quality issues
+
+
+## Data Quality Improvements (Completed)
+- [x] Remove all non-yfinance data sources, consolidate to single source only - Confirmed yfinance is the only active data source
+- [x] Fix decimal/unit conversion issues - Updated yfinanceWrapper to multiply percentage metrics by 100 (roe, roic, margins, dividendYield)
+- [x] Block anomalous metrics entirely from LLM prompts instead of replacing with "TBC" - Modified aiAnalysisEngine to use [DATA UNAVAILABLE] for anomalous metrics
+- [x] Add explicit data quality disclaimers to LLM prompts when metrics are missing - Added dataQualityNote with explicit warnings about unavailable metrics
+- [x] Show missing/problematic metrics in persona rating cards with explanations - Added dataQualityIssues field to AnalysisOutput with warning badges in UI
+- [x] Test with AAPL (ROE 171% issue) and BIDU (0.3% margin issue) - Verified AAPL now shows correct 26.92% Net Margin and 171.42% ROE (correct decimal conversion)

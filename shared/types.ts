@@ -51,6 +51,7 @@ export interface AnalysisOutput {
   criteria: PersonaCriteria[];
   keyRisks: string[];
   whatWouldChangeMind: string[];
+  dataQualityIssues?: string[];
   dataUsed: DataSource[];
   citations?: Citation[];
   runMetadata: RunMetadata;

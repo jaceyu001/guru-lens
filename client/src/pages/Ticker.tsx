@@ -249,7 +249,7 @@ export default function Ticker() {
                   {isMetricAnomalous("ROE") && <Badge variant="destructive" className="text-xs">TBC</Badge>}
                 </div>
                 <div className={`font-semibold font-mono-numbers ${isMetricAnomalous("ROE") ? "text-yellow-600" : ""}`}>
-                  {(ratios.roe * 100).toFixed(2)}%
+                  {ratios.roe.toFixed(2)}%
                 </div>
               </div>
             )}
@@ -267,7 +267,7 @@ export default function Ticker() {
             {ratios?.netMargin !== undefined && (
               <div>
                 <div className="text-xs text-muted-foreground mb-1">Net Margin</div>
-                <div className="font-semibold font-mono-numbers">{(ratios.netMargin * 100).toFixed(2)}%</div>
+                <div className="font-semibold font-mono-numbers">{ratios.netMargin.toFixed(2)}%</div>
               </div>
             )}
           </div>
@@ -321,10 +321,16 @@ export default function Ticker() {
                     ))}
                   </div>
                   
-                  <div className="mt-4 pt-4 border-t">
+                  <div className="mt-4 pt-4 border-t space-y-2">
                     <div className="text-xs text-muted-foreground">
                       Confidence: {(analysis.confidence * 100).toFixed(0)}%
                     </div>
+                    {analysis.dataQualityIssues && analysis.dataQualityIssues.length > 0 && (
+                      <div className="text-xs bg-yellow-50 dark:bg-yellow-950 text-yellow-800 dark:text-yellow-200 p-2 rounded">
+                        <div className="font-semibold mb-1">⚠️ Data Quality Issues:</div>
+                        <div className="text-xs">{analysis.dataQualityIssues.join(', ')} unavailable</div>
+                      </div>
+                    )}
                   </div>
                 </Card>
               ))}
