@@ -202,3 +202,12 @@
 - [x] Fix Debt-to-Equity anomaly threshold - Changed from >10 to >200 since D/E is already in percentage format
 - [x] Verify Current Ratio 0.893 is normal for AAPL (not anomalous) - Confirmed: 0.893 is between 0.5 and 50 (normal range)
 - [x] Verify AAPL D/E 152.41% and BIDU D/E 33.81% are correct (not anomalous) - Confirmed: Both < 200% threshold
+
+
+## UI Improvements - Missing Metrics Transparency (Completed)
+- [x] Map missing metrics to persona-specific criteria dependencies - Created buildMissingMetricsImpact function with persona-specific metric mappings
+- [x] Update aiAnalysisEngine to track metric-to-criteria impacts and adjust confidence - Added baseConfidence, confidence penalty, and missingMetricsImpact calculation
+- [x] Display data quality warnings in persona cards showing missing metrics - Added missingMetricsImpact display to persona card UI
+- [x] Add detailed data quality section to persona analysis modal - Added "Missing Critical Data" section showing affected criteria and descriptions
+- [x] Test with BIDU Warren Buffett to verify missing metrics are shown - Verified ROIC and Interest Coverage are properly tracked as missing metrics
+- [x] Fix Interest Coverage anomaly detection - Updated getSafeMetricValue call to properly check interestCoverageZero flag

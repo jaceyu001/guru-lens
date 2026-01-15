@@ -47,11 +47,13 @@ export interface AnalysisOutput {
   score: number;
   verdict: "Strong Fit" | "Fit" | "Borderline" | "Not a Fit" | "Insufficient Data";
   confidence: number;
+  baseConfidence?: number;
   summaryBullets: string[];
   criteria: PersonaCriteria[];
   keyRisks: string[];
   whatWouldChangeMind: string[];
   dataQualityIssues?: string[];
+  missingMetricsImpact?: Array<{metric: string; affectedCriteria: string[]; description: string}>;
   dataUsed: DataSource[];
   citations?: Citation[];
   runMetadata: RunMetadata;

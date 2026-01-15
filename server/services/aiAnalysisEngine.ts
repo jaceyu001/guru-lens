@@ -42,16 +42,89 @@ export interface AnalysisOutput {
   score: number; // 0-100
   verdict: "strong_fit" | "moderate_fit" | "weak_fit" | "poor_fit" | "insufficient_data";
   confidence: number; // 0-1
+  baseConfidence: number; // 0-1, confidence before data quality adjustment
   summaryBullets: string[];
   criteria: AnalysisCriterion[];
   keyRisks: string[];
   whatWouldChangeMind: string[];
   dataQualityIssues?: string[]; // Metrics that were unavailable or anomalous
+  missingMetricsImpact?: Array<{metric: string; affectedCriteria: string[]; description: string}>; // Maps missing metrics to criteria they impact
   dataUsed: {
     priceAsOf: Date;
     financialsAsOf: string;
     sources: string[];
   };
+}
+
+// Map missing metrics to persona-specific criteria they impact
+function buildMissingMetricsImpact(personaId: string, missingMetrics: string[]): Array<{metric: string; affectedCriteria: string[]; description: string}> {
+  const metricToCriteria: Record<string, Record<string, {criteria: string[]; description: string}>> = {
+    'warren_buffett': {
+      'ROIC': {
+        criteria: ['Durable Competitive Advantage (Moat)', 'Management Quality & Capital Allocation'],
+        description: 'ROIC is essential for evaluating moat strength and capital efficiency'
+      },
+      'Interest Coverage': {
+        criteria: ['Financial Strength & Safety'],
+        description: 'Interest Coverage is critical for assessing financial stability and debt safety'
+      },
+      'Debt/Equity': {
+        criteria: ['Financial Strength & Safety'],
+        description: 'Debt/Equity ratio impacts financial leverage assessment'
+      }
+    },
+    'benjamin_graham': {
+      'ROIC': {
+        criteria: ['Return on Capital'],
+        description: 'ROIC is needed to evaluate capital efficiency'
+      },
+      'Interest Coverage': {
+        criteria: ['Financial Strength & Safety Margin'],
+        description: 'Interest Coverage is crucial for safety margin calculation'
+      },
+      'Current Ratio': {
+        criteria: ['Financial Strength & Safety Margin'],
+        description: 'Current Ratio is needed to assess liquidity and financial strength'
+      }
+    },
+    'ray_dalio': {
+      'ROIC': {
+        criteria: ['Return on Capital'],
+        description: 'ROIC impacts return on capital assessment'
+      },
+      'Interest Coverage': {
+        criteria: ['Balance Sheet Health'],
+        description: 'Interest Coverage is important for debt sustainability analysis'
+      }
+    },
+    'peter_lynch': {
+      'ROIC': {
+        criteria: ['Earnings Growth & PEG Ratio'],
+        description: 'ROIC affects earnings quality assessment'
+      }
+    },
+    'cathie_wood': {
+      'ROIC': {
+        criteria: ['Innovation & Disruption'],
+        description: 'ROIC impacts capital efficiency in growth analysis'
+      }
+    },
+    'philip_fisher': {
+      'ROIC': {
+        criteria: ['Long-term Growth Potential'],
+        description: 'ROIC is important for assessing sustainable competitive advantages'
+      }
+    }
+  };
+
+  const personaMetrics = metricToCriteria[personaId] || {};
+  return missingMetrics
+    .filter(metric => personaMetrics[metric])
+    .map(metric => ({
+      metric,
+      affectedCriteria: personaMetrics[metric]!.criteria,
+      description: personaMetrics[metric]!.description
+    }));
 }
 
 export async function analyzeStock(input: AnalysisInput): Promise<AnalysisOutput> {
@@ -132,7 +205,7 @@ Free Cash Flow: $${(latestFinancials.freeCashFlow / 1e9).toFixed(2)}B`
     .replace('{operatingMargin}', input.ratios.operatingMargin.toFixed(1))
     .replace('{debtToEquity}', getSafeMetricValue(input.ratios.debtToEquity.toFixed(2), input.dataQualityFlags?.debtToEquityAnomalous, 'Debt/Equity'))
     .replace('{currentRatio}', getSafeMetricValue(input.ratios.currentRatio.toFixed(2), input.dataQualityFlags?.currentRatioAnomalous, 'Current Ratio'))
-    .replace('{interestCoverage}', input.ratios.interestCoverage.toFixed(1))
+    .replace('{interestCoverage}', getSafeMetricValue(input.ratios.interestCoverage.toFixed(1), input.dataQualityFlags?.interestCoverageZero, 'Interest Coverage'))
     .replace('{dividendYield}', input.ratios.dividendYield.toFixed(2))
     .replace('{financials}', financialSummary)
     .replace('{revenueGrowth}', '15.2') // TODO: Calculate from financials
@@ -237,10 +310,21 @@ Free Cash Flow: $${(latestFinancials.freeCashFlow / 1e9).toFixed(2)}B`
     const contentStr = typeof content === 'string' ? content : JSON.stringify(content);
     const analysis = JSON.parse(contentStr);
 
+    // Calculate adjusted confidence based on missing metrics
+    const baseConfidence = analysis.confidence;
+    const confidencePenalty = anomalousMetrics.length * 0.1;
+    const adjustedConfidence = Math.max(0.3, baseConfidence - confidencePenalty);
+    
+    // Build missing metrics impact mapping
+    const missingMetricsImpact = buildMissingMetricsImpact(input.personaId, anomalousMetrics);
+    
     // Add metadata
     return {
       ...analysis,
+      baseConfidence,
+      confidence: adjustedConfidence,
       dataQualityIssues: anomalousMetrics.length > 0 ? anomalousMetrics : undefined,
+      missingMetricsImpact: missingMetricsImpact.length > 0 ? missingMetricsImpact : undefined,
       dataUsed: {
         priceAsOf: input.price.timestamp,
         financialsAsOf: latestFinancials?.period || "Unknown",
@@ -255,6 +339,7 @@ Free Cash Flow: $${(latestFinancials.freeCashFlow / 1e9).toFixed(2)}B`
       score: 50,
       verdict: "insufficient_data",
       confidence: 0.3,
+      baseConfidence: 0.3,
       summaryBullets: [
         "Analysis could not be completed due to technical issues",
         "Please try again later or contact support",
@@ -295,16 +380,18 @@ export async function analyzeBatch(inputs: AnalysisInput[]): Promise<AnalysisOut
         score: 50,
         verdict: "insufficient_data" as const,
         confidence: 0.3,
+        baseConfidence: 0.3,
         summaryBullets: ["Analysis failed - please try again"],
         criteria: personaPrompt ? Object.entries(personaPrompt.criteriaWeights).map(([name, weight]) => ({
           name,
           weight,
           status: "partial" as const,
           metricsUsed: [],
-          explanation: "Analysis error",
+          explanation: "Analysis failed",
         })) : [],
-        keyRisks: ["Analysis incomplete"],
+        keyRisks: ["Analysis failed"],
         whatWouldChangeMind: ["Successful re-analysis"],
+        missingMetricsImpact: undefined,
         dataUsed: {
           priceAsOf: input.price.timestamp,
           financialsAsOf: "Unknown",

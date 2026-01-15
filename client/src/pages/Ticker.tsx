@@ -324,7 +324,23 @@ export default function Ticker() {
                   <div className="mt-4 pt-4 border-t space-y-2">
                     <div className="text-xs text-muted-foreground">
                       Confidence: {(analysis.confidence * 100).toFixed(0)}%
+                      {analysis.baseConfidence && analysis.baseConfidence !== analysis.confidence && (
+                        <span className="ml-2 text-yellow-600 dark:text-yellow-400">
+                          (base: {(analysis.baseConfidence * 100).toFixed(0)}%)
+                        </span>
+                      )}
                     </div>
+                    {analysis.missingMetricsImpact && analysis.missingMetricsImpact.length > 0 && (
+                      <div className="text-xs bg-orange-50 dark:bg-orange-950 text-orange-800 dark:text-orange-200 p-2 rounded">
+                        <div className="font-semibold mb-1">Missing Critical Data:</div>
+                        {analysis.missingMetricsImpact.map((impact, idx) => (
+                          <div key={idx} className="mb-1">
+                            <div className="font-medium">{impact.metric}</div>
+                            <div className="text-xs opacity-90">Affects: {impact.affectedCriteria.join(", ")}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                     {analysis.dataQualityIssues && analysis.dataQualityIssues.length > 0 && (
                       <div className="text-xs bg-yellow-50 dark:bg-yellow-950 text-yellow-800 dark:text-yellow-200 p-2 rounded">
                         <div className="font-semibold mb-1">⚠️ Data Quality Issues:</div>
@@ -374,6 +390,27 @@ export default function Ticker() {
                       {selectedAnalysis.verdict}
                     </Badge>
                   </div>
+
+                  {/* Data Quality Warnings */}
+                  {(selectedAnalysis.missingMetricsImpact?.length || 0) > 0 && (
+                    <Card className="p-4 bg-orange-50 dark:bg-orange-950 border-orange-200 dark:border-orange-800">
+                      <h3 className="font-semibold text-orange-900 dark:text-orange-100 mb-3">Missing Critical Data</h3>
+                      <div className="space-y-3">
+                        {selectedAnalysis.missingMetricsImpact?.map((impact: any, idx: number) => (
+                          <div key={idx} className="text-sm">
+                            <div className="font-medium text-orange-900 dark:text-orange-100">{impact.metric}</div>
+                            <div className="text-orange-800 dark:text-orange-200 text-xs mt-1">{impact.description}</div>
+                            <div className="text-orange-700 dark:text-orange-300 text-xs mt-1">
+                              <strong>Impacts:</strong> {impact.affectedCriteria.join(", ")}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="text-xs text-orange-700 dark:text-orange-300 mt-3 pt-3 border-t border-orange-200 dark:border-orange-800">
+                        Analysis based on available metrics only. Results may be incomplete.
+                      </div>
+                    </Card>
+                  )}
 
                   {/* Summary */}
                   <div>
