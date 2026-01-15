@@ -89,7 +89,7 @@ def get_stock_data(symbol):
                 "dividendYield": (float(info.get('dividendYield', 0)) or 0) * 100
             },
             "dataQualityFlags": {
-                "debtToEquityAnomalous": float(info.get('debtToEquity', 0)) > 10,
+                "debtToEquityAnomalous": float(info.get('debtToEquity', 0)) > 200,  # D/E is already in percentage format
                 "roicZero": (float(info.get('returnOnCapital', 0)) or 0) * 100 == 0,
                 "interestCoverageZero": float(info.get('interestCoverage', 0)) == 0,
                 "peNegative": float(info.get('trailingPE', 0)) < 0 or float(info.get('forwardPE', 0)) < 0,

@@ -196,3 +196,9 @@
 - [x] Add explicit data quality disclaimers to LLM prompts when metrics are missing - Added dataQualityNote with explicit warnings about unavailable metrics
 - [x] Show missing/problematic metrics in persona rating cards with explanations - Added dataQualityIssues field to AnalysisOutput with warning badges in UI
 - [x] Test with AAPL (ROE 171% issue) and BIDU (0.3% margin issue) - Verified AAPL now shows correct 26.92% Net Margin and 171.42% ROE (correct decimal conversion)
+
+
+## Bug Fixes - Anomaly Detection
+- [x] Fix Debt-to-Equity anomaly threshold - Changed from >10 to >200 since D/E is already in percentage format
+- [x] Verify Current Ratio 0.893 is normal for AAPL (not anomalous) - Confirmed: 0.893 is between 0.5 and 50 (normal range)
+- [x] Verify AAPL D/E 152.41% and BIDU D/E 33.81% are correct (not anomalous) - Confirmed: Both < 200% threshold
