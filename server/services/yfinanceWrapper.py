@@ -104,17 +104,17 @@ def get_stock_data(symbol):
             "financials": []
         }
         
-        # Get annual financials using quarterly_financials
+        # Get annual financials (preferred over quarterly for YoY growth calculations)
         try:
-            # Try to get quarterly financials
-            quarterly_fin = ticker.quarterly_financials
-            if quarterly_fin is not None and not quarterly_fin.empty:
-                # Get the most recent quarters (up to 4)
-                for idx, col in enumerate(quarterly_fin.columns[:4]):
+            # Use income_stmt which provides annual data
+            income_stmt = ticker.income_stmt
+            if income_stmt is not None and not income_stmt.empty:
+                # Get the most recent 3 years of annual data
+                for idx, col in enumerate(income_stmt.columns[:3]):
                     try:
-                        revenue = float(quarterly_fin.loc['Total Revenue', col]) if 'Total Revenue' in quarterly_fin.index else 0
-                        net_income = float(quarterly_fin.loc['Net Income', col]) if 'Net Income' in quarterly_fin.index else 0
-                        operating_income = float(quarterly_fin.loc['Operating Income', col]) if 'Operating Income' in quarterly_fin.index else 0
+                        revenue = float(income_stmt.loc['Total Revenue', col]) if 'Total Revenue' in income_stmt.index else 0
+                        net_income = float(income_stmt.loc['Net Income', col]) if 'Net Income' in income_stmt.index else 0
+                        operating_income = float(income_stmt.loc['Operating Income', col]) if 'Operating Income' in income_stmt.index else 0
                         
                         result["financials"].append({
                             "period": str(col)[:10],
@@ -130,16 +130,17 @@ def get_stock_data(symbol):
         except Exception as e:
             pass
         
-        # If no quarterly data, try annual
+        # If no annual data, try quarterly as fallback
         if len(result["financials"]) == 0:
             try:
-                annual_fin = ticker.annual_financials
-                if annual_fin is not None and not annual_fin.empty:
-                    for idx, col in enumerate(annual_fin.columns[:3]):
+                quarterly_fin = ticker.quarterly_financials
+                if quarterly_fin is not None and not quarterly_fin.empty:
+                    # Get the most recent quarters (up to 4)
+                    for idx, col in enumerate(quarterly_fin.columns[:4]):
                         try:
-                            revenue = float(annual_fin.loc['Total Revenue', col]) if 'Total Revenue' in annual_fin.index else 0
-                            net_income = float(annual_fin.loc['Net Income', col]) if 'Net Income' in annual_fin.index else 0
-                            operating_income = float(annual_fin.loc['Operating Income', col]) if 'Operating Income' in annual_fin.index else 0
+                            revenue = float(quarterly_fin.loc['Total Revenue', col]) if 'Total Revenue' in quarterly_fin.index else 0
+                            net_income = float(quarterly_fin.loc['Net Income', col]) if 'Net Income' in quarterly_fin.index else 0
+                            operating_income = float(quarterly_fin.loc['Operating Income', col]) if 'Operating Income' in quarterly_fin.index else 0
                             
                             result["financials"].append({
                                 "period": str(col)[:10],

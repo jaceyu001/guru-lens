@@ -304,3 +304,8 @@
 - [x] Ensure no fallback to mock data in production
 - [x] Fixed hardcoded mock values in aiAnalysisEngine (revenueGrowth: 15.2 -> actual data)
 - [ ] Fix broken aiAnalysisEngine tests (buildEnrichedPrompt not exported)
+
+## Fixed: Revenue and Earnings Growth Calculations
+- [x] Fixed yfinanceWrapper to use annual data instead of quarterly
+- [x] BIDU now shows correct growth rates (was -253.4% from quarterly comparison, now correct YoY)
+- [x] All fundamentals agent tests passing (22/22)
