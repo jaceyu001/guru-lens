@@ -132,33 +132,52 @@ export async function analyzeFundamentals(
 }
 
 function analyzeGrowth(financialData: FinancialData): GrowthAnalysis {
-  // Calculate growth rates from financial statements
-  const revenueGrowth = calculateRevenueGrowth(financialData.financials) || 0;
-  const earningsGrowth = calculateEarningsGrowth(financialData.financials) || 0;
+  // Use YoY growth rates from yfinance ratios (primary source)
+  let revenueGrowth = (financialData.ratios?.revenueGrowth || 0) * 100; // Convert decimal to percentage
+  let earningsGrowth = (financialData.ratios?.earningsGrowth || 0) * 100; // Convert decimal to percentage
+  
+  // Fallback to calculated growth from financials if ratios not available
+  if (revenueGrowth === 0 && financialData.financials) {
+    revenueGrowth = calculateRevenueGrowth(financialData.financials) || 0;
+  }
+  if (earningsGrowth === 0 && financialData.financials) {
+    earningsGrowth = calculateEarningsGrowth(financialData.financials) || 0;
+  }
+  
   const fcfGrowth = calculateFcfGrowth(financialData.financials) || 0;
   
   // Calculate confidence based on data availability
   let confidence = 85;
-  if (!financialData.financials || financialData.financials.length < 2) confidence = 60;
+  if (revenueGrowth === 0 && earningsGrowth === 0) confidence = 50; // No growth data available
+  if (!financialData.financials || financialData.financials.length < 2) confidence = Math.max(confidence - 10, 60);
+  
+  // Reduce confidence if growth is highly negative (indicates structural issues)
+  if (earningsGrowth < -30) confidence -= 10;
 
-  // Determine assessment
+  // Determine assessment based on YoY growth
   let assessment: "STRONG" | "MODERATE" | "WEAK" | "UNCLEAR" = "UNCLEAR";
-  if (revenueGrowth > 15 && earningsGrowth > 15) {
-    assessment = "STRONG";
+  
+  // Handle negative growth (contraction)
+  if (revenueGrowth < -10 || earningsGrowth < -20) {
+    assessment = "WEAK"; // Significant contraction
+  } else if (revenueGrowth < 0 || earningsGrowth < 0) {
+    assessment = "WEAK"; // Any negative growth
+  } else if (revenueGrowth > 15 && earningsGrowth > 15) {
+    assessment = "STRONG"; // Strong growth
   } else if (revenueGrowth > 5 && earningsGrowth > 5) {
-    assessment = "MODERATE";
+    assessment = "MODERATE"; // Moderate growth
   } else if (revenueGrowth > 0 && earningsGrowth > 0) {
-    assessment = "WEAK";
+    assessment = "WEAK"; // Weak positive growth
   }
 
   // Determine trend
   let trend: "ACCELERATING" | "STABLE" | "DECELERATING" | "UNKNOWN" = "UNKNOWN";
-  if (earningsGrowth > revenueGrowth) {
-    trend = "ACCELERATING";
-  } else if (Math.abs(earningsGrowth - revenueGrowth) < 2) {
-    trend = "STABLE";
-  } else if (earningsGrowth < revenueGrowth) {
-    trend = "DECELERATING";
+  if (earningsGrowth > revenueGrowth + 2) {
+    trend = "ACCELERATING"; // Earnings growing faster than revenue
+  } else if (Math.abs(earningsGrowth - revenueGrowth) <= 2) {
+    trend = "STABLE"; // Growth rates aligned
+  } else if (earningsGrowth < revenueGrowth - 2) {
+    trend = "DECELERATING"; // Earnings growing slower than revenue (margin compression)
   }
 
   const narrative = buildGrowthNarrative(revenueGrowth, earningsGrowth, fcfGrowth, trend);
