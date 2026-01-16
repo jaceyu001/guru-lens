@@ -1,161 +1,108 @@
 /**
  * Financial Data Service
  * 
- * This is a mock implementation for demonstration purposes.
- * Replace with real Financial Datasets API integration for production.
- * 
- * Real implementation would use:
- * - Financial Datasets API (https://financialdatasets.ai/)
- * - API key from environment: process.env.FINANCIAL_DATASETS_API_KEY
+ * Uses yfinance via Python subprocess to fetch real financial data
+ * including shares outstanding for accurate valuation calculations.
  */
 
 import type { FinancialData, TickerSnapshot } from "../../shared/types";
+import { execSync } from "child_process";
 
-// Mock stock universe for demonstration
-const MOCK_STOCKS: Record<string, TickerSnapshot & { basePrice: number }> = {
-  AAPL: {
-    symbol: "AAPL",
-    companyName: "Apple Inc.",
-    sector: "Technology",
-    industry: "Consumer Electronics",
-    exchange: "NASDAQ",
-    basePrice: 178.50,
-    marketCap: 2800000000000 as number,
-  },
-  MSFT: {
-    symbol: "MSFT",
-    companyName: "Microsoft Corporation",
-    sector: "Technology",
-    industry: "Software",
-    exchange: "NASDAQ",
-    basePrice: 380.00,
-    marketCap: 2820000000000 as number,
-  },
-  GOOGL: {
-    symbol: "GOOGL",
-    companyName: "Alphabet Inc.",
-    sector: "Technology",
-    industry: "Internet Services",
-    exchange: "NASDAQ",
-    basePrice: 140.50,
-    marketCap: 1750000000000 as number,
-  },
-  NVDA: {
-    symbol: "NVDA",
-    companyName: "NVIDIA Corporation",
-    sector: "Technology",
-    industry: "Semiconductors",
-    exchange: "NASDAQ",
-    basePrice: 495.00,
-    marketCap: 1220000000000 as number,
-  },
-  TSLA: {
-    symbol: "TSLA",
-    companyName: "Tesla, Inc.",
-    sector: "Consumer Cyclical",
-    industry: "Auto Manufacturers",
-    exchange: "NASDAQ",
-    basePrice: 248.00,
-    marketCap: 788000000000 as number,
-  },
-  JPM: {
-    symbol: "JPM",
-    companyName: "JPMorgan Chase & Co.",
-    sector: "Financial Services",
-    industry: "Banks",
-    exchange: "NYSE",
-    basePrice: 158.00,
-    marketCap: 450000000000 as number,
-  },
-  JNJ: {
-    symbol: "JNJ",
-    companyName: "Johnson & Johnson",
-    sector: "Healthcare",
-    industry: "Drug Manufacturers",
-    exchange: "NYSE",
-    basePrice: 162.00,
-    marketCap: 395000000000 as number,
-  },
-  WMT: {
-    symbol: "WMT",
-    companyName: "Walmart Inc.",
-    sector: "Consumer Defensive",
-    industry: "Discount Stores",
-    exchange: "NYSE",
-    basePrice: 68.50,
-    marketCap: 535000000000 as number,
-  },
-  V: {
-    symbol: "V",
-    companyName: "Visa Inc.",
-    sector: "Financial Services",
-    industry: "Credit Services",
-    exchange: "NYSE",
-    basePrice: 275.00,
-    marketCap: 560000000000 as number,
-  },
-  KO: {
-    symbol: "KO",
-    companyName: "The Coca-Cola Company",
-    sector: "Consumer Defensive",
-    industry: "Beverages",
-    exchange: "NYSE",
-    basePrice: 62.50,
-    marketCap: 270000000000 as number,
-  },
-  BIDU: {
-    symbol: "BIDU",
-    companyName: "Baidu Inc.",
-    sector: "Technology",
-    industry: "Internet Services",
-    exchange: "NASDAQ",
-    basePrice: 102.50,
-    marketCap: 18000000000 as number,
-  },
-  AMZN: {
-    symbol: "AMZN",
-    companyName: "Amazon.com Inc.",
-    sector: "Consumer Cyclical",
-    industry: "Internet Retail",
-    exchange: "NASDAQ",
-    basePrice: 195.00,
-    marketCap: 2050000000000 as number,
-  },
-  META: {
-    symbol: "META",
-    companyName: "Meta Platforms Inc.",
-    sector: "Technology",
-    industry: "Internet Services",
-    exchange: "NASDAQ",
-    basePrice: 475.00,
-    marketCap: 1520000000000 as number,
-  },
-};
+/**
+ * Fetch financial data from yfinance using Python
+ */
+async function fetchFromYfinance(symbol: string): Promise<any> {
+  try {
+    const pythonScript = `
+import yfinance as yf
+import json
+import sys
+
+try:
+    ticker = yf.Ticker("${symbol}")
+    
+    # Get historical data
+    hist = ticker.history(period="1y")
+    
+    # Get info
+    info = ticker.info
+    
+    # Extract key data
+    data = {
+        "symbol": "${symbol}",
+        "current_price": info.get("currentPrice", info.get("regularMarketPrice", 0)),
+        "shares_outstanding": info.get("sharesOutstanding", 0),
+        "market_cap": info.get("marketCap", 0),
+        "revenue": info.get("totalRevenue", 0),
+        "net_income": info.get("netIncome", 0),
+        "eps": info.get("trailingEps", 0),
+        "pe_ratio": info.get("trailingPE", 0),
+        "pb_ratio": info.get("priceToBook", 0),
+        "roe": info.get("returnOnEquity", 0),
+        "debt_to_equity": info.get("debtToEquity", 0),
+        "current_ratio": info.get("currentRatio", 0),
+        "gross_margin": info.get("grossMargins", [0])[-1] if info.get("grossMargins") else 0,
+        "operating_margin": info.get("operatingMargins", [0])[-1] if info.get("operatingMargins") else 0,
+        "net_margin": info.get("profitMargins", [0])[-1] if info.get("profitMargins") else 0,
+        "sector": info.get("sector", ""),
+        "industry": info.get("industry", ""),
+        "company_name": info.get("longName", ""),
+        "website": info.get("website", ""),
+        "employees": info.get("fullTimeEmployees", 0),
+    }
+    
+    print(json.dumps(data))
+except Exception as e:
+    print(json.dumps({"error": str(e)}))
+`;
+
+    const result = execSync(`python3 -c "${pythonScript.replace(/"/g, '\\"')}"`, {
+      encoding: "utf-8",
+      timeout: 30000,
+    });
+
+    return JSON.parse(result);
+  } catch (error) {
+    console.error(`Error fetching yfinance data for ${symbol}:`, error);
+    return null;
+  }
+}
 
 /**
  * Search for tickers by symbol or company name
  */
 export async function searchTickerData(query: string): Promise<TickerSnapshot[]> {
-  const upperQuery = query.toUpperCase();
+  // For search, return mock data as yfinance doesn't have a search API
+  const commonTickers = [
+    "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "TSLA", "META", "JPM", "JNJ", "WMT", "V", "KO", "BIDU"
+  ];
   
-  return Object.values(MOCK_STOCKS)
-    .filter(stock => 
-      stock.symbol.includes(upperQuery) || 
-      stock.companyName.toUpperCase().includes(upperQuery)
-    )
-    .map(({ basePrice, ...stock }) => stock);
+  const upperQuery = query.toUpperCase();
+  const matches = commonTickers.filter(ticker => ticker.includes(upperQuery));
+  
+  return matches.map(symbol => ({
+    symbol,
+    companyName: symbol,
+    sector: "Technology",
+    industry: "Various",
+    exchange: "NASDAQ",
+    lastDataUpdate: new Date(),
+  }));
 }
 
 /**
  * Get ticker snapshot information
  */
 export async function getTickerSnapshot(symbol: string): Promise<TickerSnapshot | null> {
-  const stock = MOCK_STOCKS[symbol.toUpperCase()];
-  if (!stock) return null;
+  const data = await fetchFromYfinance(symbol);
+  if (!data || data.error) return null;
   
-  const { basePrice, ...snapshot } = stock;
   return {
-    ...snapshot,
+    symbol: data.symbol,
+    companyName: data.company_name || symbol,
+    sector: data.sector || "Unknown",
+    industry: data.industry || "Unknown",
+    exchange: "NASDAQ",
     lastDataUpdate: new Date(),
   };
 }
@@ -164,71 +111,54 @@ export async function getTickerSnapshot(symbol: string): Promise<TickerSnapshot 
  * Get comprehensive financial data for a ticker
  */
 export async function getFinancialData(symbol: string): Promise<FinancialData | null> {
-  const stock = MOCK_STOCKS[symbol.toUpperCase()];
-  if (!stock) return null;
-  
-  // Generate realistic mock data with some randomness
-  const priceVariation = (Math.random() - 0.5) * 0.05; // ±2.5%
-  const currentPrice = stock.basePrice * (1 + priceVariation);
-  const change = stock.basePrice * priceVariation;
-  const changePercent = priceVariation * 100;
-  
-  // Get realistic financials based on market cap
-  const marketCap = stock.marketCap!;
-  const marketCapInBillions = marketCap / 1000000000;
-  const revenueMultiplier = Math.random() * 0.5 + 1.5; // 1.5x to 2x market cap
-  const netIncomeMargin = Math.random() * 0.15 + 0.05; // 5-20% net margin
-  
-  const revenue = marketCap * revenueMultiplier;
-  const netIncome = revenue * netIncomeMargin;
-  const eps = netIncome / (marketCap / currentPrice); // Shares outstanding
-  const pe = currentPrice / eps;
-  
+  const data = await fetchFromYfinance(symbol);
+  if (!data || data.error) {
+    console.error(`Failed to fetch data for ${symbol}:`, data?.error);
+    return null;
+  }
+
+  // Convert shares outstanding from individual shares to millions
+  const sharesOutstandingInMillions = data.shares_outstanding ? data.shares_outstanding / 1000000 : 0;
+
   return {
+    sharesOutstanding: sharesOutstandingInMillions,
     price: {
-      current: Number(currentPrice.toFixed(2)),
-      change: Number(change.toFixed(2)),
-      changePercent: Number(changePercent.toFixed(2)),
-      open: Number((currentPrice * 0.998).toFixed(2)),
-      high: Number((currentPrice * 1.015).toFixed(2)),
-      low: Number((currentPrice * 0.985).toFixed(2)),
-      volume: Math.floor(Math.random() * 50000000) + 10000000,
+      current: Number(data.current_price?.toFixed(2) || 0),
+      change: 0,
+      changePercent: 0,
+      open: Number(data.current_price?.toFixed(2) || 0),
+      high: Number(data.current_price?.toFixed(2) || 0),
+      low: Number(data.current_price?.toFixed(2) || 0),
+      volume: 0,
       timestamp: new Date(),
     },
     profile: {
-      sector: stock.sector!,
-      industry: stock.industry!,
-      description: `${stock.companyName} operates in the ${stock.industry} industry within the ${stock.sector} sector.`,
-      employees: Math.floor(Math.random() * 200000) + 10000,
-      website: `https://www.${symbol.toLowerCase()}.com`,
+      sector: data.sector || "Unknown",
+      industry: data.industry || "Unknown",
+      description: `${data.company_name} operates in the ${data.industry} industry.`,
+      employees: data.employees || 0,
+      website: data.website || "",
     },
     financials: [
       {
-        revenue: Number(revenue.toFixed(0)),
-        netIncome: Number(netIncome.toFixed(0)),
-        eps: Number(eps.toFixed(2)),
-        period: "Q4",
-        fiscalYear: 2024,
-      },
-      {
-        revenue: Number((revenue * 0.95).toFixed(0)),
-        netIncome: Number((netIncome * 0.92).toFixed(0)),
-        eps: Number((eps * 0.92).toFixed(2)),
-        period: "Q3",
-        fiscalYear: 2024,
+        revenue: Number(data.revenue || 0),
+        netIncome: Number(data.net_income || 0),
+        eps: Number(data.eps?.toFixed(2) || 0),
+        period: "FY",
+        fiscalYear: new Date().getFullYear(),
       },
     ],
     ratios: {
-      pe: Number(pe.toFixed(2)),
-      pb: Number((Math.random() * 8 + 2).toFixed(2)),
-      ps: Number((revenue / marketCap).toFixed(2)),
-      roe: Number((netIncome / (marketCap * 0.3)).toFixed(4)),
-      roic: Number((Math.random() * 0.20 + 0.08).toFixed(4)),
-      debtToEquity: Number((Math.random() * 1.5 + 0.3).toFixed(2)),
-      currentRatio: Number((Math.random() * 2 + 1).toFixed(2)),
-      grossMargin: Number((Math.random() * 0.40 + 0.30).toFixed(4)),
-      operatingMargin: Number((Math.random() * 0.30 + 0.15).toFixed(4)),
-      netMargin: Number(netIncomeMargin.toFixed(4)),
+      pe: Number(data.pe_ratio?.toFixed(2) || 0),
+      pb: Number(data.pb_ratio?.toFixed(2) || 0),
+      ps: data.revenue && data.market_cap ? Number((data.revenue / data.market_cap).toFixed(2)) : 0,
+      roe: Number(data.roe?.toFixed(4) || 0),
+      roic: 0,
+      debtToEquity: Number(data.debt_to_equity?.toFixed(2) || 0),
+      currentRatio: Number(data.current_ratio?.toFixed(2) || 0),
+      grossMargin: Number(data.gross_margin?.toFixed(4) || 0),
+      operatingMargin: Number(data.operating_margin?.toFixed(4) || 0),
+      netMargin: Number(data.net_margin?.toFixed(4) || 0),
     },
   };
 }
@@ -237,12 +167,12 @@ export async function getFinancialData(symbol: string): Promise<FinancialData | 
  * Get list of all available tickers
  */
 export function getAllAvailableTickers(): string[] {
-  return Object.keys(MOCK_STOCKS);
+  return ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "TSLA", "META", "JPM", "JNJ", "WMT", "V", "KO", "BIDU"];
 }
 
 /**
  * Check if ticker exists in our data
  */
 export function isValidTicker(symbol: string): boolean {
-  return symbol.toUpperCase() in MOCK_STOCKS;
+  return getAllAvailableTickers().includes(symbol.toUpperCase());
 }

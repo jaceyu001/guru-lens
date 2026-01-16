@@ -257,9 +257,8 @@ async function calculateComparable(
       };
     }
 
-    // Get shares outstanding - use a reasonable default (16B shares for AAPL-like companies)
-    // In production, this should come from the API
-    const sharesOutstanding = 16000; // millions of shares
+    // Get shares outstanding from financial data (in millions)
+    const sharesOutstanding = financialData.sharesOutstanding || 16000; // millions of shares (fallback to default if not available)
     
     // Calculate using P/E multiple
     const eps = latestFinancials.eps || 0;

@@ -169,6 +169,7 @@ export interface KeyRatios {
 }
 
 export interface FinancialData {
+  sharesOutstanding?: number; // in millions
   price?: {
     current: number;
     change: number;
