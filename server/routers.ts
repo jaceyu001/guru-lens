@@ -222,13 +222,15 @@ export const appRouter = router({
           };
           
           const ratios = financialData.ratios!;
-          // Convert decimal ratios to percentages (yfinance returns 0.157 for 15.7%)
-          const roePercent = ((ratios.roe || 0) * 100);
-          const roaPercent = ((ratios.roe || 0) * 0.5 * 100);
-          const roicPercent = ((ratios.roic || 0) * 100);
-          const netMarginPercent = ((ratios.netMargin || 0) * 100);
-          const operatingMarginPercent = ((ratios.operatingMargin || 0) * 100);
-          const grossMarginPercent = ((ratios.grossMargin || 0) * 100);
+          // NOTE: yfinanceWrapper.py already converts to percentages (multiplies by 100)
+          // So ratios.roe is already in percentage format (e.g., -7.4 for -7.4%)
+          // Do NOT multiply by 100 again
+          const roePercent = (ratios.roe || 0);
+          const roaPercent = ((ratios.roe || 0) * 0.5);
+          const roicPercent = (ratios.roic || 0);
+          const netMarginPercent = (ratios.netMargin || 0);
+          const operatingMarginPercent = (ratios.operatingMargin || 0);
+          const grossMarginPercent = (ratios.grossMargin || 0);
           
           // Calculate PEG correctly: only valid for profitable, growing companies
           let pegRatio = 0;
