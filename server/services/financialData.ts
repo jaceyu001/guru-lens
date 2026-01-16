@@ -154,7 +154,8 @@ export async function getFinancialData(symbol: string): Promise<FinancialData | 
       ps: data.revenue && data.market_cap ? Number((data.revenue / data.market_cap).toFixed(2)) : 0,
       roe: Number(data.roe?.toFixed(4) || 0),
       roic: 0,
-      debtToEquity: Number(data.debt_to_equity?.toFixed(2) || 0),
+      // Fix: debtToEquity from yfinance is in percentage format (33.81 = 33.81%), convert to decimal
+      debtToEquity: Number((data.debt_to_equity / 100)?.toFixed(4) || 0),
       currentRatio: Number(data.current_ratio?.toFixed(2) || 0),
       grossMargin: Number(data.gross_margin?.toFixed(4) || 0),
       operatingMargin: Number(data.operating_margin?.toFixed(4) || 0),

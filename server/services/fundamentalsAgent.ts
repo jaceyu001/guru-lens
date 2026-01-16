@@ -94,7 +94,7 @@ export async function analyzeFundamentals(
     dataQualityWarnings.push("Current ratio appears anomalous");
   }
   if (dataQualityFlags.debtToEquityAnomalous) {
-    dataQualityWarnings.push("Debt-to-Equity ratio appears anomalously high (>200%)");
+    dataQualityWarnings.push("Debt-to-Equity ratio appears anomalously high (>150%)");
   }
   if (dataQualityFlags.marketCapZero) {
     dataQualityWarnings.push("Market cap data is zero or unavailable");
@@ -266,16 +266,16 @@ function analyzeFinancialHealth(
   // Determine assessment
   let assessment: "STRONG" | "STABLE" | "CONCERNING" | "WEAK" | "UNCLEAR" = "STABLE";
 
+  // D/E is now in percentage format (0-100% range)
   if (debtToEquity < 50 && currentRatio > 1.5 && interestCoverage > 5) {
     assessment = "STRONG";
   } else if (debtToEquity < 100 && currentRatio > 1 && interestCoverage > 2) {
     assessment = "STABLE";
-  } else if (debtToEquity > 150 || currentRatio < 0.8 || interestCoverage < 1) {
+  } else if (debtToEquity > 100 || currentRatio < 0.8 || interestCoverage < 1) {
     assessment = "CONCERNING";
-  } else if (debtToEquity > 200 || currentRatio < 0.5) {
+  } else if (debtToEquity > 150 || currentRatio < 0.5) {
     assessment = "WEAK";
   }
-
   // Check for data quality issues
   if (dataQualityFlags.interestCoverageZero || dataQualityFlags.currentRatioAnomalous) {
     assessment = "UNCLEAR";
@@ -425,7 +425,10 @@ function buildFinancialHealthNarrative(
     narrative += `, and interest coverage of ${interestCoverage.toFixed(1)}x.`;
   }
 
-  if (debtToEquity < 100) {
+  // D/E is in percentage format (0-100% range)
+  if (debtToEquity < 50) {
+    narrative += " Financial health is strong with conservative leverage.";
+  } else if (debtToEquity < 100) {
     narrative += " Financial health is stable with manageable leverage.";
   } else if (debtToEquity < 150) {
     narrative += " Elevated leverage but manageable for cash-generative businesses.";
