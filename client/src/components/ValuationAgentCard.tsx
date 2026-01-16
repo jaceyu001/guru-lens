@@ -84,9 +84,14 @@ export function ValuationAgentCard({ findings, isLoading }: ValuationAgentCardPr
         <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="font-semibold text-slate-900">Consensus Valuation</h3>
-            <Badge className={`${getAssessmentColor(findings.overallAssessment)}`}>
-              {findings.overallAssessment.replace(/_/g, " ")}
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge className={`${getAssessmentColor(findings.overallAssessment)}`}>
+                {findings.overallAssessment.replace(/_/g, " ")}
+              </Badge>
+              <Badge variant="outline" className="text-xs">
+                {findings.confidence}% confidence
+              </Badge>
+            </div>
           </div>
           <div className="grid grid-cols-3 gap-4">
             <div>
@@ -118,6 +123,18 @@ export function ValuationAgentCard({ findings, isLoading }: ValuationAgentCardPr
             <Progress value={Math.min(Math.max((findings.consensusUpside + 50) / 2, 0), 100)} className="h-2" />
           </div>
         </div>
+
+        {/* Data Quality Warnings */}
+        {findings.dataQualityWarnings && findings.dataQualityWarnings.length > 0 && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <p className="text-sm font-semibold text-yellow-900 mb-2">Data Quality Warnings</p>
+            <ul className="text-xs text-yellow-800 space-y-1">
+              {findings.dataQualityWarnings.map((warning, idx) => (
+                <li key={idx}>• {warning}</li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {/* Margin of Safety & Method Agreement */}
         <div className="grid grid-cols-2 gap-4">

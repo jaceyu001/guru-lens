@@ -9,6 +9,7 @@ export interface GrowthAnalysis {
   fcfGrowth: number; // %
   trend: "ACCELERATING" | "STABLE" | "DECELERATING" | "UNKNOWN";
   narrative: string;
+  confidence: number; // 0-100
 }
 
 export interface ProfitabilityAnalysis {
@@ -18,6 +19,7 @@ export interface ProfitabilityAnalysis {
   grossMargin: number; // %
   trend: "IMPROVING" | "STABLE" | "DETERIORATING" | "UNKNOWN";
   narrative: string;
+  confidence: number; // 0-100
 }
 
 export interface CapitalEfficiencyAnalysis {
@@ -26,6 +28,7 @@ export interface CapitalEfficiencyAnalysis {
   roic: number; // %
   roa: number; // %
   narrative: string;
+  confidence: number; // 0-100
 }
 
 export interface FinancialHealthAnalysis {
@@ -34,6 +37,7 @@ export interface FinancialHealthAnalysis {
   currentRatio: number;
   interestCoverage: number;
   narrative: string;
+  confidence: number; // 0-100
 }
 
 export interface CashFlowAnalysis {
@@ -41,6 +45,7 @@ export interface CashFlowAnalysis {
   fcfMargin: number; // %
   fcfGrowth: number; // %
   narrative: string;
+  confidence: number; // 0-100
 }
 
 export interface FundamentalsFindings {
@@ -131,6 +136,10 @@ function analyzeGrowth(financialData: FinancialData): GrowthAnalysis {
   const revenueGrowth = calculateRevenueGrowth(financialData.financials) || 0;
   const earningsGrowth = calculateEarningsGrowth(financialData.financials) || 0;
   const fcfGrowth = calculateFcfGrowth(financialData.financials) || 0;
+  
+  // Calculate confidence based on data availability
+  let confidence = 85;
+  if (!financialData.financials || financialData.financials.length < 2) confidence = 60;
 
   // Determine assessment
   let assessment: "STRONG" | "MODERATE" | "WEAK" | "UNCLEAR" = "UNCLEAR";
@@ -161,6 +170,7 @@ function analyzeGrowth(financialData: FinancialData): GrowthAnalysis {
     fcfGrowth,
     trend,
     narrative,
+    confidence,
   };
 }
 
@@ -188,6 +198,11 @@ function analyzeProfitability(
   let trend: "IMPROVING" | "STABLE" | "DETERIORATING" | "UNKNOWN" = "UNKNOWN";
 
   const narrative = buildProfitabilityNarrative(netMargin, operatingMargin, grossMargin);
+  
+  // Calculate confidence based on data quality
+  let confidence = 90;
+  if (dataQualityFlags.peAnomalous) confidence -= 10;
+  if (dataQualityFlags.pbAnomalous) confidence -= 5;
 
   return {
     assessment,
@@ -196,6 +211,7 @@ function analyzeProfitability(
     grossMargin,
     trend,
     narrative,
+    confidence,
   };
 }
 
@@ -223,6 +239,11 @@ function analyzeCapitalEfficiency(
   }
 
   const narrative = buildCapitalEfficiencyNarrative(roe, roic, roa, dataQualityFlags);
+  
+  // Calculate confidence based on data quality
+  let confidence = 85;
+  if (dataQualityFlags.roicZero) confidence = 50;
+  if (dataQualityFlags.roeNegative) confidence -= 15;
 
   return {
     assessment,
@@ -230,6 +251,7 @@ function analyzeCapitalEfficiency(
     roic,
     roa,
     narrative,
+    confidence,
   };
 }
 
@@ -259,12 +281,13 @@ function analyzeFinancialHealth(
     assessment = "UNCLEAR";
   }
 
-  const narrative = buildFinancialHealthNarrative(
-    debtToEquity,
-    currentRatio,
-    interestCoverage,
-    dataQualityFlags
-  );
+  const narrative = buildFinancialHealthNarrative(debtToEquity, currentRatio, interestCoverage, dataQualityFlags);
+  
+  // Calculate confidence based on data quality
+  let confidence = 80;
+  if (dataQualityFlags.debtToEquityAnomalous) confidence = 50;
+  if (dataQualityFlags.currentRatioAnomalous) confidence -= 15;
+  if (dataQualityFlags.interestCoverageZero) confidence -= 10;
 
   return {
     assessment,
@@ -272,6 +295,7 @@ function analyzeFinancialHealth(
     currentRatio,
     interestCoverage,
     narrative,
+    confidence,
   };
 }
 
@@ -293,12 +317,17 @@ function analyzeCashFlow(financialData: FinancialData): CashFlowAnalysis {
   }
 
   const narrative = buildCashFlowNarrative(fcfMargin, fcfGrowth);
+  
+  // Calculate confidence based on data availability
+  let confidence = 85;
+  if (!financialData.financials || financialData.financials.length === 0) confidence = 50;
 
   return {
     assessment,
     fcfMargin,
     fcfGrowth,
     narrative,
+    confidence,
   };
 }
 

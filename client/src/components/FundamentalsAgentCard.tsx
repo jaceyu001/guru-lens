@@ -46,7 +46,8 @@ export function FundamentalsAgentCard({ findings, isLoading }: FundamentalsAgent
     }
   };
 
-  const getTrendIcon = (trend: string) => {
+  const getTrendIcon = (trend?: string) => {
+    if (!trend) return null;
     switch (trend) {
       case "ACCELERATING":
       case "IMPROVING":
@@ -92,6 +93,9 @@ export function FundamentalsAgentCard({ findings, isLoading }: FundamentalsAgent
               <span className="font-semibold text-slate-900">Growth</span>
               <Badge className={`${getAssessmentColor(findings.growth.assessment)}`}>
                 {findings.growth.assessment}
+              </Badge>
+              <Badge variant="outline" className="text-xs">
+                {findings.growth.confidence}% confidence
               </Badge>
               {getTrendIcon(findings.growth.trend)}
             </div>
@@ -139,6 +143,9 @@ export function FundamentalsAgentCard({ findings, isLoading }: FundamentalsAgent
               <Badge className={`${getAssessmentColor(findings.profitability.assessment)}`}>
                 {findings.profitability.assessment}
               </Badge>
+              <Badge variant="outline" className="text-xs">
+                {findings.profitability.confidence}% confidence
+              </Badge>
               {getTrendIcon(findings.profitability.trend)}
             </div>
             <ChevronDown
@@ -185,6 +192,9 @@ export function FundamentalsAgentCard({ findings, isLoading }: FundamentalsAgent
               <Badge className={`${getAssessmentColor(findings.capitalEfficiency.assessment)}`}>
                 {findings.capitalEfficiency.assessment}
               </Badge>
+              <Badge variant="outline" className="text-xs">
+                {findings.capitalEfficiency.confidence}% confidence
+              </Badge>
             </div>
             <ChevronDown
               className={`w-5 h-5 transition-transform ${
@@ -229,6 +239,9 @@ export function FundamentalsAgentCard({ findings, isLoading }: FundamentalsAgent
               <span className="font-semibold text-slate-900">Financial Health</span>
               <Badge className={`${getAssessmentColor(findings.financialHealth.assessment)}`}>
                 {findings.financialHealth.assessment}
+              </Badge>
+              <Badge variant="outline" className="text-xs">
+                {findings.financialHealth.confidence}% confidence
               </Badge>
             </div>
             <ChevronDown
@@ -275,7 +288,10 @@ export function FundamentalsAgentCard({ findings, isLoading }: FundamentalsAgent
               <Badge className={`${getAssessmentColor(findings.cashFlow.assessment)}`}>
                 {findings.cashFlow.assessment}
               </Badge>
-              {getTrendIcon(findings.cashFlow.trend || "UNKNOWN")}
+              <Badge variant="outline" className="text-xs">
+                {findings.cashFlow.confidence}% confidence
+              </Badge>
+              {getTrendIcon(findings.cashFlow.trend)}
             </div>
             <ChevronDown
               className={`w-5 h-5 transition-transform ${
@@ -303,6 +319,18 @@ export function FundamentalsAgentCard({ findings, isLoading }: FundamentalsAgent
             </div>
           )}
         </div>
+
+        {/* Data Quality Warnings */}
+        {findings.dataQualityWarnings && findings.dataQualityWarnings.length > 0 && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <p className="text-sm font-semibold text-yellow-900 mb-2">Data Quality Warnings</p>
+            <ul className="text-xs text-yellow-800 space-y-1">
+              {findings.dataQualityWarnings.map((warning, idx) => (
+                <li key={idx}>• {warning}</li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     </Card>
   );

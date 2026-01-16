@@ -29,6 +29,7 @@ export interface ValuationFindings {
   marginOfSafety: number; // %
   methodAgreement: "STRONG" | "MODERATE" | "WEAK" | "DIVERGENT";
   overallAssessment: "UNDERVALUED" | "FAIRLY_VALUED" | "OVERVALUED" | "UNABLE_TO_VALUE";
+  confidence: number; // 0-100
   summary: string;
   dataQualityWarnings: string[];
   recommendationsForPersonas: string[];
@@ -98,6 +99,18 @@ export async function analyzeValuation(input: ValuationInput): Promise<Valuation
     dataQualityWarnings
   );
 
+  // Calculate overall confidence based on method agreement and data quality
+  let confidence = 75;
+  if (methodAgreement === "STRONG") confidence = 90;
+  else if (methodAgreement === "MODERATE") confidence = 75;
+  else if (methodAgreement === "WEAK") confidence = 60;
+  else if (methodAgreement === "DIVERGENT") confidence = 40;
+  
+  if (dataQualityWarnings.length > 0) confidence -= 10;
+  if (applicableMethods.length < 2) confidence -= 15;
+  
+  confidence = Math.max(30, Math.min(100, confidence));
+
   return {
     currentPrice,
     methods,
@@ -106,6 +119,7 @@ export async function analyzeValuation(input: ValuationInput): Promise<Valuation
     marginOfSafety,
     methodAgreement,
     overallAssessment,
+    confidence,
     summary,
     dataQualityWarnings,
     recommendationsForPersonas,
@@ -243,9 +257,12 @@ async function calculateComparable(
       };
     }
 
+    // Get shares outstanding - use a reasonable default (16B shares for AAPL-like companies)
+    // In production, this should come from the API
+    const sharesOutstanding = 16000; // millions of shares
+    
     // Calculate using P/E multiple
     const eps = latestFinancials.eps || 0;
-    const sharesOutstanding = 16.0; // Placeholder - would need from data
     const industryPE = 20; // S&P 500 average
     const peValuation = eps > 0 ? eps * industryPE : 0;
 
@@ -254,17 +271,19 @@ async function calculateComparable(
     const industryPB = 3.0;
     const pbValuation = bookValue > 0 ? bookValue * industryPB : 0;
 
-    // Calculate using P/S multiple
-    const revenue = latestFinancials.revenue || 0;
+    // Calculate using P/S multiple (revenue per share * P/S multiple)
+    const revenue = latestFinancials.revenue || 0; // in millions
+    const revenuePerShare = sharesOutstanding > 0 ? (revenue / sharesOutstanding) : 0;
     const industryPS = 2.0;
-    const psValuation = revenue > 0 ? revenue * industryPS : 0;
-
-    // Average applicable valuations
-    const valuations = [peValuation, pbValuation, psValuation].filter(v => v > 0);
-    const intrinsicValue = valuations.length > 0 ? valuations.reduce((a, b) => a + b) / valuations.length : 0;
+    const psValuation = revenuePerShare > 0 ? revenuePerShare * industryPS : 0;
+    
+    // Validate that valuations are reasonable (not anomalous)
+    const isAnomalous = (val: number) => val > 10000 || val < 0.01;
+    const validValuations = [peValuation, pbValuation, psValuation].filter(v => v > 0 && !isAnomalous(v));
+    const intrinsicValue = validValuations.length > 0 ? validValuations.reduce((a, b) => a + b) / validValuations.length : 0;
 
     // Determine confidence
-    const confidence = valuations.length >= 2 ? 0.75 : 0.5;
+    const confidence = validValuations.length >= 2 ? 0.75 : 0.5;
 
     // Calculate upside
     const upside = intrinsicValue > 0 ? ((intrinsicValue - currentPrice) / currentPrice) * 100 : 0;
@@ -273,7 +292,7 @@ async function calculateComparable(
     const assessment = determineAssessment(intrinsicValue, currentPrice, "Comparable");
 
     const narrative = `Comparable analysis uses industry multiples (P/E: ${industryPE}x, P/B: ${industryPB}x, P/S: ${industryPS}x). ` +
-      `${valuations.length} valuation methods applied. ` +
+      `${validValuations.length} valuation methods applied. ` +
       `Assumes company quality similar to industry average.`;
 
     return {
@@ -287,7 +306,7 @@ async function calculateComparable(
         industryPE: `${industryPE}x`,
         industryPB: `${industryPB}x`,
         industryPS: `${industryPS}x`,
-        methodsApplied: valuations.length,
+        methodsApplied: validValuations.length,
       },
       limitations: [
         "Assumes company is similar to industry average",

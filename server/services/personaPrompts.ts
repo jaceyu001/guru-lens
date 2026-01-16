@@ -50,13 +50,18 @@ Financial Metrics:
 Recent Financials:
 {financials}
 
+Agent Analysis Findings:
+{agentFindings}
+
 Evaluate this stock based on Warren Buffett's value investing principles. Consider:
 1. Does it have a durable competitive advantage (moat)?
 2. Is management competent and shareholder-friendly?
-3. Are earnings predictable and growing?
-4. Is the valuation reasonable with margin of safety?
+3. Are earnings predictable and growing? (Reference Fundamentals Agent growth assessment)
+4. Is the valuation reasonable with margin of safety? (Reference Valuation Agent intrinsic value)
 5. Can you understand and explain the business model?
-6. Would you be comfortable holding this for 10+ years?`,
+6. Would you be comfortable holding this for 10+ years?
+
+IMPORTANT: Incorporate agent findings into your analysis. Use agent assessments to validate or challenge your conclusions.`,
 
     criteriaWeights: {
       "Economic Moat": 25,
@@ -104,13 +109,18 @@ Financial Metrics:
 Recent Financials:
 {financials}
 
+Agent Analysis Findings:
+{agentFindings}
+
 Evaluate this stock using Peter Lynch's GARP methodology. Consider:
 1. What category does this stock fit (fast grower, stalwart, cyclical, etc.)?
 2. Is the PEG ratio attractive (< 1.0)?
 3. Can you understand what the company does and why people buy its products?
-4. Is earnings growth strong and sustainable (15-25%)?
-5. Is the stock "reasonably priced" relative to its growth?
-6. Does it have potential to be a "tenbagger"?`,
+4. Is earnings growth strong and sustainable (15-25%)? (Reference Fundamentals Agent growth rate)
+5. Is the stock reasonably priced relative to its growth?
+6. Does it have potential to be a tenbagger?
+
+IMPORTANT: Use Fundamentals Agent growth metrics to validate earnings sustainability. Consider Valuation Agent findings when assessing if price is reasonable.`,
 
     criteriaWeights: {
       "Growth Rate": 30,
@@ -158,13 +168,18 @@ Financial Metrics:
 Recent Financials:
 {financials}
 
+Agent Analysis Findings:
+{agentFindings}
+
 Evaluate this stock using Benjamin Graham's strict value investing criteria. Consider:
 1. Does it meet the quantitative screens (P/E < 15, P/B < 1.5)?
-2. Is there a sufficient margin of safety (trading below intrinsic value)?
-3. Is the balance sheet strong (current ratio > 2, low debt)?
+2. Is there a sufficient margin of safety? (Reference Valuation Agent margin of safety calculation)
+3. Is the balance sheet strong (current ratio > 2, low debt)? (Reference Financial Health assessment)
 4. Are earnings consistent and positive?
 5. Is there a dividend history?
-6. Would the "defensive investor" be comfortable owning this?`,
+6. Would the defensive investor be comfortable owning this?
+
+IMPORTANT: Use Valuation Agent findings to assess margin of safety. Use Financial Health assessment to validate balance sheet strength.`,
 
     criteriaWeights: {
       "Valuation Metrics": 30,
@@ -211,13 +226,18 @@ Financial Metrics:
 Recent Financials:
 {financials}
 
+Agent Analysis Findings:
+{agentFindings}
+
 Evaluate this stock through the lens of disruptive innovation. Consider:
 1. What disruptive innovation theme does this represent (AI, genomics, blockchain, etc.)?
-2. Is there exponential growth potential over 5+ years?
+2. Is there exponential growth potential over 5+ years? (Reference Fundamentals Agent growth assessment)
 3. How large is the addressable market?
 4. Does it benefit from technology convergence?
 5. Is management bold and visionary?
-6. Can you accept high volatility for potential 10x+ returns?`,
+6. Can you accept high volatility for potential 10x+ returns?
+
+IMPORTANT: Use Fundamentals Agent growth metrics to assess exponential growth potential. Consider profitability and capital efficiency assessments.`,
 
     criteriaWeights: {
       "Disruptive Potential": 35,
@@ -265,13 +285,18 @@ Financial Metrics:
 Recent Financials:
 {financials}
 
+Agent Analysis Findings:
+{agentFindings}
+
 Evaluate this stock using Ray Dalio's principles-based approach. Consider:
 1. How does this fit in the current macroeconomic environment?
-2. Is the balance sheet healthy (manageable debt, strong cash flow)?
+2. Is the balance sheet healthy (manageable debt, strong cash flow)? (Reference Financial Health assessment)
 3. What are the key risks and how likely are they?
 4. How would this perform in different economic scenarios (growth, recession, inflation)?
 5. Is management transparent and systematic in decision-making?
-6. What is the risk-adjusted return potential?`,
+6. What is the risk-adjusted return potential?
+
+IMPORTANT: Use Financial Health and Cash Flow assessments from Fundamentals Agent to validate balance sheet strength.`,
 
     criteriaWeights: {
       "Balance Sheet Health": 30,
@@ -328,13 +353,18 @@ Financial Metrics:
 Recent Financials:
 {financials}
 
+Agent Analysis Findings:
+{agentFindings}
+
 Evaluate this stock using Philip Fisher's growth investing principles. Consider:
 1. Does the company have products/services with long-term market potential?
 2. Is management committed to innovation and R&D?
-3. Are profit margins above average and improving?
-4. Does the company have a strong competitive position?
+3. Are profit margins above average and improving? (Reference Profitability assessment)
+4. Does the company have a strong competitive position? (Reference Capital Efficiency and ROE metrics)
 5. Is management of high integrity and candor?
-6. Would you be comfortable holding this for 10+ years based on growth potential?`,
+6. Would you be comfortable holding this for 10+ years based on growth potential?
+
+IMPORTANT: Use Fundamentals Agent profitability and capital efficiency metrics to validate margin quality and competitive strength.`,
 
     criteriaWeights: {
       "Management Quality": 30,

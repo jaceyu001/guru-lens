@@ -227,8 +227,9 @@ export interface GrowthAnalysis {
   revenueGrowth: number; // %
   earningsGrowth: number; // %
   fcfGrowth: number; // %
-  trend: "ACCELERATING" | "STABLE" | "DECELERATING" | "UNKNOWN";
+  trend?: "ACCELERATING" | "STABLE" | "DECELERATING" | "UNKNOWN";
   narrative: string;
+  confidence: number; // 0-100
 }
 
 export interface ProfitabilityAnalysis {
@@ -236,8 +237,9 @@ export interface ProfitabilityAnalysis {
   netMargin: number; // %
   operatingMargin: number; // %
   grossMargin: number; // %
-  trend: "IMPROVING" | "STABLE" | "DETERIORATING" | "UNKNOWN";
+  trend?: "IMPROVING" | "STABLE" | "DETERIORATING" | "UNKNOWN";
   narrative: string;
+  confidence: number; // 0-100
 }
 
 export interface CapitalEfficiencyAnalysis {
@@ -246,6 +248,7 @@ export interface CapitalEfficiencyAnalysis {
   roic: number; // %
   roa: number; // %
   narrative: string;
+  confidence: number; // 0-100
 }
 
 export interface FinancialHealthAnalysis {
@@ -254,6 +257,7 @@ export interface FinancialHealthAnalysis {
   currentRatio: number;
   interestCoverage: number;
   narrative: string;
+  confidence: number; // 0-100
 }
 
 export interface CashFlowAnalysis {
@@ -262,6 +266,7 @@ export interface CashFlowAnalysis {
   fcfGrowth: number; // %
   trend?: "IMPROVING" | "STABLE" | "DETERIORATING" | "UNKNOWN";
   narrative: string;
+  confidence: number; // 0-100
 }
 
 export interface FundamentalsFindings {
@@ -298,6 +303,7 @@ export interface ValuationFindings {
   marginOfSafety: number; // %
   methodAgreement: "STRONG" | "MODERATE" | "WEAK" | "DIVERGENT";
   overallAssessment: "UNDERVALUED" | "FAIRLY_VALUED" | "OVERVALUED" | "UNABLE_TO_VALUE";
+  confidence: number; // 0-100
   summary: string;
   dataQualityWarnings: string[];
   recommendationsForPersonas: string[];
