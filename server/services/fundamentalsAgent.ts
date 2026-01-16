@@ -133,8 +133,12 @@ export async function analyzeFundamentals(
 
 function analyzeGrowth(financialData: FinancialData): GrowthAnalysis {
   // Use YoY growth rates from yfinance ratios (primary source)
+  // These are Year-over-Year (YoY) growth rates comparing most recent fiscal year to previous year
   let revenueGrowth = (financialData.ratios?.revenueGrowth || 0) * 100; // Convert decimal to percentage
   let earningsGrowth = (financialData.ratios?.earningsGrowth || 0) * 100; // Convert decimal to percentage
+  
+  // Note: Extreme negative values (< -100%) indicate company swing from profit to loss
+  // These are valid but should be flagged as significant structural changes
   
   // Fallback to calculated growth from financials if ratios not available
   if (revenueGrowth === 0 && financialData.financials) {
@@ -390,11 +394,19 @@ function buildGrowthNarrative(
   fcfGrowth: number,
   trend: string
 ): string {
-  return `Revenue growing at ${revenueGrowth.toFixed(1)}% YoY, with earnings growth of ${earningsGrowth.toFixed(1)}%. FCF growth of ${fcfGrowth.toFixed(1)}% shows ${trend.toLowerCase()} trend. ${
+  // All metrics are Year-over-Year (YoY) growth rates
+  // Comparing most recent fiscal year to previous fiscal year
+  let narrative = `Revenue growing at ${revenueGrowth.toFixed(1)}% YoY, with earnings growth of ${earningsGrowth.toFixed(1)}% YoY. FCF growth of ${fcfGrowth.toFixed(1)}% shows ${trend.toLowerCase()} trend. ${
     earningsGrowth > revenueGrowth
       ? "Earnings outpacing revenue suggests margin expansion."
       : "Revenue outpacing earnings suggests margin pressure."
   }`;
+  
+  if (earningsGrowth < -100) {
+    narrative += " WARNING: Extreme earnings decline indicates significant structural changes or swing from profitability to losses.";
+  }
+  
+  return narrative;
 }
 
 function buildProfitabilityNarrative(

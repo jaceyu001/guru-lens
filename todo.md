@@ -288,3 +288,8 @@
 - [x] Add timestamp tracking to analysis results
 - [x] Display formatted timestamp under "return analysis" button
 - [x] Show when analysis was last run
+
+## Investigation: Earnings Growth Metric
+- [x] Investigate BIDU earnings growth -253.4% - determine if YoY, TTM, or other calculation
+- [x] Document earnings growth metric source and calculation method
+- [x] Add validation/documentation for extreme values
