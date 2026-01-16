@@ -230,12 +230,35 @@ export const appRouter = router({
           const operatingMarginPercent = ((ratios.operatingMargin || 0) * 100);
           const grossMarginPercent = ((ratios.grossMargin || 0) * 100);
           
+          // Calculate PEG correctly: only valid for profitable, growing companies
+          let pegRatio = 0;
+          const peRatio = ratios.pe || 0;
+          const earningsGrowth = ratios.earningsGrowth || 0;
+          
+          // PEG is undefined if:
+          // 1. Company is unprofitable (negative P/E)
+          // 2. Earnings are not growing positively
+          if (peRatio > 0 && earningsGrowth > 0) {
+            // Standard PEG formula: P/E / Earnings Growth Rate (%)
+            // earningsGrowth is in decimal form (e.g., 0.15 for 15%)
+            pegRatio = peRatio / (earningsGrowth * 100);
+          }
+          // Otherwise pegRatio stays 0 (representing undefined/N/A)
+          
+          // Build data quality flags
+          const dataQualityFlags = {
+            peNegative: peRatio < 0,
+            pegUndefined: pegRatio === 0,
+            earningsCollapse: earningsGrowth < -0.10,
+            revenueDecline: (ratios.revenueGrowth || 0) < 0,
+          };
+          
           const keyRatios = {
             symbol: input.symbol,
-            peRatio: ratios.pe || 0,
+            peRatio: peRatio,
             pbRatio: ratios.pb || 0,
             psRatio: ratios.ps || 0,
-            pegRatio: (ratios.pe || 0) / 15,
+            pegRatio: pegRatio,
             dividendYield: 0,
             payoutRatio: 0,
             roe: roePercent,

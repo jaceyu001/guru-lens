@@ -86,7 +86,9 @@ def get_stock_data(symbol):
                 "grossMargin": (float(info.get('grossMargins', 0)) or 0) * 100,
                 "operatingMargin": (float(info.get('operatingMargins', 0)) or 0) * 100,
                 "netMargin": (float(info.get('profitMargins', 0)) or 0) * 100,
-                "dividendYield": (float(info.get('dividendYield', 0)) or 0) * 100
+                "dividendYield": (float(info.get('dividendYield', 0)) or 0) * 100,
+                "revenueGrowth": (float(info.get('revenueGrowth', 0)) or 0),
+                "earningsGrowth": (float(info.get('earningsGrowth', 0)) or 0)
             },
             "dataQualityFlags": {
                 "debtToEquityAnomalous": float(info.get('debtToEquity', 0)) > 200,  # D/E is already in percentage format

@@ -144,6 +144,8 @@ export async function getStockData(symbol: string): Promise<FinancialData> {
               grossMargin: data.ratios.grossMargin,
               operatingMargin: data.ratios.operatingMargin,
               netMargin: data.ratios.netMargin,
+              revenueGrowth: data.ratios.revenueGrowth,
+              earningsGrowth: data.ratios.earningsGrowth,
             },
           });
         } catch (parseError) {

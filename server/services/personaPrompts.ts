@@ -114,13 +114,13 @@ Agent Analysis Findings:
 
 Evaluate this stock using Peter Lynch's GARP methodology. Consider:
 1. What category does this stock fit (fast grower, stalwart, cyclical, etc.)?
-2. Is the PEG ratio attractive (< 1.0)?
+2. Is the PEG ratio attractive (< 1.0)? NOTE: If PEG shows 'N/A', the company is unprofitable or not growing - this is a red flag for Lynch's strategy.
 3. Can you understand what the company does and why people buy its products?
 4. Is earnings growth strong and sustainable (15-25%)? (Reference Fundamentals Agent growth rate)
 5. Is the stock reasonably priced relative to its growth?
 6. Does it have potential to be a tenbagger?
 
-IMPORTANT: Use Fundamentals Agent growth metrics to validate earnings sustainability. Consider Valuation Agent findings when assessing if price is reasonable.`,
+IMPORTANT: Use Fundamentals Agent growth metrics to validate earnings sustainability. Consider Valuation Agent findings when assessing if price is reasonable. If PEG is N/A, this likely disqualifies the stock from Lynch's GARP criteria.`,
 
     criteriaWeights: {
       "Growth Rate": 30,
