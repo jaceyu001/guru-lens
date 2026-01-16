@@ -7,7 +7,7 @@
 
 import { invokeLLM } from "../_core/llm";
 import { getPersonaPrompt } from "./personaPrompts";
-import type { StockPrice, CompanyProfile, FinancialStatement, KeyRatios } from "../../shared/types";
+import type { StockPrice, CompanyProfile, FinancialStatement, KeyRatios, FundamentalsFindings, ValuationFindings } from "../../shared/types";
 
 export interface AnalysisInput {
   symbol: string;
@@ -28,6 +28,8 @@ export interface AnalysisInput {
     roeNegative?: boolean;
     currentRatioAnomalous?: boolean;
   };
+  fundamentalsFindings?: FundamentalsFindings;
+  valuationFindings?: ValuationFindings;
 }
 
 export interface AnalysisCriterion {
@@ -187,6 +189,28 @@ Free Cash Flow: $${(latestFinancials.freeCashFlow / 1e9).toFixed(2)}B`
     return value;
   };
 
+  // Build agent findings summary for enrichment
+  let agentFindingsSummary = '';
+  if (input.fundamentalsFindings) {
+    const fund = input.fundamentalsFindings;
+    agentFindingsSummary += `\n\nFUNDAMENTALS AGENT FINDINGS:\n`;
+    agentFindingsSummary += `- Growth: ${fund.growth.assessment} (Revenue: ${fund.growth.revenueGrowth.toFixed(1)}%, Earnings: ${fund.growth.earningsGrowth.toFixed(1)}%, FCF: ${fund.growth.fcfGrowth.toFixed(1)}%)\n`;
+    agentFindingsSummary += `- Profitability: ${fund.profitability.assessment} (Net Margin: ${fund.profitability.netMargin.toFixed(1)}%, Operating: ${fund.profitability.operatingMargin.toFixed(1)}%)\n`;
+    agentFindingsSummary += `- Capital Efficiency: ${fund.capitalEfficiency.assessment} (ROE: ${fund.capitalEfficiency.roe.toFixed(1)}%, ROIC: ${fund.capitalEfficiency.roic.toFixed(1)}%)\n`;
+    agentFindingsSummary += `- Financial Health: ${fund.financialHealth.assessment} (D/E: ${fund.financialHealth.debtToEquity.toFixed(1)}%, Current Ratio: ${fund.financialHealth.currentRatio.toFixed(2)}x)\n`;
+    agentFindingsSummary += `- Cash Flow: ${fund.cashFlow.assessment} (FCF Margin: ${fund.cashFlow.fcfMargin.toFixed(1)}%, Growth: ${fund.cashFlow.fcfGrowth.toFixed(1)}%)\n`;
+  }
+  if (input.valuationFindings) {
+    const val = input.valuationFindings;
+    agentFindingsSummary += `\nVALUATION AGENT FINDINGS:\n`;
+    agentFindingsSummary += `- Current Price: $${val.currentPrice.toFixed(2)}\n`;
+    agentFindingsSummary += `- Consensus Valuation: $${val.consensusValuation.low.toFixed(2)} - $${val.consensusValuation.high.toFixed(2)} (Midpoint: $${val.consensusValuation.midpoint.toFixed(2)})\n`;
+    agentFindingsSummary += `- Assessment: ${val.overallAssessment.replace(/_/g, ' ')}\n`;
+    agentFindingsSummary += `- Upside Potential: ${val.consensusUpside.toFixed(1)}%\n`;
+    agentFindingsSummary += `- Margin of Safety: ${val.marginOfSafety.toFixed(1)}%\n`;
+    agentFindingsSummary += `- Method Agreement: ${val.methodAgreement}\n`;
+  }
+
   // Fill in the analysis template
   const userPrompt = personaPrompt.analysisTemplate
     .replace('{symbol}', input.symbol)
@@ -211,6 +235,7 @@ Free Cash Flow: $${(latestFinancials.freeCashFlow / 1e9).toFixed(2)}B`
     .replace('{revenueGrowth}', '15.2') // TODO: Calculate from financials
     .replace('{rdIntensity}', '8.5') // TODO: Get from data
     .replace('{freeCashFlow}', latestFinancials ? `$${(latestFinancials.freeCashFlow / 1e9).toFixed(2)}B` : 'N/A')
+    .replace('{agentFindings}', agentFindingsSummary)
     .replace('{dataQualityNote}', '');
 
   // Build comprehensive data quality disclaimer

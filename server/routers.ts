@@ -1,5 +1,5 @@
-import { z } from "zod";
 import { nanoid } from "nanoid";
+import { z } from "zod";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
@@ -7,7 +7,9 @@ import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import * as db from "./db";
 import * as realFinancialData from './services/realFinancialData';
 import * as aiAnalysisEngine from "./services/aiAnalysisEngine";
-import type { AnalysisOutput, OpportunityOutput, TickerSnapshot } from "@shared/types";
+import * as fundamentalsAgent from "./services/fundamentalsAgent";
+import * as valuationAgent from "./services/valuationAgent";
+import type { AnalysisOutput, OpportunityOutput, TickerSnapshot, FundamentalsFindings, ValuationFindings } from "@shared/types";
 
 export const appRouter = router({
   system: systemRouter,
@@ -176,6 +178,17 @@ export const appRouter = router({
         
         const validPersonas = personas.filter((p): p is NonNullable<typeof p> => p !== undefined);
         
+        // Fetch agent findings in parallel
+        const [fundamentalsFindings, valuationFindings] = await Promise.all([
+          fundamentalsAgent.analyzeFundamentals(financialData, financialData.dataQualityFlags || {}),
+          valuationAgent.analyzeValuation({
+            ticker: input.symbol,
+            currentPrice: financialData.price?.current || 0,
+            financialData,
+            dataQualityFlags: financialData.dataQualityFlags || {},
+          } as any),
+        ]).catch(() => [undefined, undefined]);
+        
         // Run analysis for each persona
         const analyses: AnalysisOutput[] = [];
         for (const persona of validPersonas) {
@@ -268,6 +281,8 @@ export const appRouter = router({
             financials,
             ratios: keyRatios,
             dataQualityFlags: financialData.dataQualityFlags,
+            fundamentalsFindings,
+            valuationFindings,
           };
           
           const result = await aiAnalysisEngine.analyzeStock(analysisInput);
@@ -724,6 +739,40 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         await db.deleteAlert(ctx.user.id, input.alertId);
         return { success: true };
+      }),
+  }),
+
+  // Agent operations
+  agents: router({
+    fundamentals: publicProcedure
+      .input(z.object({ symbol: z.string() }))
+      .query(async ({ input }) => {
+        const financialData = await realFinancialData.getStockData(input.symbol);
+        const dataQualityFlags = financialData.dataQualityFlags || {};
+        
+        const findings = await fundamentalsAgent.analyzeFundamentals(
+          financialData,
+          dataQualityFlags
+        );
+        
+        return findings;
+      }),
+    
+    valuation: publicProcedure
+      .input(z.object({ symbol: z.string() }))
+      .query(async ({ input }) => {
+        const financialData = await realFinancialData.getStockData(input.symbol);
+        const currentPrice = financialData.price?.current || 0;
+        const dataQualityFlags = financialData.dataQualityFlags || {};
+        
+        const findings = await valuationAgent.analyzeValuation({
+          ticker: input.symbol,
+          currentPrice,
+          financialData,
+          dataQualityFlags,
+        } as any);
+        
+        return findings;
       }),
   }),
 });

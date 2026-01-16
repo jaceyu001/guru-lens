@@ -217,3 +217,88 @@ export interface FinancialData {
     currentRatioAnomalous?: boolean;
   };
 }
+
+// ============================================================================
+// Agent Analysis Types
+// ============================================================================
+
+export interface GrowthAnalysis {
+  assessment: "STRONG" | "MODERATE" | "WEAK" | "UNCLEAR";
+  revenueGrowth: number; // %
+  earningsGrowth: number; // %
+  fcfGrowth: number; // %
+  trend: "ACCELERATING" | "STABLE" | "DECELERATING" | "UNKNOWN";
+  narrative: string;
+}
+
+export interface ProfitabilityAnalysis {
+  assessment: "EXCELLENT" | "GOOD" | "FAIR" | "POOR" | "UNCLEAR";
+  netMargin: number; // %
+  operatingMargin: number; // %
+  grossMargin: number; // %
+  trend: "IMPROVING" | "STABLE" | "DETERIORATING" | "UNKNOWN";
+  narrative: string;
+}
+
+export interface CapitalEfficiencyAnalysis {
+  assessment: "EXCELLENT" | "GOOD" | "FAIR" | "POOR" | "UNCLEAR";
+  roe: number; // %
+  roic: number; // %
+  roa: number; // %
+  narrative: string;
+}
+
+export interface FinancialHealthAnalysis {
+  assessment: "STRONG" | "STABLE" | "CONCERNING" | "WEAK" | "UNCLEAR";
+  debtToEquity: number; // %
+  currentRatio: number;
+  interestCoverage: number;
+  narrative: string;
+}
+
+export interface CashFlowAnalysis {
+  assessment: "STRONG" | "HEALTHY" | "WEAK" | "NEGATIVE" | "UNCLEAR";
+  fcfMargin: number; // %
+  fcfGrowth: number; // %
+  trend?: "IMPROVING" | "STABLE" | "DETERIORATING" | "UNKNOWN";
+  narrative: string;
+}
+
+export interface FundamentalsFindings {
+  growth: GrowthAnalysis;
+  profitability: ProfitabilityAnalysis;
+  capitalEfficiency: CapitalEfficiencyAnalysis;
+  financialHealth: FinancialHealthAnalysis;
+  cashFlow: CashFlowAnalysis;
+  summary: string;
+  dataQualityWarnings: string[];
+  recommendationsForPersonas: string[];
+}
+
+export interface ValuationMethod {
+  name: "DCF" | "Comparable" | "DDM" | "AssetBased";
+  intrinsicValue: number;
+  upside: number; // %
+  assessment: "UNDERVALUED" | "FAIRLY_VALUED" | "OVERVALUED" | "UNABLE_TO_VALUE";
+  confidence: number; // 0-1
+  narrative: string;
+  assumptions: Record<string, string | number>;
+  limitations: string[];
+}
+
+export interface ValuationFindings {
+  currentPrice: number;
+  methods: ValuationMethod[];
+  consensusValuation: {
+    low: number;
+    high: number;
+    midpoint: number;
+  };
+  consensusUpside: number; // %
+  marginOfSafety: number; // %
+  methodAgreement: "STRONG" | "MODERATE" | "WEAK" | "DIVERGENT";
+  overallAssessment: "UNDERVALUED" | "FAIRLY_VALUED" | "OVERVALUED" | "UNABLE_TO_VALUE";
+  summary: string;
+  dataQualityWarnings: string[];
+  recommendationsForPersonas: string[];
+}

@@ -9,6 +9,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Progress } from "@/components/ui/progress";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { FundamentalsAgentCard } from "@/components/FundamentalsAgentCard";
+import { ValuationAgentCard } from "@/components/ValuationAgentCard";
 import type { AnalysisOutput } from "@shared/types";
 
 export default function Ticker() {
@@ -34,6 +36,14 @@ export default function Ticker() {
   const inWatchlist = trpc.watchlist.isInWatchlist.useQuery(
     { symbol: symbol?.toUpperCase() || "" },
     { enabled: isAuthenticated }
+  );
+  const fundamentalsAgent = trpc.agents.fundamentals.useQuery(
+    { symbol: symbol?.toUpperCase() || "" },
+    { enabled: !!symbol }
+  );
+  const valuationAgent = trpc.agents.valuation.useQuery(
+    { symbol: symbol?.toUpperCase() || "" },
+    { enabled: !!symbol }
   );
 
   const runAnalysisMutation = trpc.analyses.runAnalysis.useMutation({
@@ -272,6 +282,27 @@ export default function Ticker() {
             )}
           </div>
         </Card>
+
+        {/* Agent Analysis Cards */}
+        {(fundamentalsAgent.data || valuationAgent.data) && (
+          <div className="mb-8 space-y-6">
+            <h2 className="text-2xl font-bold">Agent Analysis</h2>
+            <div className="grid gap-6 lg:grid-cols-2">
+              {fundamentalsAgent.data && (
+                <FundamentalsAgentCard 
+                  findings={fundamentalsAgent.data} 
+                  isLoading={fundamentalsAgent.isLoading}
+                />
+              )}
+              {valuationAgent.data && (
+                <ValuationAgentCard 
+                  findings={valuationAgent.data} 
+                  isLoading={valuationAgent.isLoading}
+                />
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Persona Analyses */}
         <div className="mb-6">
