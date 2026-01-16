@@ -309,3 +309,13 @@
 - [x] Fixed yfinanceWrapper to use annual data instead of quarterly
 - [x] BIDU now shows correct growth rates (was -253.4% from quarterly comparison, now correct YoY)
 - [x] All fundamentals agent tests passing (22/22)
+
+## Phase: TTM vs Full Year Growth Implementation
+- [x] Phase 1: Implement dataAvailabilityDetector.ts with comprehensive tests (12 tests passing)
+- [x] Phase 1: Test with multiple stocks (BIDU, AAPL, MSFT, etc.)
+- [x] Phase 2: Implement growthCalculator.ts service (15 tests passing)
+- [ ] Phase 2: Integrate growthCalculator with fundamentalsAgent
+- [ ] Phase 2: Integrate growthCalculator with valuationAgent
+- [ ] Phase 3: Update UI to display period labels ("2025 TTM vs 2024 FY")
+- [ ] Phase 3: Add tooltips explaining TTM vs FY comparisons
+- [ ] Final: End-to-end testing with multiple stocks
