@@ -2,7 +2,7 @@
  * Financial Data Service
  * 
  * Uses yfinance via Python subprocess to fetch real financial data
- * including shares outstanding for accurate valuation calculations.
+ * including balance sheet data (total assets, liabilities) for accurate analysis.
  */
 
 import type { FinancialData, TickerSnapshot } from "../../shared/types";
@@ -17,6 +17,7 @@ async function fetchFromYfinance(symbol: string): Promise<any> {
 import yfinance as yf
 import json
 import sys
+import pandas as pd
 
 try:
     ticker = yf.Ticker("${symbol}")
@@ -26,6 +27,27 @@ try:
     
     # Get info
     info = ticker.info
+    
+    # Get balance sheet data
+    total_assets = 0
+    total_liabilities = 0
+    total_equity = 0
+    
+    try:
+        # Try to get annual balance sheet (most recent year)
+        bs = ticker.balance_sheet
+        if bs is not None and not bs.empty:
+            latest_bs = bs.iloc[:, 0]  # Most recent column
+            total_assets = float(latest_bs.get('Total Assets', 0)) or 0
+            # Get total equity - try multiple field names
+            total_equity = float(latest_bs.get('Stockholders Equity', 0)) or float(latest_bs.get('Total Stockholder Equity', 0)) or float(latest_bs.get('Common Stock Equity', 0)) or 0
+            # Get total liabilities
+            total_liabilities = float(latest_bs.get('Total Liabilities Net Minority Interest', 0)) or 0
+            # If we don't have liabilities, calculate from assets - equity
+            if total_liabilities == 0 and total_assets > 0 and total_equity > 0:
+                total_liabilities = total_assets - total_equity
+    except Exception as e:
+        pass
     
     # Extract key data
     data = {
@@ -49,6 +71,11 @@ try:
         "company_name": info.get("longName", ""),
         "website": info.get("website", ""),
         "employees": info.get("fullTimeEmployees", 0),
+        "total_assets": total_assets,
+        "total_liabilities": total_liabilities,
+        "total_equity": total_equity,
+        "total_debt": info.get("totalDebt", 0),
+        "total_cash": info.get("totalCash", 0),
     }
     
     print(json.dumps(data))
@@ -56,14 +83,14 @@ except Exception as e:
     print(json.dumps({"error": str(e)}))
 `;
 
-    const result = execSync(`python3 -c "${pythonScript.replace(/"/g, '\\"')}"`, {
+    const result = execSync(\`python3 -c "\${pythonScript.replace(/"/g, '\\\\"')}"\`, {
       encoding: "utf-8",
       timeout: 30000,
     });
 
     return JSON.parse(result);
   } catch (error) {
-    console.error(`Error fetching yfinance data for ${symbol}:`, error);
+    console.error(\`Error fetching yfinance data for \${symbol}:\`, error);
     return null;
   }
 }
@@ -113,12 +140,20 @@ export async function getTickerSnapshot(symbol: string): Promise<TickerSnapshot 
 export async function getFinancialData(symbol: string): Promise<FinancialData | null> {
   const data = await fetchFromYfinance(symbol);
   if (!data || data.error) {
-    console.error(`Failed to fetch data for ${symbol}:`, data?.error);
+    console.error(\`Failed to fetch data for \${symbol}:\`, data?.error);
     return null;
   }
 
   // Convert shares outstanding from individual shares to millions
   const sharesOutstandingInMillions = data.shares_outstanding ? data.shares_outstanding / 1000000 : 0;
+
+  // Calculate proper debt-to-equity using balance sheet data
+  let debtToEquity = Number((data.debt_to_equity / 100)?.toFixed(4) || 0);
+  
+  // If we have balance sheet data, calculate D/E more accurately
+  if (data.total_equity > 0 && data.total_debt > 0) {
+    debtToEquity = Number((data.total_debt / data.total_equity)?.toFixed(4) || 0);
+  }
 
   return {
     sharesOutstanding: sharesOutstandingInMillions,
@@ -135,7 +170,7 @@ export async function getFinancialData(symbol: string): Promise<FinancialData | 
     profile: {
       sector: data.sector || "Unknown",
       industry: data.industry || "Unknown",
-      description: `${data.company_name} operates in the ${data.industry} industry.`,
+      description: \`\${data.company_name} operates in the \${data.industry} industry.\`,
       employees: data.employees || 0,
       website: data.website || "",
     },
@@ -154,8 +189,8 @@ export async function getFinancialData(symbol: string): Promise<FinancialData | 
       ps: data.revenue && data.market_cap ? Number((data.revenue / data.market_cap).toFixed(2)) : 0,
       roe: Number(data.roe?.toFixed(4) || 0),
       roic: 0,
-      // Fix: debtToEquity from yfinance is in percentage format (33.81 = 33.81%), convert to decimal
-      debtToEquity: Number((data.debt_to_equity / 100)?.toFixed(4) || 0),
+      // Use calculated D/E from balance sheet if available, otherwise use yfinance value
+      debtToEquity: debtToEquity,
       currentRatio: Number(data.current_ratio?.toFixed(2) || 0),
       grossMargin: Number(data.gross_margin?.toFixed(4) || 0),
       operatingMargin: Number(data.operating_margin?.toFixed(4) || 0),

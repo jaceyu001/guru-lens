@@ -216,6 +216,8 @@ export interface FinancialData {
     peAnomalous?: boolean;
     roeNegative?: boolean;
     currentRatioAnomalous?: boolean;
+    leverageTrend?: string; // INCREASING, STABLE, DECREASING
+    liquidityTrend?: string; // IMPROVING, STABLE, DETERIORATING
   };
 }
 
@@ -308,4 +310,32 @@ export interface ValuationFindings {
   summary: string;
   dataQualityWarnings: string[];
   recommendationsForPersonas: string[];
+}
+
+// Historical Balance Sheet Data
+export interface HistoricalBalanceSheet {
+  symbol: string;
+  period: string; // "Q1", "Q2", "Q3", "Q4", "FY"
+  year: number;
+  totalAssets: number;
+  totalLiabilities: number;
+  totalEquity: number;
+  totalDebt: number;
+  currentAssets: number;
+  currentLiabilities: number;
+  debtToEquity: number; // Calculated D/E ratio
+  currentRatio: number;
+  timestamp: Date;
+}
+
+// Balance Sheet Trends
+export interface BalanceSheetTrend {
+  symbol: string;
+  debtToEquityTrend: "INCREASING" | "STABLE" | "DECREASING";
+  debtToEquityChange: number; // % change over period
+  currentRatioTrend: "IMPROVING" | "STABLE" | "DETERIORATING";
+  currentRatioChange: number; // % change over period
+  leverageRisk: "HIGH" | "MEDIUM" | "LOW";
+  liquidityRisk: "HIGH" | "MEDIUM" | "LOW";
+  analysisDate: Date;
 }
