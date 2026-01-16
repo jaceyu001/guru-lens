@@ -238,8 +238,8 @@ Free Cash Flow: $${(latestFinancials.freeCashFlow / 1e9).toFixed(2)}B`
     .replace('{interestCoverage}', getSafeMetricValue(input.ratios.interestCoverage.toFixed(1), input.dataQualityFlags?.interestCoverageZero, 'Interest Coverage'))
     .replace('{dividendYield}', input.ratios.dividendYield.toFixed(2))
     .replace('{financials}', financialSummary)
-    .replace('{revenueGrowth}', '15.2') // TODO: Calculate from financials
-    .replace('{rdIntensity}', '8.5') // TODO: Get from data
+    .replace('{revenueGrowth}', input.fundamentalsFindings?.growth?.revenueGrowth?.toFixed(1) || 'N/A') // Use actual revenue growth from fundamentals
+    .replace('{rdIntensity}', 'N/A') // R&D intensity not available in current data set
     .replace('{freeCashFlow}', latestFinancials ? `$${(latestFinancials.freeCashFlow / 1e9).toFixed(2)}B` : 'N/A')
     .replace('{agentFindings}', agentFindingsSummary)
     .replace('{dataQualityNote}', '');

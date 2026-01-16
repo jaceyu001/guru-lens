@@ -293,3 +293,14 @@
 - [x] Investigate BIDU earnings growth -253.4% - determine if YoY, TTM, or other calculation
 - [x] Document earnings growth metric source and calculation method
 - [x] Add validation/documentation for extreme values
+
+## Critical: System-Wide Live Data Audit
+- [x] Audit all agents for live yfinance data usage
+- [x] Remove mock data fixtures and test mocks from production paths
+- [x] Verify fundamentals agent uses live data
+- [x] Verify valuation agent uses live data
+- [x] Verify all persona agents use live data
+- [x] Check for cached data or stale data sources
+- [x] Ensure no fallback to mock data in production
+- [x] Fixed hardcoded mock values in aiAnalysisEngine (revenueGrowth: 15.2 -> actual data)
+- [ ] Fix broken aiAnalysisEngine tests (buildEnrichedPrompt not exported)
