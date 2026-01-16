@@ -166,7 +166,8 @@ export default function Ticker() {
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Home
           </Button>
-          <div className="flex gap-2">
+          <div className="flex flex-col items-end gap-2">
+            <div className="flex gap-2">
             {isAuthenticated && (
               <Button
                 variant="outline"
@@ -184,6 +185,13 @@ export default function Ticker() {
               <RefreshCw className={`mr-2 h-4 w-4 ${isRunning ? "animate-spin" : ""}`} />
               {isRunning ? "Running..." : "Rerun Analysis"}
             </Button>
+            </div>
+            {analyses.data && analyses.data.length > 0 && (
+              <div className="text-xs text-muted-foreground flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                Last run: {new Date(analyses.data[0].runTimestamp).toLocaleString()}
+              </div>
+            )}
           </div>
         </div>
 

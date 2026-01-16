@@ -283,3 +283,8 @@
 
 ## Bug Fixes - Search Autocomplete
 - [x] Fix ticker search autocomplete - only shows suggestions when deleting characters, not when typing
+
+## Feature: Analysis Timestamp Display
+- [x] Add timestamp tracking to analysis results
+- [x] Display formatted timestamp under "return analysis" button
+- [x] Show when analysis was last run
