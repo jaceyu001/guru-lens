@@ -12,7 +12,7 @@ export default function Home() {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
-  const personas = trpc.personas.list.useQuery();
+
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,18 +22,13 @@ export default function Home() {
     setLocation(`/ticker/${searchQuery.toUpperCase()}`);
   };
 
-  const searchMutation = trpc.tickers.search.useQuery(
-    { query: searchQuery || "A" }, // Provide default to satisfy min(1) validation
-    { enabled: false }
-  );
-
   const handleSearchInput = async (value: string) => {
     setSearchQuery(value);
     if (value.length >= 1) {
       setIsSearching(true);
       try {
-        const results = await searchMutation.refetch();
-        setSearchResults(results.data || []);
+        const results = await trpc.tickers.search.fetch({ query: value });
+        setSearchResults(results || []);
       } catch (error) {
         console.error("Search error:", error);
         setSearchResults([]);
@@ -44,6 +39,9 @@ export default function Home() {
       setSearchResults([]);
     }
   };
+
+  // Fetch personas list
+  const personasQuery = trpc.personas.list.useQuery();
 
   const selectTicker = (symbol: string) => {
     setSearchQuery("");
@@ -170,7 +168,7 @@ export default function Home() {
             </p>
           </div>
 
-          {personas.isLoading ? (
+          {personasQuery.isLoading ? (
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {[...Array(6)].map((_, i) => (
                 <Card key={i} className="p-6 animate-pulse">
@@ -182,7 +180,7 @@ export default function Home() {
             </div>
           ) : (
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {personas.data?.map((persona) => (
+              {personasQuery.data?.map((persona) => (
                 <Card
                   key={persona.id}
                   className="p-6 hover:shadow-lg transition-all cursor-pointer"

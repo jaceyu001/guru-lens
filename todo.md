@@ -280,3 +280,6 @@
 - [x] Test with real stock examples (AAPL, DQ, MSFT)
 - [x] Test edge cases (high ROE, negative values, extreme growth)
 - [x] All 22 tests passing in 327ms
+
+## Bug Fixes - Search Autocomplete
+- [x] Fix ticker search autocomplete - only shows suggestions when deleting characters, not when typing
