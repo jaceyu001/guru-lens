@@ -169,6 +169,7 @@ export interface KeyRatios {
 }
 
 export interface FinancialData {
+  symbol?: string;
   sharesOutstanding?: number; // in millions
   price?: {
     current: number;
@@ -193,6 +194,8 @@ export interface FinancialData {
     eps: number;
     period: string;
     fiscalYear: number;
+    revenueGrowth?: number;
+    earningsGrowth?: number;
   }[];
   ratios?: {
     pe?: number;
@@ -205,6 +208,8 @@ export interface FinancialData {
     grossMargin?: number;
     operatingMargin?: number;
     netMargin?: number;
+    revenueGrowth?: number; // YoY revenue growth
+    earningsGrowth?: number; // YoY earnings growth
   };
   dataQualityFlags?: {
     debtToEquityAnomalous?: boolean;
@@ -218,6 +223,8 @@ export interface FinancialData {
     currentRatioAnomalous?: boolean;
     leverageTrend?: string; // INCREASING, STABLE, DECREASING
     liquidityTrend?: string; // IMPROVING, STABLE, DETERIORATING
+    revenueDecline?: boolean; // Revenue declining YoY
+    earningsCollapse?: boolean; // Earnings declining significantly
   };
 }
 

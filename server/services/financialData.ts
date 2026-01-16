@@ -49,6 +49,24 @@ try:
     except Exception as e:
         pass
     
+    # Calculate earnings growth from income statement
+    earnings_growth = 0
+    revenue_growth = info.get("revenueGrowth", 0)
+    try:
+        income_stmt = ticker.income_stmt
+        if income_stmt is not None and not income_stmt.empty and len(income_stmt.columns) >= 2:
+            # Get net income for current and previous year
+            current_ni = float(income_stmt.iloc[:, 0].get('Net Income', 0)) or 0
+            previous_ni = float(income_stmt.iloc[:, 1].get('Net Income', 0)) or 0
+            if previous_ni != 0:
+                earnings_growth = (current_ni - previous_ni) / abs(previous_ni)
+    except:
+        # Fall back to EPS-based calculation
+        current_eps = info.get("trailingEps", 0)
+        forward_eps = info.get("forwardEps", 0)
+        if current_eps > 0:
+            earnings_growth = (forward_eps - current_eps) / current_eps
+    
     # Extract key data
     data = {
         "symbol": "${symbol}",
@@ -66,6 +84,8 @@ try:
         "gross_margin": info.get("grossMargins", [0])[-1] if info.get("grossMargins") else 0,
         "operating_margin": info.get("operatingMargins", [0])[-1] if info.get("operatingMargins") else 0,
         "net_margin": info.get("profitMargins", [0])[-1] if info.get("profitMargins") else 0,
+        "revenue_growth": revenue_growth,
+        "earnings_growth": earnings_growth,
         "sector": info.get("sector", ""),
         "industry": info.get("industry", ""),
         "company_name": info.get("longName", ""),
