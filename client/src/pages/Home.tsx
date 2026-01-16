@@ -22,22 +22,21 @@ export default function Home() {
     setLocation(`/ticker/${searchQuery.toUpperCase()}`);
   };
 
-  const handleSearchInput = async (value: string) => {
-    setSearchQuery(value);
-    if (value.length >= 1) {
-      setIsSearching(true);
-      try {
-        const results = await trpc.tickers.search.fetch({ query: value });
-        setSearchResults(results || []);
-      } catch (error) {
-        console.error("Search error:", error);
-        setSearchResults([]);
-      } finally {
-        setIsSearching(false);
-      }
-    } else {
-      setSearchResults([]);
+  // Use query hook for search with proper dependency tracking
+  const searchQuery_hook = trpc.tickers.search.useQuery(
+    { query: searchQuery },
+    { enabled: searchQuery.length >= 1 }
+  );
+
+  // Update results when search query changes
+  useMemo(() => {
+    if (searchQuery_hook.data) {
+      setSearchResults(searchQuery_hook.data);
     }
+  }, [searchQuery_hook.data]);
+
+  const handleSearchInput = (value: string) => {
+    setSearchQuery(value);
   };
 
   // Fetch personas list
