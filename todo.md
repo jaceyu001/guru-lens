@@ -271,3 +271,12 @@
 - [x] Implemented parallel execution of agents for performance
 - [x] Agent findings are now passed to persona analysis for enriched LLM prompts
 - [x] Added FundamentalsFindings and ValuationFindings types to shared/types.ts
+
+## Phase 7: Unit Tests for Metric Calculations (Completed)
+- [x] Create metricCalculations.test.ts with comprehensive unit tests
+- [x] Test ROE, ROIC, margin calculations (no double multiplication)
+- [x] Test PEG ratio calculation with correct formula (P/E / EarningsGrowth%)
+- [x] Test PEG returns N/A for unprofitable or non-growing companies
+- [x] Test with real stock examples (AAPL, DQ, MSFT)
+- [x] Test edge cases (high ROE, negative values, extreme growth)
+- [x] All 22 tests passing in 327ms
