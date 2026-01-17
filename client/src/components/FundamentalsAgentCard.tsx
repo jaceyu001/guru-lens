@@ -3,6 +3,7 @@ import { ChevronDown, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { MetricWithTooltip } from "./MetricWithTooltip";
 import type { FundamentalsFindings } from "@shared/types";
 
 interface FundamentalsAgentCardProps {
@@ -108,24 +109,27 @@ export function FundamentalsAgentCard({ findings, isLoading }: FundamentalsAgent
           {expandedSections.has("growth") && (
             <div className="px-4 pb-4 border-t border-slate-200 space-y-3">
               <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <p className="text-sm text-slate-600">Revenue Growth</p>
-                  <p className="text-lg font-semibold text-slate-900">
-                    {findings.growth.revenueGrowth.toFixed(1)}%
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-slate-600">Earnings Growth</p>
-                  <p className="text-lg font-semibold text-slate-900">
-                    {findings.growth.earningsGrowth.toFixed(1)}%
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-slate-600">FCF Growth</p>
-                  <p className="text-lg font-semibold text-slate-900">
-                    {findings.growth.fcfGrowth.toFixed(1)}%
-                  </p>
-                </div>
+                <MetricWithTooltip
+                  label="Revenue Growth"
+                  value={findings.growth.revenueGrowth}
+                  unit="%"
+                  periodLabel={findings.growthPeriodLabels?.revenueGrowthPeriod}
+                  tooltipContent="Year-over-year or TTM revenue growth. TTM used when Q2+ available; FY vs FY when Q1 only."
+                />
+                <MetricWithTooltip
+                  label="Earnings Growth"
+                  value={findings.growth.earningsGrowth}
+                  unit="%"
+                  periodLabel={findings.growthPeriodLabels?.earningsGrowthPeriod}
+                  tooltipContent="Year-over-year or TTM net income growth. Negative values indicate earnings decline or losses."
+                />
+                <MetricWithTooltip
+                  label="FCF Growth"
+                  value={findings.growth.fcfGrowth}
+                  unit="%"
+                  periodLabel={findings.growthPeriodLabels?.fcfGrowthPeriod}
+                  tooltipContent="Free Cash Flow growth year-over-year or TTM. Shows cash generation capability."
+                />
               </div>
               <p className="text-sm text-slate-700 italic">{findings.growth.narrative}</p>
             </div>
@@ -195,6 +199,7 @@ export function FundamentalsAgentCard({ findings, isLoading }: FundamentalsAgent
               <Badge variant="outline" className="text-xs">
                 {findings.capitalEfficiency.confidence}% confidence
               </Badge>
+
             </div>
             <ChevronDown
               className={`w-5 h-5 transition-transform ${
@@ -217,12 +222,7 @@ export function FundamentalsAgentCard({ findings, isLoading }: FundamentalsAgent
                     {findings.capitalEfficiency.roic.toFixed(1)}%
                   </p>
                 </div>
-                <div>
-                  <p className="text-sm text-slate-600">ROA</p>
-                  <p className="text-lg font-semibold text-slate-900">
-                    {findings.capitalEfficiency.roa.toFixed(1)}%
-                  </p>
-                </div>
+
               </div>
               <p className="text-sm text-slate-700 italic">{findings.capitalEfficiency.narrative}</p>
             </div>
@@ -243,6 +243,7 @@ export function FundamentalsAgentCard({ findings, isLoading }: FundamentalsAgent
               <Badge variant="outline" className="text-xs">
                 {findings.financialHealth.confidence}% confidence
               </Badge>
+
             </div>
             <ChevronDown
               className={`w-5 h-5 transition-transform ${
@@ -254,21 +255,21 @@ export function FundamentalsAgentCard({ findings, isLoading }: FundamentalsAgent
             <div className="px-4 pb-4 border-t border-slate-200 space-y-3">
               <div className="grid grid-cols-3 gap-4">
                 <div>
-                  <p className="text-sm text-slate-600">Debt/Equity</p>
-                  <p className="text-lg font-semibold text-slate-900">
-                    {findings.financialHealth.debtToEquity.toFixed(1)}%
-                  </p>
-                </div>
-                <div>
                   <p className="text-sm text-slate-600">Current Ratio</p>
                   <p className="text-lg font-semibold text-slate-900">
                     {findings.financialHealth.currentRatio.toFixed(2)}x
                   </p>
                 </div>
                 <div>
+                  <p className="text-sm text-slate-600">Debt/Equity</p>
+                  <p className="text-lg font-semibold text-slate-900">
+                    {findings.financialHealth.debtToEquity.toFixed(2)}x
+                  </p>
+                </div>
+                <div>
                   <p className="text-sm text-slate-600">Interest Coverage</p>
                   <p className="text-lg font-semibold text-slate-900">
-                    {findings.financialHealth.interestCoverage.toFixed(1)}x
+                    {findings.financialHealth.interestCoverage.toFixed(2)}x
                   </p>
                 </div>
               </div>
@@ -320,11 +321,18 @@ export function FundamentalsAgentCard({ findings, isLoading }: FundamentalsAgent
           )}
         </div>
 
+        {/* Summary */}
+        <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+          <p className="text-sm text-slate-700">{findings.summary}</p>
+        </div>
+
         {/* Data Quality Warnings */}
         {findings.dataQualityWarnings && findings.dataQualityWarnings.length > 0 && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <p className="text-sm font-semibold text-yellow-900 mb-2">Data Quality Warnings</p>
-            <ul className="text-xs text-yellow-800 space-y-1">
+          <div className="bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 p-4 rounded-lg">
+            <p className="text-sm font-semibold text-yellow-800 dark:text-yellow-200 mb-2">
+              ⚠️ Data Quality Warnings
+            </p>
+            <ul className="text-sm text-yellow-700 dark:text-yellow-300 space-y-1">
               {findings.dataQualityWarnings.map((warning, idx) => (
                 <li key={idx}>• {warning}</li>
               ))}

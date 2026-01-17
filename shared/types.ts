@@ -290,6 +290,11 @@ export interface FundamentalsFindings {
   summary: string;
   dataQualityWarnings: string[];
   recommendationsForPersonas: string[];
+  growthPeriodLabels?: {
+    revenueGrowthPeriod: string;
+    earningsGrowthPeriod: string;
+    fcfGrowthPeriod: string;
+  };
 }
 
 export interface ValuationMethod {

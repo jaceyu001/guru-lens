@@ -58,6 +58,11 @@ export interface FundamentalsFindings {
   summary: string;
   dataQualityWarnings: string[];
   recommendationsForPersonas: string[];
+  growthPeriodLabels?: {
+    revenueGrowthPeriod: string;
+    earningsGrowthPeriod: string;
+    fcfGrowthPeriod: string;
+  };
 }
 
 export async function analyzeFundamentals(
@@ -120,6 +125,20 @@ export async function analyzeFundamentals(
     cashFlow
   );
 
+  // Get period labels from growth calculations
+  const revenueGrowthResult = calculateGrowth({
+    financialData,
+    metric: 'revenue',
+  });
+  const earningsGrowthResult = calculateGrowth({
+    financialData,
+    metric: 'earnings',
+  });
+  const fcfGrowthResult = calculateGrowth({
+    financialData,
+    metric: 'fcf',
+  });
+
   return {
     growth,
     profitability,
@@ -129,6 +148,11 @@ export async function analyzeFundamentals(
     summary,
     dataQualityWarnings,
     recommendationsForPersonas,
+    growthPeriodLabels: {
+      revenueGrowthPeriod: revenueGrowthResult.periodLabel,
+      earningsGrowthPeriod: earningsGrowthResult.periodLabel,
+      fcfGrowthPeriod: fcfGrowthResult.periodLabel,
+    },
   };
 }
 
