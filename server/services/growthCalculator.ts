@@ -12,7 +12,7 @@ import {
 } from './dataAvailabilityDetector';
 import type { FinancialData } from '@shared/types';
 
-export type GrowthMetric = 'revenue' | 'earnings' | 'netIncome' | 'operatingIncome' | 'fcf' | 'freeCashFlow';
+export type GrowthMetric = 'revenue' | 'netIncome' | 'operatingIncome' | 'freeCashFlow';
 export type ComparisonType = 'TTM_VS_FY' | 'FY_VS_FY' | 'INSUFFICIENT_DATA';
 
 export interface GrowthCalculationInput {
@@ -27,7 +27,6 @@ export interface GrowthCalculationResult {
   priorValue: number;
   currentPeriod: string; // "2025 TTM" or "2024 FY"
   priorPeriod: string; // "2024 FY"
-  periodLabel: string; // "2025 TTM vs 2024 FY" for UI display
   comparisonType: ComparisonType;
   metricName: GrowthMetric;
   dataQualityFlags: {
@@ -84,7 +83,6 @@ export function calculateGrowth(input: GrowthCalculationInput): GrowthCalculatio
       priorValue: 0,
       currentPeriod: 'N/A',
       priorPeriod: 'N/A',
-      periodLabel: 'Insufficient Data',
       comparisonType: 'INSUFFICIENT_DATA',
       metricName: metric,
       dataQualityFlags: {
@@ -107,7 +105,6 @@ export function calculateGrowth(input: GrowthCalculationInput): GrowthCalculatio
     priorValue,
     currentPeriod: comparison.currentPeriod,
     priorPeriod: comparison.priorPeriod,
-    periodLabel: `${comparison.currentPeriod} vs ${comparison.priorPeriod}`,
     comparisonType: comparison.type,
     metricName: metric,
     dataQualityFlags: {
@@ -182,10 +179,8 @@ function getMetricValue(
 ): number {
   const metricMap: Record<GrowthMetric, string> = {
     revenue: 'revenue',
-    earnings: 'netIncome',
     netIncome: 'netIncome',
     operatingIncome: 'operatingIncome',
-    fcf: 'freeCashFlow',
     freeCashFlow: 'freeCashFlow',
   };
 
