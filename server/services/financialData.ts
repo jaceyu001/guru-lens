@@ -103,14 +103,14 @@ except Exception as e:
     print(json.dumps({"error": str(e)}))
 `;
 
-    const result = execSync(\`python3 -c "\${pythonScript.replace(/"/g, '\\\\"')}"\`, {
+    const result = execSync(`python3 -c "${pythonScript.replace(/"/g, '\\"')}"`, {
       encoding: "utf-8",
       timeout: 30000,
     });
 
     return JSON.parse(result);
   } catch (error) {
-    console.error(\`Error fetching yfinance data for \${symbol}:\`, error);
+    console.error(`Error fetching yfinance data for ${symbol}:`, error);
     return null;
   }
 }
@@ -160,7 +160,7 @@ export async function getTickerSnapshot(symbol: string): Promise<TickerSnapshot 
 export async function getFinancialData(symbol: string): Promise<FinancialData | null> {
   const data = await fetchFromYfinance(symbol);
   if (!data || data.error) {
-    console.error(\`Failed to fetch data for \${symbol}:\`, data?.error);
+    console.error(`Failed to fetch data for ${symbol}:`, data?.error);
     return null;
   }
 
@@ -190,7 +190,7 @@ export async function getFinancialData(symbol: string): Promise<FinancialData | 
     profile: {
       sector: data.sector || "Unknown",
       industry: data.industry || "Unknown",
-      description: \`\${data.company_name} operates in the \${data.industry} industry.\`,
+      description: `${data.company_name} operates in the ${data.industry} industry.`,
       employees: data.employees || 0,
       website: data.website || "",
     },

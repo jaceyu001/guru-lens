@@ -223,7 +223,7 @@ Free Cash Flow: $${(latestFinancials.freeCashFlow / 1e9).toFixed(2)}B`
     .replace('{peRatio}', getSafeMetricValue(input.ratios.peRatio.toFixed(1), input.dataQualityFlags?.peAnomalous || input.dataQualityFlags?.peNegative, 'P/E Ratio'))
     .replace('{pegRatio}', (() => {
       // PEG is undefined (0) for unprofitable or non-growing companies
-      if (input.ratios.pegRatio === 0 || input.dataQualityFlags?.pegUndefined) {
+      if (input.ratios.pegRatio === 0) {
         return 'N/A (Company is unprofitable or earnings not growing)';
       }
       return getSafeMetricValue(input.ratios.pegRatio.toFixed(2), input.dataQualityFlags?.peAnomalous, 'PEG Ratio');

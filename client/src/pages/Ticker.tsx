@@ -109,7 +109,8 @@ export default function Ticker() {
     };
     
     const flagKey = anomalyMap[metricName];
-    return flagKey ? (flags[flagKey] ?? false) : false;
+    if (!flagKey || typeof flagKey !== 'string') return false;
+    return (flags[flagKey as keyof typeof flags] as boolean) ?? false;
   };
 
 
