@@ -70,14 +70,14 @@ except Exception as e:
     print(json.dumps({"error": str(e)}))
 `;
 
-    const result = execSync(\`python3 -c "\${pythonScript.replace(/"/g, '\\\\"')}"\`, {
+    const result = execSync(`python3 -c "${pythonScript.replace(/"/g, '\\"')}"`, {
       encoding: "utf-8",
       timeout: 30000,
     });
 
     const data = JSON.parse(result);
     if (data.error) {
-      console.error(`Error fetching balance sheet history for \${symbol}:`, data.error);
+      console.error(`Error fetching balance sheet history for ${symbol}:`, data.error);
       return [];
     }
 
@@ -96,7 +96,7 @@ except Exception as e:
       timestamp: new Date(item.timestamp),
     }));
   } catch (error) {
-    console.error(`Error fetching balance sheet history for \${symbol}:`, error);
+    console.error(`Error fetching balance sheet history for ${symbol}:`, error);
     return [];
   }
 }

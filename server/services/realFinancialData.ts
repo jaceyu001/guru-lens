@@ -49,6 +49,8 @@ interface YFinanceResponse {
     netMargin: number;
     dividendYield: number;
     interestCoverage: number;
+    revenueGrowth?: number;
+    earningsGrowth?: number;
   };
   financials: Array<{
     period: string;

@@ -1,4 +1,5 @@
-import { FinancialData } from "../../shared/types";
+import type { FinancialData } from '@shared/types';
+import { calculateGrowth } from './growthCalculator';
 
 type DataQualityFlags = NonNullable<FinancialData['dataQualityFlags']>;
 
@@ -132,23 +133,23 @@ export async function analyzeFundamentals(
 }
 
 function analyzeGrowth(financialData: FinancialData): GrowthAnalysis {
-  // Use YoY growth rates from yfinance ratios (primary source)
-  // These are Year-over-Year (YoY) growth rates comparing most recent fiscal year to previous year
-  let revenueGrowth = (financialData.ratios?.revenueGrowth || 0) * 100; // Convert decimal to percentage
-  let earningsGrowth = (financialData.ratios?.earningsGrowth || 0) * 100; // Convert decimal to percentage
+  // Use TTM vs FY growth calculator for consistent system-wide calculations
+  const revenueGrowthResult = calculateGrowth({
+    financialData,
+    metric: 'revenue',
+  });
+  const earningsGrowthResult = calculateGrowth({
+    financialData,
+    metric: 'netIncome',
+  });
+  const fcfGrowthResult = calculateGrowth({
+    financialData,
+    metric: 'freeCashFlow',
+  });
   
-  // Note: Extreme negative values (< -100%) indicate company swing from profit to loss
-  // These are valid but should be flagged as significant structural changes
-  
-  // Fallback to calculated growth from financials if ratios not available
-  if (revenueGrowth === 0 && financialData.financials) {
-    revenueGrowth = calculateRevenueGrowth(financialData.financials) || 0;
-  }
-  if (earningsGrowth === 0 && financialData.financials) {
-    earningsGrowth = calculateEarningsGrowth(financialData.financials) || 0;
-  }
-  
-  const fcfGrowth = calculateFcfGrowth(financialData.financials) || 0;
+  const revenueGrowth = revenueGrowthResult.growthRate || 0;
+  const earningsGrowth = earningsGrowthResult.growthRate || 0;
+  const fcfGrowth = fcfGrowthResult.growthRate || 0;
   
   // Calculate confidence based on data availability
   let confidence = 85;
