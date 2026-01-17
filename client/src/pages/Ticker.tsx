@@ -100,7 +100,7 @@ export default function Ticker() {
     const flags = financialData.data?.dataQualityFlags;
     if (!flags) return false;
     
-    const anomalyMap: Record<string, string> = {
+    const anomalyMap: Record<string, keyof typeof flags> = {
       "P/E Ratio": "peAnomalous",
       "P/B Ratio": "pbAnomalous",
       "ROE": "roeNegative",
@@ -109,7 +109,7 @@ export default function Ticker() {
     };
     
     const flagKey = anomalyMap[metricName];
-    return flagKey ? Boolean(flags[flagKey as keyof typeof flags]) : false;
+    return flagKey ? (flags[flagKey] ?? false) : false;
   };
 
 

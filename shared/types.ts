@@ -166,8 +166,6 @@ export interface KeyRatios {
   netMargin: number;
   assetTurnover: number;
   inventoryTurnover: number;
-  revenueGrowth?: number;
-  earningsGrowth?: number;
 }
 
 export interface FinancialData {

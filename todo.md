@@ -314,8 +314,8 @@
 - [x] Phase 1: Implement dataAvailabilityDetector.ts with comprehensive tests (12 tests passing)
 - [x] Phase 1: Test with multiple stocks (BIDU, AAPL, MSFT, etc.)
 - [x] Phase 2: Implement growthCalculator.ts service (15 tests passing)
-- [ ] Phase 2.5: Integrate growthCalculator with fundamentalsAgent
+- [ ] Phase 2: Integrate growthCalculator with fundamentalsAgent
+- [ ] Phase 2: Integrate growthCalculator with valuationAgent
 - [ ] Phase 3: Update UI to display period labels ("2025 TTM vs 2024 FY")
-- [ ] Phase 3: Add data quality warning badges (Q1 only, TTM unavailable)
 - [ ] Phase 3: Add tooltips explaining TTM vs FY comparisons
-- [ ] Phase 4: End-to-end testing with multiple stocks
+- [ ] Final: End-to-end testing with multiple stocks
