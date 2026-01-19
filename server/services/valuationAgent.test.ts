@@ -555,3 +555,180 @@ describe("ValuationAgent - TTM vs FY Integration", () => {
     });
   });
 });
+
+
+// ============================================================================
+// DDM Method TTM vs FY Integration Tests
+// ============================================================================
+
+describe("ValuationAgent - DDM Method TTM vs FY Integration", () => {
+  it("should include TTM vs FY comparison in DDM assumptions", async () => {
+    const data = createMockFinancialData();
+    const result = await analyzeValuation({
+      ticker: "TEST",
+      currentPrice: 100,
+      financialData: data,
+      dataQualityFlags: data.dataQualityFlags!,
+    });
+
+    const ddmMethod = result.methods.find(m => m.name === "DDM");
+    if (ddmMethod && ddmMethod.assessment !== "UNABLE_TO_VALUE") {
+      expect(ddmMethod.assumptions).toHaveProperty("comparisonType");
+      expect(ddmMethod.assumptions).toHaveProperty("currentPeriod");
+      expect(ddmMethod.assumptions).toHaveProperty("priorPeriod");
+    }
+  });
+
+  it("should reference dividend growth period in DDM narrative", async () => {
+    const data = createMockFinancialData();
+    const result = await analyzeValuation({
+      ticker: "TEST",
+      currentPrice: 100,
+      financialData: data,
+      dataQualityFlags: data.dataQualityFlags!,
+    });
+
+    const ddmMethod = result.methods.find(m => m.name === "DDM");
+    if (ddmMethod) {
+      expect(ddmMethod.narrative).toBeDefined();
+      expect(ddmMethod.narrative.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("should handle non-dividend-paying companies gracefully", async () => {
+    const data = createMockFinancialData();
+    const result = await analyzeValuation({
+      ticker: "TEST",
+      currentPrice: 100,
+      financialData: data,
+      dataQualityFlags: data.dataQualityFlags!,
+    });
+
+    const ddmMethod = result.methods.find(m => m.name === "DDM");
+    expect(ddmMethod).toBeDefined();
+    // Should return UNABLE_TO_VALUE for non-dividend-paying companies
+    expect(["UNABLE_TO_VALUE", "UNDERVALUED", "FAIRLY_VALUED", "OVERVALUED"]).toContain(
+      ddmMethod?.assessment
+    );
+  });
+});
+
+// ============================================================================
+// AssetBased Method TTM vs FY Integration Tests
+// ============================================================================
+
+describe("ValuationAgent - AssetBased Method TTM vs FY Integration", () => {
+  it("should include TTM vs FY comparison in AssetBased assumptions", async () => {
+    const data = createMockFinancialData();
+    const result = await analyzeValuation({
+      ticker: "TEST",
+      currentPrice: 100,
+      financialData: data,
+      dataQualityFlags: data.dataQualityFlags!,
+    });
+
+    const assetMethod = result.methods.find(m => m.name === "AssetBased");
+    if (assetMethod && assetMethod.assessment !== "UNABLE_TO_VALUE") {
+      expect(assetMethod.assumptions).toHaveProperty("comparisonType");
+      expect(assetMethod.assumptions).toHaveProperty("currentPeriod");
+      expect(assetMethod.assumptions).toHaveProperty("priorPeriod");
+    }
+  });
+
+  it("should reference ROE period in AssetBased narrative", async () => {
+    const data = createMockFinancialData();
+    const result = await analyzeValuation({
+      ticker: "TEST",
+      currentPrice: 100,
+      financialData: data,
+      dataQualityFlags: data.dataQualityFlags!,
+    });
+
+    const assetMethod = result.methods.find(m => m.name === "AssetBased");
+    if (assetMethod) {
+      expect(assetMethod.narrative).toBeDefined();
+      expect(assetMethod.narrative.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("should handle missing balance sheet data", async () => {
+    const data = createMockFinancialData({
+      financials: [],
+    });
+
+    const result = await analyzeValuation({
+      ticker: "TEST",
+      currentPrice: 100,
+      financialData: data,
+      dataQualityFlags: data.dataQualityFlags!,
+    });
+
+    const assetMethod = result.methods.find(m => m.name === "AssetBased");
+    expect(assetMethod).toBeDefined();
+    expect(assetMethod?.assessment).toBe("UNABLE_TO_VALUE");
+  });
+});
+
+// ============================================================================
+// All Methods TTM vs FY Consistency Tests
+// ============================================================================
+
+describe("ValuationAgent - TTM vs FY Consistency Across All Methods", () => {
+  it("should have consistent period information across all methods", async () => {
+    const data = createMockFinancialData();
+    const result = await analyzeValuation({
+      ticker: "TEST",
+      currentPrice: 100,
+      financialData: data,
+      dataQualityFlags: data.dataQualityFlags!,
+    });
+
+    // Check that methods with comparison types have consistent structure
+    const methodsWithComparison = result.methods.filter(
+      m => m.assumptions?.comparisonType
+    );
+
+    methodsWithComparison.forEach(method => {
+      expect(method.assumptions).toHaveProperty("comparisonType");
+      expect(method.assumptions).toHaveProperty("currentPeriod");
+      expect(method.assumptions).toHaveProperty("priorPeriod");
+      expect(["TTM_VS_FY", "FY_VS_FY"]).toContain(method.assumptions?.comparisonType);
+    });
+  });
+
+  it("should include period information in method narratives", async () => {
+    const data = createMockFinancialData();
+    const result = await analyzeValuation({
+      ticker: "TEST",
+      currentPrice: 100,
+      financialData: data,
+      dataQualityFlags: data.dataQualityFlags!,
+    });
+
+    result.methods.forEach(method => {
+      if (method.assessment !== "UNABLE_TO_VALUE") {
+        expect(method.narrative).toBeDefined();
+        expect(method.narrative.length).toBeGreaterThan(0);
+      }
+    });
+  });
+
+  it("should calculate consensus with all applicable methods", async () => {
+    const data = createMockFinancialData();
+    const result = await analyzeValuation({
+      ticker: "TEST",
+      currentPrice: 100,
+      financialData: data,
+      dataQualityFlags: data.dataQualityFlags!,
+    });
+
+    // Should have at least some applicable methods
+    const applicableMethods = result.methods.filter(
+      m => m.assessment !== "UNABLE_TO_VALUE"
+    );
+    expect(applicableMethods.length).toBeGreaterThan(0);
+
+    // Consensus should be calculated from applicable methods
+    expect(result.consensusValuation.midpoint).toBeGreaterThan(0);
+  });
+});

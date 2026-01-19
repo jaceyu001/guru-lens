@@ -379,8 +379,14 @@ async function calculateDDM(
     // Calculate annual dividend
     const annualDividend = currentPrice * (dividendYield / 100);
 
-    // Estimate dividend growth rate (conservative)
-    const dividendGrowthRate = 3; // %
+    // Get dividend growth rate using TTM vs FY logic from growthCalculator
+    const dividendGrowthResult = calculateGrowth({
+      financialData,
+      metric: 'revenue', // Use revenue growth as proxy for dividend growth
+    });
+    
+    // Use conservative dividend growth rate based on TTM vs FY comparison
+    const dividendGrowthRate = Math.min(dividendGrowthResult.growthRate * 0.5, 8); // Conservative: 50% of revenue growth, max 8%
 
     // Calculate required return (cost of equity)
     const requiredReturn = 10; // % (conservative estimate)
@@ -399,8 +405,8 @@ async function calculateDDM(
     const assessment = determineAssessment(intrinsicValue, currentPrice, "DDM");
 
     const narrative = `DDM values company based on dividend stream of $${annualDividend.toFixed(2)} annually. ` +
-      `Assumes ${dividendGrowthRate}% dividend growth and ${requiredReturn}% required return. ` +
-      `Note: DDM undervalues companies that reinvest earnings for growth.`;
+      `Assumes ${dividendGrowthRate.toFixed(1)}% dividend growth (${dividendGrowthResult.comparisonType}: ${dividendGrowthResult.currentPeriod} vs ${dividendGrowthResult.priorPeriod}) ` +
+      `and ${requiredReturn}% required return. Note: DDM undervalues companies that reinvest earnings for growth.`;
 
     return {
       name: "DDM",
@@ -411,7 +417,10 @@ async function calculateDDM(
       narrative,
       assumptions: {
         dividendYield: `${dividendYield.toFixed(2)}%`,
-        dividendGrowthRate: `${dividendGrowthRate}%`,
+        dividendGrowthRate: `${dividendGrowthRate.toFixed(1)}%`,
+        comparisonType: dividendGrowthResult.comparisonType,
+        currentPeriod: dividendGrowthResult.currentPeriod,
+        priorPeriod: dividendGrowthResult.priorPeriod,
         requiredReturn: `${requiredReturn}%`,
       },
       limitations: [
@@ -455,6 +464,12 @@ async function calculateAssetBased(
       };
     }
 
+    // Get ROE using TTM vs FY logic to assess asset quality
+    const roeGrowthResult = calculateGrowth({
+      financialData,
+      metric: 'netIncome',
+    });
+
     // Balance sheet data not in current FinancialData structure
     const totalAssets = 0; // Placeholder
     const totalLiabilities = 0; // Placeholder
@@ -490,7 +505,7 @@ async function calculateAssetBased(
     // Determine assessment
     const assessment = "UNABLE_TO_VALUE"; // Generally not suitable for valuation
 
-    const narrative = `Asset-based valuation calculates net asset value of $${(adjustedEquity / 1e9).toFixed(1)}B after adjusting for intangible assets. ` +
+    const narrative = `Asset-based valuation calculates net asset value of $${(adjustedEquity / 1e9).toFixed(1)}B after adjusting for intangible assets (${roeGrowthResult.comparisonType}: ${roeGrowthResult.currentPeriod} vs ${roeGrowthResult.priorPeriod}). ` +
       `This method is not suitable for technology and service companies where intangible assets (brand, IP, talent) are primary value drivers.`;
 
     return {
@@ -504,6 +519,9 @@ async function calculateAssetBased(
         totalAssets: `$${(totalAssets / 1e9).toFixed(1)}B`,
         totalLiabilities: `$${(totalLiabilities / 1e9).toFixed(1)}B`,
         intangibleAdjustment: `20%`,
+        comparisonType: roeGrowthResult.comparisonType,
+        currentPeriod: roeGrowthResult.currentPeriod,
+        priorPeriod: roeGrowthResult.priorPeriod,
       },
       limitations: [
         "Not suitable for tech/service companies",

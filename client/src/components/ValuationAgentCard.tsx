@@ -1,8 +1,14 @@
 import { useState } from "react";
-import { ChevronDown, TrendingUp, TrendingDown } from "lucide-react";
+import { ChevronDown, TrendingUp, TrendingDown, Info } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { ValuationFindings } from "@shared/types";
 
 interface ValuationAgentCardProps {
@@ -51,6 +57,46 @@ export function ValuationAgentCard({ findings, isLoading }: ValuationAgentCardPr
       default:
         return "bg-gray-500/10 text-gray-700 border-gray-500/20";
     }
+  };
+
+  const getComparisonTypeBadge = (assumptions: Record<string, any>) => {
+    const comparisonType = assumptions?.comparisonType;
+    const currentPeriod = assumptions?.currentPeriod;
+    const priorPeriod = assumptions?.priorPeriod;
+
+    if (!comparisonType) return null;
+
+    const label =
+      comparisonType === "TTM_VS_FY"
+        ? `${currentPeriod} TTM vs ${priorPeriod} FY`
+        : comparisonType === "FY_VS_FY"
+        ? `${currentPeriod} vs ${priorPeriod} (Q1 Only)`
+        : null;
+
+    const tooltip =
+      comparisonType === "TTM_VS_FY"
+        ? "Trailing Twelve Months compared to last Fiscal Year. Used when Q2+ data is available."
+        : comparisonType === "FY_VS_FY"
+        ? "Fiscal Year comparison. Used when only Q1 data is available for stability."
+        : "";
+
+    if (!label) return null;
+
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200 flex items-center gap-1 cursor-help">
+              {label}
+              <Info className="w-3 h-3" />
+            </Badge>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p className="text-xs">{tooltip}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
   };
 
   if (isLoading) {
@@ -162,11 +208,12 @@ export function ValuationAgentCard({ findings, isLoading }: ValuationAgentCardPr
                 onClick={() => toggleMethod(method.name)}
                 className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition"
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-wrap">
                   <span className="font-semibold text-slate-900">{method.name}</span>
                   <Badge className={`${getAssessmentColor(method.assessment)}`}>
                     {method.assessment.replace(/_/g, " ")}
                   </Badge>
+                  {getComparisonTypeBadge(method.assumptions)}
                   <span className="text-sm font-medium text-slate-600">
                     ${method.intrinsicValue.toFixed(2)}
                   </span>
@@ -205,12 +252,24 @@ export function ValuationAgentCard({ findings, isLoading }: ValuationAgentCardPr
                   <div>
                     <p className="text-sm font-medium text-slate-700 mb-2">Assumptions</p>
                     <div className="space-y-1">
-                      {Object.entries(method.assumptions).map(([key, value]) => (
-                        <p key={key} className="text-sm text-slate-600">
-                          <span className="font-medium">{key}:</span> {String(value)}
-                        </p>
-                      ))}
+                      {Object.entries(method.assumptions)
+                        .filter(([key]) => !['comparisonType', 'currentPeriod', 'priorPeriod'].includes(key))
+                        .map(([key, value]) => (
+                          <p key={key} className="text-sm text-slate-600">
+                            <span className="font-medium">{key}:</span> {String(value)}
+                          </p>
+                        ))}
                     </div>
+                    {method.assumptions?.comparisonType && (
+                      <div className="mt-2 p-2 bg-purple-50 rounded border border-purple-200">
+                        <p className="text-xs font-medium text-purple-900 mb-1">Growth Comparison:</p>
+                        <p className="text-xs text-purple-800">
+                          {method.assumptions.comparisonType === "TTM_VS_FY"
+                            ? `${method.assumptions.currentPeriod} TTM vs ${method.assumptions.priorPeriod} FY`
+                            : `${method.assumptions.currentPeriod} vs ${method.assumptions.priorPeriod} (Q1 Only)`}
+                        </p>
+                      </div>
+                    )}
                   </div>
                   {method.limitations.length > 0 && (
                     <div>
