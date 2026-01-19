@@ -12,6 +12,7 @@ import ssl
 import urllib3
 import yfinance as yf
 from datetime import datetime
+import math
 
 # Disable SSL verification warnings
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -228,6 +229,18 @@ def get_stock_data(symbol):
             "symbol": symbol
         }
 
+def convert_nan_to_none(obj):
+    """Recursively convert NaN and Inf values to None for JSON serialization"""
+    if isinstance(obj, dict):
+        return {k: convert_nan_to_none(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_nan_to_none(item) for item in obj]
+    elif isinstance(obj, float):
+        if math.isnan(obj) or math.isinf(obj):
+            return None
+        return obj
+    return obj
+
 def main():
     if len(sys.argv) < 2:
         print(json.dumps({"error": "Symbol required"}))
@@ -235,6 +248,8 @@ def main():
     
     symbol = sys.argv[1].upper()
     data = get_stock_data(symbol)
+    # Convert NaN and Inf to None before JSON serialization
+    data = convert_nan_to_none(data)
     print(json.dumps(data))
 
 if __name__ == "__main__":

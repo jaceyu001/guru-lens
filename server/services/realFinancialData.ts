@@ -59,6 +59,16 @@ interface YFinanceResponse {
     operatingIncome: number;
     freeCashFlow: number;
   }>;
+  quarterlyFinancials?: Array<{
+    period: string;
+    quarter: string;
+    fiscalYear: number;
+    revenue: number;
+    netIncome: number;
+    eps: number;
+    operatingIncome: number;
+    freeCashFlow: number;
+  }>;
   historicalBars: Array<{
     date: string;
     open: number;
@@ -132,6 +142,18 @@ export async function getStockData(symbol: string): Promise<FinancialData> {
               revenue: f.revenue,
               netIncome: f.netIncome,
               eps: f.eps,
+              operatingIncome: f.operatingIncome,
+              freeCashFlow: f.freeCashFlow,
+            })),
+            quarterlyFinancials: data.quarterlyFinancials?.map((q) => ({
+              period: q.period,
+              quarter: q.quarter,
+              fiscalYear: q.fiscalYear,
+              revenue: q.revenue,
+              netIncome: q.netIncome,
+              eps: q.eps,
+              operatingIncome: q.operatingIncome,
+              freeCashFlow: q.freeCashFlow,
             })),
             ratios: {
               pe: data.ratios.pe,

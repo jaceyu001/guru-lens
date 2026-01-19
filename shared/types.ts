@@ -194,8 +194,20 @@ export interface FinancialData {
     eps: number;
     period: string;
     fiscalYear: number;
+    operatingIncome?: number;
+    freeCashFlow?: number;
     revenueGrowth?: number;
     earningsGrowth?: number;
+  }[];
+  quarterlyFinancials?: {
+    revenue: number;
+    netIncome: number;
+    eps: number;
+    period: string;
+    quarter: string;
+    fiscalYear: number;
+    operatingIncome?: number;
+    freeCashFlow?: number;
   }[];
   ratios?: {
     pe?: number;
