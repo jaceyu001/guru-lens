@@ -240,6 +240,15 @@ export interface GrowthAnalysis {
   trend?: "ACCELERATING" | "STABLE" | "DECELERATING" | "UNKNOWN";
   narrative: string;
   confidence: number; // 0-100
+  // TTM vs FY period information
+  comparisonType?: "TTM_VS_FY" | "FY_VS_FY" | "INSUFFICIENT_DATA";
+  currentPeriod?: string; // e.g., "2025 TTM" or "2024 FY"
+  priorPeriod?: string; // e.g., "2024 FY" or "2023 FY"
+  dataQualityFlags?: {
+    onlyQ1Available?: boolean;
+    ttmNotAvailable?: boolean;
+    insufficientData?: boolean;
+  };
 }
 
 export interface ProfitabilityAnalysis {

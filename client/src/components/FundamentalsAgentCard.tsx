@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { ChevronDown, TrendingUp, TrendingDown, Minus, Info } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -59,6 +59,19 @@ export function FundamentalsAgentCard({ findings, isLoading }: FundamentalsAgent
         return <Minus className="w-4 h-4 text-blue-600" />;
       default:
         return null;
+    }
+  };
+
+  const getComparisonTypeDescription = (comparisonType: string | undefined): string => {
+    switch (comparisonType) {
+      case "TTM_VS_FY":
+        return "Trailing Twelve Months (TTM) compared to last Full Year (FY)";
+      case "FY_VS_FY":
+        return "Full Year compared to prior Full Year (Q1 data only available)";
+      case "INSUFFICIENT_DATA":
+        return "Insufficient data for comparison";
+      default:
+        return "Comparison type unknown";
     }
   };
 
@@ -127,6 +140,38 @@ export function FundamentalsAgentCard({ findings, isLoading }: FundamentalsAgent
                   </p>
                 </div>
               </div>
+
+              {/* Period Label with Tooltip */}
+              <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                <Info className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-blue-900">
+                    {findings.growth.currentPeriod} vs {findings.growth.priorPeriod}
+                  </p>
+                  <p className="text-xs text-blue-700 mt-1">
+                    {getComparisonTypeDescription(findings.growth.comparisonType)}
+                  </p>
+                </div>
+              </div>
+
+              {/* Data Quality Warnings */}
+              {Object.values(findings.growth.dataQualityFlags || {}).some(v => v) && (
+                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                  <p className="text-xs font-medium text-yellow-900">Data Quality Notes:</p>
+                  <ul className="text-xs text-yellow-800 mt-1 space-y-1">
+                    {findings.growth.dataQualityFlags?.onlyQ1Available && (
+                      <li>• Only Q1 data available - using FY vs FY comparison</li>
+                    )}
+                    {findings.growth.dataQualityFlags?.ttmNotAvailable && (
+                      <li>• TTM not available - using FY vs FY comparison</li>
+                    )}
+                    {findings.growth.dataQualityFlags?.insufficientData && (
+                      <li>• Insufficient financial data for reliable growth calculation</li>
+                    )}
+                  </ul>
+                </div>
+              )}
+
               <p className="text-sm text-slate-700 italic">{findings.growth.narrative}</p>
             </div>
           )}
@@ -291,7 +336,6 @@ export function FundamentalsAgentCard({ findings, isLoading }: FundamentalsAgent
               <Badge variant="outline" className="text-xs">
                 {findings.cashFlow.confidence}% confidence
               </Badge>
-              {getTrendIcon(findings.cashFlow.trend)}
             </div>
             <ChevronDown
               className={`w-5 h-5 transition-transform ${
@@ -320,11 +364,18 @@ export function FundamentalsAgentCard({ findings, isLoading }: FundamentalsAgent
           )}
         </div>
 
+        {/* Summary */}
+        {findings.summary && (
+          <div className="p-4 bg-slate-100 border border-slate-200 rounded-lg">
+            <p className="text-sm text-slate-700">{findings.summary}</p>
+          </div>
+        )}
+
         {/* Data Quality Warnings */}
         {findings.dataQualityWarnings && findings.dataQualityWarnings.length > 0 && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <p className="text-sm font-semibold text-yellow-900 mb-2">Data Quality Warnings</p>
-            <ul className="text-xs text-yellow-800 space-y-1">
+          <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
+            <p className="text-sm font-semibold text-orange-900 mb-2">Data Quality Warnings:</p>
+            <ul className="text-sm text-orange-800 space-y-1">
               {findings.dataQualityWarnings.map((warning, idx) => (
                 <li key={idx}>• {warning}</li>
               ))}

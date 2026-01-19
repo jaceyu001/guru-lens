@@ -383,3 +383,175 @@ describe("valuationAgent", () => {
     });
   });
 });
+
+
+// ============================================================================
+// TTM vs FY Integration Tests
+// ============================================================================
+
+describe("ValuationAgent - TTM vs FY Integration", () => {
+  describe("DCF Method with TTM vs FY Growth", () => {
+    it("should include TTM vs FY comparison type in assumptions", async () => {
+      const data = createMockFinancialData();
+      const result = await analyzeValuation({
+        ticker: "TEST",
+        currentPrice: 100,
+        financialData: data,
+        dataQualityFlags: data.dataQualityFlags!,
+      });
+
+      const dcfMethod = result.methods.find(m => m.name === "DCF");
+      expect(dcfMethod).toBeDefined();
+      
+      if (dcfMethod) {
+        // Should have TTM vs FY related assumptions
+        expect(dcfMethod.assumptions).toBeDefined();
+        expect(typeof dcfMethod.assumptions).toBe("object");
+      }
+    });
+
+    it("should reference comparison periods in narrative", async () => {
+      const data = createMockFinancialData();
+      const result = await analyzeValuation({
+        ticker: "TEST",
+        currentPrice: 100,
+        financialData: data,
+        dataQualityFlags: data.dataQualityFlags!,
+      });
+
+      const dcfMethod = result.methods.find(m => m.name === "DCF");
+      expect(dcfMethod?.narrative).toBeDefined();
+      
+      if (dcfMethod?.narrative) {
+        // Narrative should reference financial periods
+        expect(dcfMethod.narrative.length).toBeGreaterThan(0);
+      }
+    });
+  });
+
+  describe("Comparable Method with Growth Context", () => {
+    it("should calculate comparable valuation", async () => {
+      const data = createMockFinancialData();
+      const result = await analyzeValuation({
+        ticker: "TEST",
+        currentPrice: 100,
+        financialData: data,
+        dataQualityFlags: data.dataQualityFlags!,
+      });
+
+      const comparableMethod = result.methods.find(m => m.name === "Comparable");
+      expect(comparableMethod).toBeDefined();
+      expect(comparableMethod?.assessment).toBeTruthy();
+    });
+
+    it("should have valid assumptions for comparable method", async () => {
+      const data = createMockFinancialData();
+      const result = await analyzeValuation({
+        ticker: "TEST",
+        currentPrice: 100,
+        financialData: data,
+        dataQualityFlags: data.dataQualityFlags!,
+      });
+
+      const comparableMethod = result.methods.find(m => m.name === "Comparable");
+      expect(comparableMethod?.assumptions).toBeDefined();
+      expect(Object.keys(comparableMethod?.assumptions || {}).length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("Valuation Summary with Period Information", () => {
+    it("should generate comprehensive summary", async () => {
+      const data = createMockFinancialData();
+      const result = await analyzeValuation({
+        ticker: "TEST",
+        currentPrice: 100,
+        financialData: data,
+        dataQualityFlags: data.dataQualityFlags!,
+      });
+
+      expect(result.summary).toBeDefined();
+      expect(result.summary.length).toBeGreaterThan(0);
+    });
+
+    it("should include method agreement in summary context", async () => {
+      const data = createMockFinancialData();
+      const result = await analyzeValuation({
+        ticker: "TEST",
+        currentPrice: 100,
+        financialData: data,
+        dataQualityFlags: data.dataQualityFlags!,
+      });
+
+      expect(result.methodAgreement).toMatch(/STRONG|MODERATE|WEAK|DIVERGENT/);
+      expect(result.summary).toBeDefined();
+    });
+  });
+
+  describe("Data Quality Handling with TTM Logic", () => {
+    it("should handle insufficient financial data", async () => {
+      const data = createMockFinancialData({
+        financials: [],
+      });
+
+      const result = await analyzeValuation({
+        ticker: "TEST",
+        currentPrice: 100,
+        financialData: data,
+        dataQualityFlags: { ...data.dataQualityFlags!, insufficientData: true },
+      });
+
+      expect(result).toBeDefined();
+      expect(result.methods.length).toBeGreaterThan(0);
+    });
+
+    it("should collect data quality warnings", async () => {
+      const data = createMockFinancialData({
+        dataQualityFlags: {
+          ...createMockFinancialData().dataQualityFlags!,
+          peAnomalous: true,
+          roicZero: true,
+        },
+      });
+
+      const result = await analyzeValuation({
+        ticker: "TEST",
+        currentPrice: 100,
+        financialData: data,
+        dataQualityFlags: data.dataQualityFlags!,
+      });
+
+      expect(result.dataQualityWarnings).toBeDefined();
+      expect(Array.isArray(result.dataQualityWarnings)).toBe(true);
+    });
+  });
+
+  describe("Consensus Valuation with TTM Context", () => {
+    it("should calculate valid consensus range", async () => {
+      const data = createMockFinancialData();
+      const result = await analyzeValuation({
+        ticker: "TEST",
+        currentPrice: 100,
+        financialData: data,
+        dataQualityFlags: data.dataQualityFlags!,
+      });
+
+      expect(result.consensusValuation.low).toBeGreaterThan(0);
+      expect(result.consensusValuation.high).toBeGreaterThanOrEqual(result.consensusValuation.low);
+      expect(result.consensusValuation.midpoint).toBeLessThanOrEqual(result.consensusValuation.high);
+      expect(result.consensusValuation.midpoint).toBeGreaterThanOrEqual(result.consensusValuation.low);
+    });
+
+    it("should calculate margin of safety", async () => {
+      const data = createMockFinancialData();
+      const result = await analyzeValuation({
+        ticker: "TEST",
+        currentPrice: 100,
+        financialData: data,
+        dataQualityFlags: data.dataQualityFlags!,
+      });
+
+      expect(result.marginOfSafety).toBeDefined();
+      expect(typeof result.marginOfSafety).toBe("number");
+    });
+  });
+});

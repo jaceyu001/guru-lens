@@ -1,4 +1,5 @@
 import { FinancialData } from "../../shared/types";
+import { calculateGrowth } from "./growthCalculator";
 
 type DataQualityFlags = NonNullable<FinancialData['dataQualityFlags']>;
 
@@ -151,19 +152,40 @@ async function calculateDCF(
       };
     }
 
-    // Calculate FCF growth rate (3-year average)
-    const fcfGrowthRate = calculateAverageGrowthRate(fcfHistory.slice(0, 3));
+    // Get FCF growth using TTM vs FY logic from growthCalculator
+    const fcfGrowthResult = calculateGrowth({
+      financialData,
+      metric: 'freeCashFlow',
+    });
+
+    // Check if we have sufficient data
+    if (fcfGrowthResult.comparisonType === 'INSUFFICIENT_DATA') {
+      return {
+        name: "DCF",
+        intrinsicValue: 0,
+        upside: 0,
+        assessment: "UNABLE_TO_VALUE",
+        confidence: 0,
+        narrative: `DCF analysis not possible - insufficient FCF data available. Comparison type: ${fcfGrowthResult.comparisonType}`,
+        assumptions: {},
+        limitations: ["No FCF history", "Cannot project future cash flows"],
+      };
+    }
+
+    // Use TTM vs FY growth rate
+    const fcfGrowthRate = fcfGrowthResult.growthRate;
 
     // Validate FCF data
-    if (fcfHistory[0] <= 0) {
+    const currentFcf = fcfGrowthResult.currentValue;
+    if (currentFcf <= 0) {
       return {
         name: "DCF",
         intrinsicValue: 0,
         upside: 0,
         assessment: "UNABLE_TO_VALUE",
         confidence: 0.2,
-        narrative: "DCF analysis unreliable - current FCF is negative or zero.",
-        assumptions: { fcfGrowthRate: `${fcfGrowthRate.toFixed(1)}%` },
+        narrative: `DCF analysis unreliable - current FCF is negative or zero. Using ${fcfGrowthResult.currentPeriod} data.`,
+        assumptions: { fcfGrowthRate: `${fcfGrowthRate.toFixed(1)}%`, comparisonType: fcfGrowthResult.comparisonType, currentPeriod: fcfGrowthResult.currentPeriod, priorPeriod: fcfGrowthResult.priorPeriod },
         limitations: ["Negative FCF", "Cannot project positive future cash flows"],
       };
     }
@@ -174,16 +196,16 @@ async function calculateDCF(
     // Terminal growth rate (conservative)
     const terminalGrowthRate = 2.5;
 
-    // Project FCF for 5 years
-    let currentFcf = fcfHistory[0];
+    // Project FCF for 5 years using TTM vs FY growth rate
+    let projectedFcf = currentFcf;
     let pvFcf = 0;
     for (let year = 1; year <= 5; year++) {
-      currentFcf = currentFcf * (1 + fcfGrowthRate / 100);
-      pvFcf += currentFcf / Math.pow(1 + wacc / 100, year);
+      projectedFcf = projectedFcf * (1 + fcfGrowthRate / 100);
+      pvFcf += projectedFcf / Math.pow(1 + wacc / 100, year);
     }
 
     // Calculate terminal value
-    const terminalFcf = currentFcf * (1 + terminalGrowthRate / 100);
+    const terminalFcf = projectedFcf * (1 + terminalGrowthRate / 100);
     const terminalValue = terminalFcf / ((wacc - terminalGrowthRate) / 100);
     const pvTerminalValue = terminalValue / Math.pow(1 + wacc / 100, 5);
 
@@ -199,7 +221,8 @@ async function calculateDCF(
     // Determine assessment
     const assessment = determineAssessment(intrinsicValue, 0, "DCF"); // Placeholder
 
-    const narrative = `DCF analysis based on historical FCF of $${(fcfHistory[0] / 1e9).toFixed(1)}B and ${fcfGrowthRate.toFixed(1)}% growth assumption. ` +
+    const narrative = `DCF analysis based on ${fcfGrowthResult.currentPeriod} FCF of $${(currentFcf / 1e9).toFixed(1)}B (vs ${fcfGrowthResult.priorPeriod} $${(fcfGrowthResult.priorValue / 1e9).toFixed(1)}B) ` +
+      `with ${fcfGrowthRate.toFixed(1)}% growth assumption (${fcfGrowthResult.comparisonType}). ` +
       `Terminal value represents ${((pvTerminalValue / intrinsicValue) * 100).toFixed(0)}% of total value. ` +
       `WACC of ${wacc.toFixed(1)}% used for discounting.`;
 
@@ -212,6 +235,9 @@ async function calculateDCF(
       narrative,
       assumptions: {
         fcfGrowthRate: `${fcfGrowthRate.toFixed(1)}%`,
+        comparisonType: fcfGrowthResult.comparisonType,
+        currentPeriod: fcfGrowthResult.currentPeriod,
+        priorPeriod: fcfGrowthResult.priorPeriod,
         wacc: `${wacc.toFixed(1)}%`,
         terminalGrowthRate: `${terminalGrowthRate}%`,
         projectionPeriod: "5 years",

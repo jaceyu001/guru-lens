@@ -194,11 +194,33 @@ Free Cash Flow: $${(latestFinancials.freeCashFlow / 1e9).toFixed(2)}B`
   if (input.fundamentalsFindings) {
     const fund = input.fundamentalsFindings;
     agentFindingsSummary += `\n\nFUNDAMENTALS AGENT FINDINGS:\n`;
-    agentFindingsSummary += `- Growth: ${fund.growth.assessment} (Revenue: ${fund.growth.revenueGrowth.toFixed(1)}%, Earnings: ${fund.growth.earningsGrowth.toFixed(1)}%, FCF: ${fund.growth.fcfGrowth.toFixed(1)}%)\n`;
+    
+    // Add period information for growth metrics
+    const growthPeriodInfo = fund.growth.comparisonType === 'TTM_VS_FY' 
+      ? `(${fund.growth.currentPeriod} vs ${fund.growth.priorPeriod})`
+      : fund.growth.comparisonType === 'FY_VS_FY'
+      ? `(${fund.growth.currentPeriod} vs ${fund.growth.priorPeriod} - Q1 data only)`
+      : '';
+    
+    agentFindingsSummary += `- Growth: ${fund.growth.assessment} ${growthPeriodInfo} (Revenue: ${fund.growth.revenueGrowth.toFixed(1)}%, Earnings: ${fund.growth.earningsGrowth.toFixed(1)}%, FCF: ${fund.growth.fcfGrowth.toFixed(1)}%)\n`;
     agentFindingsSummary += `- Profitability: ${fund.profitability.assessment} (Net Margin: ${fund.profitability.netMargin.toFixed(1)}%, Operating: ${fund.profitability.operatingMargin.toFixed(1)}%)\n`;
     agentFindingsSummary += `- Capital Efficiency: ${fund.capitalEfficiency.assessment} (ROE: ${fund.capitalEfficiency.roe.toFixed(1)}%, ROIC: ${fund.capitalEfficiency.roic.toFixed(1)}%)\n`;
     agentFindingsSummary += `- Financial Health: ${fund.financialHealth.assessment} (D/E: ${fund.financialHealth.debtToEquity.toFixed(1)}%, Current Ratio: ${fund.financialHealth.currentRatio.toFixed(2)}x)\n`;
     agentFindingsSummary += `- Cash Flow: ${fund.cashFlow.assessment} (FCF Margin: ${fund.cashFlow.fcfMargin.toFixed(1)}%, Growth: ${fund.cashFlow.fcfGrowth.toFixed(1)}%)\n`;
+    
+    // Add data quality flags if present
+    if (fund.growth.dataQualityFlags && Object.values(fund.growth.dataQualityFlags).some(v => v)) {
+      agentFindingsSummary += `\nGrowth Data Quality Notes:\n`;
+      if (fund.growth.dataQualityFlags.onlyQ1Available) {
+        agentFindingsSummary += `- Only Q1 data available; using FY vs FY comparison for stability\n`;
+      }
+      if (fund.growth.dataQualityFlags.ttmNotAvailable) {
+        agentFindingsSummary += `- TTM data not available; using FY vs FY comparison\n`;
+      }
+      if (fund.growth.dataQualityFlags.insufficientData) {
+        agentFindingsSummary += `- Insufficient financial data for reliable growth calculation\n`;
+      }
+    }
   }
   if (input.valuationFindings) {
     const val = input.valuationFindings;
@@ -238,7 +260,11 @@ Free Cash Flow: $${(latestFinancials.freeCashFlow / 1e9).toFixed(2)}B`
     .replace('{interestCoverage}', getSafeMetricValue(input.ratios.interestCoverage.toFixed(1), input.dataQualityFlags?.interestCoverageZero, 'Interest Coverage'))
     .replace('{dividendYield}', input.ratios.dividendYield.toFixed(2))
     .replace('{financials}', financialSummary)
-    .replace('{revenueGrowth}', input.fundamentalsFindings?.growth?.revenueGrowth?.toFixed(1) || 'N/A') // Use actual revenue growth from fundamentals
+    .replace('{revenueGrowth}', (() => {
+      const growth = input.fundamentalsFindings?.growth?.revenueGrowth?.toFixed(1) || 'N/A';
+      const period = input.fundamentalsFindings?.growth?.comparisonType === 'TTM_VS_FY' ? ' (TTM vs FY)' : input.fundamentalsFindings?.growth?.comparisonType === 'FY_VS_FY' ? ' (FY vs FY)' : '';
+      return growth === 'N/A' ? 'N/A' : `${growth}%${period}`;
+    })()) // Use actual revenue growth from fundamentals with period info
     .replace('{rdIntensity}', 'N/A') // R&D intensity not available in current data set
     .replace('{freeCashFlow}', latestFinancials ? `$${(latestFinancials.freeCashFlow / 1e9).toFixed(2)}B` : 'N/A')
     .replace('{agentFindings}', agentFindingsSummary)
