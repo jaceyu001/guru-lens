@@ -1,4 +1,5 @@
 import { FinancialData } from "../../shared/types";
+import { calculateGrowth, type GrowthCalculationResult } from "./growthCalculator";
 
 type DataQualityFlags = NonNullable<FinancialData['dataQualityFlags']>;
 
@@ -10,6 +11,15 @@ export interface GrowthAnalysis {
   trend: "ACCELERATING" | "STABLE" | "DECELERATING" | "UNKNOWN";
   narrative: string;
   confidence: number; // 0-100
+  // TTM vs FY period information
+  comparisonType: "TTM_VS_FY" | "FY_VS_FY" | "INSUFFICIENT_DATA";
+  currentPeriod: string; // e.g., "2025 TTM" or "2024 FY"
+  priorPeriod: string; // e.g., "2024 FY" or "2023 FY"
+  dataQualityFlags: {
+    onlyQ1Available?: boolean;
+    ttmNotAvailable?: boolean;
+    insufficientData?: boolean;
+  };
 }
 
 export interface ProfitabilityAnalysis {
@@ -100,6 +110,17 @@ export async function analyzeFundamentals(
     dataQualityWarnings.push("Market cap data is zero or unavailable");
   }
 
+  // Add TTM-related data quality warnings
+  if (growth.dataQualityFlags.onlyQ1Available) {
+    dataQualityWarnings.push("Only Q1 data available - using FY vs FY comparison instead of TTM");
+  }
+  if (growth.dataQualityFlags.ttmNotAvailable) {
+    dataQualityWarnings.push("TTM not available - using FY vs FY comparison");
+  }
+  if (growth.dataQualityFlags.insufficientData) {
+    dataQualityWarnings.push("Insufficient financial data for growth calculation");
+  }
+
   // Generate recommendations for personas
   const recommendationsForPersonas = generateRecommendations(
     growth,
@@ -132,46 +153,66 @@ export async function analyzeFundamentals(
 }
 
 function analyzeGrowth(financialData: FinancialData): GrowthAnalysis {
-  // Use YoY growth rates from yfinance ratios (primary source)
-  // These are Year-over-Year (YoY) growth rates comparing most recent fiscal year to previous year
-  let revenueGrowth = (financialData.ratios?.revenueGrowth || 0) * 100; // Convert decimal to percentage
-  let earningsGrowth = (financialData.ratios?.earningsGrowth || 0) * 100; // Convert decimal to percentage
-  
-  // Note: Extreme negative values (< -100%) indicate company swing from profit to loss
-  // These are valid but should be flagged as significant structural changes
-  
-  // Fallback to calculated growth from financials if ratios not available
-  if (revenueGrowth === 0 && financialData.financials) {
-    revenueGrowth = calculateRevenueGrowth(financialData.financials) || 0;
-  }
-  if (earningsGrowth === 0 && financialData.financials) {
-    earningsGrowth = calculateEarningsGrowth(financialData.financials) || 0;
-  }
-  
-  const fcfGrowth = calculateFcfGrowth(financialData.financials) || 0;
-  
-  // Calculate confidence based on data availability
+  // Calculate growth using TTM vs FY logic
+  const revenueResult = calculateGrowth({
+    financialData,
+    metric: 'revenue',
+  });
+
+  const earningsResult = calculateGrowth({
+    financialData,
+    metric: 'netIncome',
+  });
+
+  const fcfResult = calculateGrowth({
+    financialData,
+    metric: 'freeCashFlow',
+  });
+
+  // Use the growth rates from calculations
+  const revenueGrowth = revenueResult.growthRate;
+  const earningsGrowth = earningsResult.growthRate;
+  const fcfGrowth = fcfResult.growthRate;
+
+  // Get comparison type and period information from revenue result (all should be same)
+  const comparisonType = revenueResult.comparisonType;
+  const currentPeriod = revenueResult.currentPeriod;
+  const priorPeriod = revenueResult.priorPeriod;
+  const dataQualityFlags = revenueResult.dataQualityFlags;
+
+  // Calculate confidence based on data availability and comparison type
   let confidence = 85;
-  if (revenueGrowth === 0 && earningsGrowth === 0) confidence = 50; // No growth data available
-  if (!financialData.financials || financialData.financials.length < 2) confidence = Math.max(confidence - 10, 60);
-  
+  if (comparisonType === 'INSUFFICIENT_DATA') {
+    confidence = 50; // Low confidence if insufficient data
+  }
+  if (dataQualityFlags.onlyQ1Available) {
+    confidence -= 10; // Reduce confidence for Q1-only data
+  }
+  if (dataQualityFlags.ttmNotAvailable) {
+    confidence -= 5; // Slight reduction if TTM not available
+  }
+
   // Reduce confidence if growth is highly negative (indicates structural issues)
   if (earningsGrowth < -30) confidence -= 10;
 
-  // Determine assessment based on YoY growth
+  // Determine assessment based on growth rates
   let assessment: "STRONG" | "MODERATE" | "WEAK" | "UNCLEAR" = "UNCLEAR";
-  
-  // Handle negative growth (contraction)
-  if (revenueGrowth < -10 || earningsGrowth < -20) {
-    assessment = "WEAK"; // Significant contraction
-  } else if (revenueGrowth < 0 || earningsGrowth < 0) {
-    assessment = "WEAK"; // Any negative growth
-  } else if (revenueGrowth > 15 && earningsGrowth > 15) {
-    assessment = "STRONG"; // Strong growth
-  } else if (revenueGrowth > 5 && earningsGrowth > 5) {
-    assessment = "MODERATE"; // Moderate growth
-  } else if (revenueGrowth > 0 && earningsGrowth > 0) {
-    assessment = "WEAK"; // Weak positive growth
+
+  if (comparisonType === 'INSUFFICIENT_DATA') {
+    assessment = "UNCLEAR";
+  } else {
+    // Handle negative growth (contraction)
+    if (revenueGrowth < -10 || earningsGrowth < -20) {
+      assessment = "WEAK"; // Significant contraction
+    } else if (revenueGrowth < 0 || earningsGrowth < 0) {
+      assessment = "WEAK"; // Any negative growth
+    } else if (revenueGrowth > 15 && earningsGrowth > 15) {
+      assessment = "STRONG"; // Strong growth
+    } else if (revenueGrowth > 5 && earningsGrowth > 5) {
+      assessment = "MODERATE"; // Moderate growth
+    } else if (revenueGrowth > 0 && earningsGrowth > 0) {
+      assessment = "WEAK"; // Weak positive growth
+    }
   }
 
   // Determine trend
@@ -184,7 +225,15 @@ function analyzeGrowth(financialData: FinancialData): GrowthAnalysis {
     trend = "DECELERATING"; // Earnings growing slower than revenue (margin compression)
   }
 
-  const narrative = buildGrowthNarrative(revenueGrowth, earningsGrowth, fcfGrowth, trend);
+  const narrative = buildGrowthNarrative(
+    revenueGrowth,
+    earningsGrowth,
+    fcfGrowth,
+    trend,
+    currentPeriod,
+    priorPeriod,
+    comparisonType
+  );
 
   return {
     assessment,
@@ -194,6 +243,10 @@ function analyzeGrowth(financialData: FinancialData): GrowthAnalysis {
     trend,
     narrative,
     confidence,
+    comparisonType,
+    currentPeriod,
+    priorPeriod,
+    dataQualityFlags,
   };
 }
 
@@ -221,7 +274,7 @@ function analyzeProfitability(
   let trend: "IMPROVING" | "STABLE" | "DETERIORATING" | "UNKNOWN" = "UNKNOWN";
 
   const narrative = buildProfitabilityNarrative(netMargin, operatingMargin, grossMargin);
-  
+
   // Calculate confidence based on data quality
   let confidence = 90;
   if (dataQualityFlags.peAnomalous) confidence -= 10;
@@ -262,7 +315,7 @@ function analyzeCapitalEfficiency(
   }
 
   const narrative = buildCapitalEfficiencyNarrative(roe, roic, roa, dataQualityFlags);
-  
+
   // Calculate confidence based on data quality
   let confidence = 85;
   if (dataQualityFlags.roicZero) confidence = 50;
@@ -305,7 +358,7 @@ function analyzeFinancialHealth(
   }
 
   const narrative = buildFinancialHealthNarrative(debtToEquity, currentRatio, interestCoverage, dataQualityFlags);
-  
+
   // Calculate confidence based on data quality
   let confidence = 80;
   if (dataQualityFlags.debtToEquityAnomalous) confidence = 50;
@@ -340,7 +393,7 @@ function analyzeCashFlow(financialData: FinancialData): CashFlowAnalysis {
   }
 
   const narrative = buildCashFlowNarrative(fcfMargin, fcfGrowth);
-  
+
   // Calculate confidence based on data availability
   let confidence = 85;
   if (!financialData.financials || financialData.financials.length === 0) confidence = 50;
@@ -392,20 +445,26 @@ function buildGrowthNarrative(
   revenueGrowth: number,
   earningsGrowth: number,
   fcfGrowth: number,
-  trend: string
+  trend: string,
+  currentPeriod: string,
+  priorPeriod: string,
+  comparisonType: string
 ): string {
-  // All metrics are Year-over-Year (YoY) growth rates
-  // Comparing most recent fiscal year to previous fiscal year
-  let narrative = `Revenue growing at ${revenueGrowth.toFixed(1)}% YoY, with earnings growth of ${earningsGrowth.toFixed(1)}% YoY. FCF growth of ${fcfGrowth.toFixed(1)}% shows ${trend.toLowerCase()} trend. ${
+  if (comparisonType === 'INSUFFICIENT_DATA') {
+    return "Insufficient financial data available to calculate growth rates.";
+  }
+
+  const periodLabel = comparisonType === 'TTM_VS_FY' ? 'TTM' : 'FY';
+  let narrative = `Revenue growing at ${revenueGrowth.toFixed(1)}% (${currentPeriod} vs ${priorPeriod}), with earnings growth of ${earningsGrowth.toFixed(1)}%. FCF growth of ${fcfGrowth.toFixed(1)}% shows ${trend.toLowerCase()} trend. ${
     earningsGrowth > revenueGrowth
       ? "Earnings outpacing revenue suggests margin expansion."
       : "Revenue outpacing earnings suggests margin pressure."
   }`;
-  
+
   if (earningsGrowth < -100) {
     narrative += " WARNING: Extreme earnings decline indicates significant structural changes or swing from profitability to losses.";
   }
-  
+
   return narrative;
 }
 
