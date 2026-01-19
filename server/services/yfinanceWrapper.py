@@ -91,7 +91,7 @@ def get_stock_data(symbol):
                 "earningsGrowth": (float(info.get('earningsGrowth', 0)) or 0)
             },
             "dataQualityFlags": {
-                "debtToEquityAnomalous": float(info.get('debtToEquity', 0)) > 200,  # D/E is already in percentage format
+                "debtToEquityAnomalous": float(info.get('debtToEquity', 0)) > 200,
                 "roicZero": (float(info.get('returnOnCapital', 0)) or 0) * 100 == 0,
                 "interestCoverageZero": float(info.get('interestCoverage', 0)) == 0,
                 "peNegative": float(info.get('trailingPE', 0)) < 0 or float(info.get('forwardPE', 0)) < 0,
@@ -101,7 +101,8 @@ def get_stock_data(symbol):
                 "roeNegative": (float(info.get('returnOnEquity', 0)) or 0) * 100 < 0,
                 "currentRatioAnomalous": float(info.get('currentRatio', 0)) < 0.5 or float(info.get('currentRatio', 0)) > 50
             },
-            "financials": []
+            "financials": [],
+            "quarterlyFinancials": []
         }
         
         # Get annual financials (preferred over quarterly for YoY growth calculations)
@@ -156,6 +157,38 @@ def get_stock_data(symbol):
             except Exception as e:
                 pass
         
+        # Get quarterly financials (for TTM calculations)
+        try:
+            quarterly_fin = ticker.quarterly_financials
+            if quarterly_fin is not None and not quarterly_fin.empty:
+                # Get the most recent quarters (up to 8 for 2 years of data)
+                for idx, col in enumerate(quarterly_fin.columns[:8]):
+                    try:
+                        revenue = float(quarterly_fin.loc['Total Revenue', col]) if 'Total Revenue' in quarterly_fin.index else 0
+                        net_income = float(quarterly_fin.loc['Net Income', col]) if 'Net Income' in quarterly_fin.index else 0
+                        operating_income = float(quarterly_fin.loc['Operating Income', col]) if 'Operating Income' in quarterly_fin.index else 0
+                        
+                        # Parse quarter from date
+                        period_str = str(col)[:10]
+                        period_date = datetime.strptime(period_str, "%Y-%m-%d")
+                        quarter_num = (period_date.month - 1) // 3 + 1
+                        quarter_str = f"{period_date.year}-Q{quarter_num}"
+                        
+                        result["quarterlyFinancials"].append({
+                            "period": period_str,
+                            "quarter": quarter_str,
+                            "fiscalYear": int(str(col)[:4]),
+                            "revenue": revenue,
+                            "netIncome": net_income,
+                            "eps": float(info.get('trailingEps', 0)) or 0,
+                            "operatingIncome": operating_income,
+                            "freeCashFlow": 0
+                        })
+                    except (ValueError, KeyError, TypeError):
+                        pass
+        except Exception as e:
+            pass
+        
         # If still no financials, add a placeholder
         if len(result["financials"]) == 0:
             result["financials"].append({
@@ -179,6 +212,13 @@ def get_stock_data(symbol):
                 "close": float(row['Close']),
                 "volume": int(row['Volume'])
             })
+        
+        # Sort quarterly financials by date (most recent first)
+        result["quarterlyFinancials"] = sorted(
+            result["quarterlyFinancials"],
+            key=lambda x: x["period"],
+            reverse=True
+        )
         
         return result
         
