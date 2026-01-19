@@ -136,9 +136,16 @@ async function calculateDCF(
   dataQualityFlags: DataQualityFlags
 ): Promise<ValuationMethod> {
   try {
-    // Get historical FCF (not available in current FinancialData structure)
-    // Using placeholder - would need to calculate from operating cash flow - capex
+    // Get historical FCF from financials
     const fcfHistory: number[] = [];
+    if (financialData.financials && financialData.financials.length > 0) {
+      for (const period of financialData.financials) {
+        if (period.freeCashFlow && period.freeCashFlow > 0) {
+          fcfHistory.push(period.freeCashFlow);
+        }
+      }
+    }
+    
     if (fcfHistory.length === 0) {
       return {
         name: "DCF",
@@ -190,8 +197,8 @@ async function calculateDCF(
       };
     }
 
-    // Calculate WACC
-    const wacc = calculateWACC(financialData, dataQualityFlags);
+    // Use hardcoded WACC of 9% (typical for mature US companies)
+    const wacc = 9.0;
 
     // Terminal growth rate (conservative)
     const terminalGrowthRate = 2.5;
@@ -457,9 +464,9 @@ async function calculateAssetBased(
   dataQualityFlags: DataQualityFlags
 ): Promise<ValuationMethod> {
   try {
-    // Get balance sheet data
-    const latestFinancials = financialData.financials?.[0];
-    if (!latestFinancials) {
+    // Get balance sheet data from financialData
+    const balanceSheet = financialData.balanceSheet;
+    if (!balanceSheet || balanceSheet.totalAssets === undefined || balanceSheet.totalEquity === undefined) {
       return {
         name: "AssetBased",
         intrinsicValue: 0,
@@ -478,10 +485,10 @@ async function calculateAssetBased(
       metric: 'netIncome',
     });
 
-    // Balance sheet data not in current FinancialData structure
-    const totalAssets = 0; // Placeholder
-    const totalLiabilities = 0; // Placeholder
-    const shareholderEquity = totalAssets - totalLiabilities;
+    // Extract balance sheet values
+    const totalAssets = balanceSheet.totalAssets;
+    const totalLiabilities = balanceSheet.totalLiabilities || 0;
+    const shareholderEquity = balanceSheet.totalEquity;
 
     // Check for negative equity
     if (shareholderEquity <= 0) {
@@ -497,23 +504,32 @@ async function calculateAssetBased(
       };
     }
 
-    // Adjust for intangible assets (reduce by 20% for typical company)
-    const intangibleAdjustment = shareholderEquity * 0.2;
-    const adjustedEquity = shareholderEquity - intangibleAdjustment;
+    // Calculate tangible book value (adjust for intangible assets)
+    const tangibleEquity = balanceSheet.tangibleBookValuePerShare 
+      ? balanceSheet.tangibleBookValuePerShare * (financialData.sharesOutstanding || 1)
+      : shareholderEquity * 0.8; // Default: reduce by 20% for typical intangibles
 
-    // Calculate intrinsic value per share (placeholder - would need share count)
-    const intrinsicValue = adjustedEquity;
+    // Calculate intrinsic value per share using tangible equity
+    const sharesOut = financialData.sharesOutstanding || 1;
+    const intrinsicValuePerShare = tangibleEquity / sharesOut;
+    const intrinsicValue = intrinsicValuePerShare;
 
-    // Determine confidence (low for tech/service companies)
-    const confidence = 0.4; // Asset-based is generally less reliable
+    // Determine confidence based on asset quality (ROE indicates how well assets are used)
+    let confidence = 0.5; // Base confidence for asset-based method
+    if (roeGrowthResult.growthRate && roeGrowthResult.growthRate > 15) {
+      confidence = 0.65; // Higher confidence if ROE is strong
+    } else if (roeGrowthResult.growthRate && roeGrowthResult.growthRate < 5) {
+      confidence = 0.35; // Lower confidence if ROE is weak
+    }
 
-    // Calculate upside (placeholder)
-    const upside = 0;
+    // Calculate upside
+    const currentPrice = (financialData.price && typeof financialData.price === 'object' ? (financialData.price as any).current : financialData.price) || 0;
+    const upside = currentPrice > 0 ? ((intrinsicValuePerShare - currentPrice) / currentPrice) * 100 : 0;
 
     // Determine assessment
-    const assessment = "UNABLE_TO_VALUE"; // Generally not suitable for valuation
+    const assessment = upside > 20 ? "UNDERVALUED" : upside > 0 ? "FAIRLY_VALUED" : "OVERVALUED"; // Based on upside potential
 
-    const narrative = `Asset-based valuation calculates net asset value of $${(adjustedEquity / 1e9).toFixed(1)}B after adjusting for intangible assets (${roeGrowthResult.comparisonType}: ${roeGrowthResult.currentPeriod} vs ${roeGrowthResult.priorPeriod}). ` +
+    const narrative = `Asset-based valuation calculates tangible book value per share of $${intrinsicValuePerShare.toFixed(2)} after adjusting for intangible assets (${roeGrowthResult.comparisonType}: ${roeGrowthResult.currentPeriod} vs ${roeGrowthResult.priorPeriod}). ` +
       `This method is not suitable for technology and service companies where intangible assets (brand, IP, talent) are primary value drivers.`;
 
     return {
@@ -588,8 +604,15 @@ function calculateDynamicMultiples(
     }
   }
 
-  // Get P/B from current ratios
-  if (financialData.ratios?.pb && financialData.ratios.pb > 0 && financialData.ratios.pb < 100) {
+  // Get P/B from balance sheet data (book value per share)
+  if (financialData.balanceSheet?.bookValuePerShare && financialData.balanceSheet.bookValuePerShare > 0) {
+    const pbFromBalance = currentPrice / financialData.balanceSheet.bookValuePerShare;
+    if (pbFromBalance > 0 && pbFromBalance < 100) {
+      historicalPBs.push(pbFromBalance);
+    }
+  }
+  // Fallback to ratios if balance sheet not available
+  else if (financialData.ratios?.pb && financialData.ratios.pb > 0 && financialData.ratios.pb < 100) {
     historicalPBs.push(financialData.ratios.pb);
   }
 

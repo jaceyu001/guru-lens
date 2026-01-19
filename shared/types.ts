@@ -223,6 +223,13 @@ export interface FinancialData {
     revenueGrowth?: number; // YoY revenue growth
     earningsGrowth?: number; // YoY earnings growth
   };
+  balanceSheet?: {
+    totalAssets?: number;
+    totalLiabilities?: number;
+    totalEquity?: number;
+    bookValuePerShare?: number;
+    tangibleBookValuePerShare?: number;
+  };
   dataQualityFlags?: {
     debtToEquityAnomalous?: boolean;
     roicZero?: boolean;

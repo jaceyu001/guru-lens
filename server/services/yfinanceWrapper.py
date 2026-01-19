@@ -103,7 +103,14 @@ def get_stock_data(symbol):
                 "currentRatioAnomalous": float(info.get('currentRatio', 0)) < 0.5 or float(info.get('currentRatio', 0)) > 50
             },
             "financials": [],
-            "quarterlyFinancials": []
+            "quarterlyFinancials": [],
+            "balanceSheet": {
+                "totalAssets": 0,
+                "totalLiabilities": 0,
+                "totalEquity": 0,
+                "bookValuePerShare": 0,
+                "tangibleBookValuePerShare": 0
+            }
         }
         
         # Get annual financials with FCF data
@@ -227,6 +234,34 @@ def get_stock_data(symbol):
                 "operatingIncome": 0,
                 "freeCashFlow": 0
             })
+        
+        # Extract balance sheet data
+        try:
+            balance_sheet = ticker.balance_sheet
+            if balance_sheet is not None and not balance_sheet.empty:
+                # Get the most recent balance sheet
+                col = balance_sheet.columns[0]
+                total_assets = float(balance_sheet.loc['Total Assets', col]) if 'Total Assets' in balance_sheet.index else 0
+                stockholders_equity = float(balance_sheet.loc['Stockholders Equity', col]) if 'Stockholders Equity' in balance_sheet.index else 0
+                total_liabilities = total_assets - stockholders_equity if total_assets > 0 else 0
+                
+                # Calculate book value per share
+                shares_out = result.get('sharesOutstanding', 0) or 1
+                book_value_per_share = stockholders_equity / shares_out if shares_out > 0 else 0
+                
+                # Get tangible book value (if available)
+                tangible_bv = float(balance_sheet.loc['Tangible Book Value', col]) if 'Tangible Book Value' in balance_sheet.index else stockholders_equity
+                tangible_bv_per_share = tangible_bv / shares_out if shares_out > 0 else 0
+                
+                result["balanceSheet"] = {
+                    "totalAssets": total_assets,
+                    "totalLiabilities": total_liabilities,
+                    "totalEquity": stockholders_equity,
+                    "bookValuePerShare": book_value_per_share,
+                    "tangibleBookValuePerShare": tangible_bv_per_share
+                }
+        except Exception as e:
+            pass
         
         # Add historical bars (last 30 days)
         result["historicalBars"] = []
