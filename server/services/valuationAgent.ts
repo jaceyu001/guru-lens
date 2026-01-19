@@ -286,21 +286,25 @@ async function calculateComparable(
     // Get shares outstanding from financial data (in millions)
     const sharesOutstanding = financialData.sharesOutstanding || 16000; // millions of shares (fallback to default if not available)
     
+    // Calculate dynamic multiples based on historical data and growth
+    const { dynamicPE, dynamicPB, dynamicPS, growthAdjustment } = calculateDynamicMultiples(
+      financialData,
+      currentPrice,
+      sharesOutstanding
+    );
+    
     // Calculate using P/E multiple
     const eps = latestFinancials.eps || 0;
-    const industryPE = 20; // S&P 500 average
-    const peValuation = eps > 0 ? eps * industryPE : 0;
+    const peValuation = eps > 0 ? eps * dynamicPE : 0;
 
     // Calculate using P/B multiple (if available)
     const bookValue = financialData.ratios?.pb ? 1 / financialData.ratios.pb : 0;
-    const industryPB = 3.0;
-    const pbValuation = bookValue > 0 ? bookValue * industryPB : 0;
+    const pbValuation = bookValue > 0 ? bookValue * dynamicPB : 0;
 
     // Calculate using P/S multiple (revenue per share * P/S multiple)
     const revenue = latestFinancials.revenue || 0; // in millions
     const revenuePerShare = sharesOutstanding > 0 ? (revenue / sharesOutstanding) : 0;
-    const industryPS = 2.0;
-    const psValuation = revenuePerShare > 0 ? revenuePerShare * industryPS : 0;
+    const psValuation = revenuePerShare > 0 ? revenuePerShare * dynamicPS : 0;
     
     // Validate that valuations are reasonable (not anomalous)
     const isAnomalous = (val: number) => val > 10000 || val < 0.01;
@@ -316,9 +320,11 @@ async function calculateComparable(
     // Determine assessment
     const assessment = determineAssessment(intrinsicValue, currentPrice, "Comparable");
 
-    const narrative = `Comparable analysis uses industry multiples (P/E: ${industryPE}x, P/B: ${industryPB}x, P/S: ${industryPS}x). ` +
+    const narrative = `Comparable analysis uses dynamic multiples based on historical data and growth profile ` +
+      `(P/E: ${dynamicPE.toFixed(1)}x, P/B: ${dynamicPB.toFixed(1)}x, P/S: ${dynamicPS.toFixed(1)}x). ` +
       `${validValuations.length} valuation methods applied. ` +
-      `Assumes company quality similar to industry average.`;
+      `Growth adjustment: ${(growthAdjustment * 100).toFixed(0)}%. ` +
+      `Valuation reflects company-specific growth profile and historical trading multiples.`;
 
     return {
       name: "Comparable",
@@ -328,15 +334,17 @@ async function calculateComparable(
       confidence,
       narrative,
       assumptions: {
-        industryPE: `${industryPE}x`,
-        industryPB: `${industryPB}x`,
-        industryPS: `${industryPS}x`,
+        dynamicPE: `${dynamicPE.toFixed(1)}x (based on historical avg)`,
+        dynamicPB: `${dynamicPB.toFixed(1)}x (based on historical avg)`,
+        dynamicPS: `${dynamicPS.toFixed(1)}x (based on historical avg)`,
+        growthAdjustment: `${(growthAdjustment * 100).toFixed(0)}%`,
         methodsApplied: validValuations.length,
       },
       limitations: [
-        "Assumes company is similar to industry average",
-        "Market multiples can be irrational",
-        "Doesn't account for company-specific competitive advantages",
+        "Historical multiples may not reflect future market conditions",
+        "Growth adjustment is based on recent trends which may not persist",
+        "Limited to available historical data (typically 3 years)",
+        "Market multiples can be irrational and subject to sentiment shifts",
       ],
     };
   } catch (error) {
@@ -542,6 +550,77 @@ async function calculateAssetBased(
       limitations: ["Calculation error"],
     };
   }
+}
+
+// ============================================================================
+// Dynamic Multiples Calculation
+// ============================================================================
+
+function calculateDynamicMultiples(
+  financialData: FinancialData,
+  currentPrice: number,
+  sharesOutstanding: number
+): { dynamicPE: number; dynamicPB: number; dynamicPS: number; growthAdjustment: number } {
+  // Calculate historical multiples from available financial data
+  const historicalPEs: number[] = [];
+  const historicalPSs: number[] = [];
+  const historicalPBs: number[] = [];
+
+  // Extract historical multiples from financials
+  if (financialData.financials && financialData.financials.length > 0) {
+    for (const period of financialData.financials.slice(0, 3)) {
+      // P/E calculation
+      if (period.eps && period.eps > 0) {
+        const pe = currentPrice / period.eps;
+        if (pe > 0 && pe < 200) {
+          historicalPEs.push(pe);
+        }
+      }
+
+      // P/S calculation
+      if (period.revenue && period.revenue > 0 && sharesOutstanding > 0) {
+        const revenuePerShare = period.revenue / sharesOutstanding;
+        const ps = currentPrice / revenuePerShare;
+        if (ps > 0 && ps < 100) {
+          historicalPSs.push(ps);
+        }
+      }
+    }
+  }
+
+  // Get P/B from current ratios
+  if (financialData.ratios?.pb && financialData.ratios.pb > 0 && financialData.ratios.pb < 100) {
+    historicalPBs.push(financialData.ratios.pb);
+  }
+
+  // Calculate averages with fallback to conservative defaults
+  const avgPE = historicalPEs.length > 0 ? historicalPEs.reduce((a, b) => a + b) / historicalPEs.length : 18;
+  const avgPS = historicalPSs.length > 0 ? historicalPSs.reduce((a, b) => a + b) / historicalPSs.length : 2.5;
+  const avgPB = historicalPBs.length > 0 ? historicalPBs.reduce((a, b) => a + b) / historicalPBs.length : 2.5;
+
+  // Calculate growth adjustment factor
+  let growthAdjustment = 1.0;
+  if (financialData.ratios) {
+    // If company has high ROE, apply premium
+    if (financialData.ratios.roe && financialData.ratios.roe > 20) {
+      growthAdjustment = 1.15; // 15% premium for high ROE
+    }
+    // If company has negative ROE, apply discount
+    else if (financialData.ratios.roe && financialData.ratios.roe < 0) {
+      growthAdjustment = 0.75; // 25% discount for negative ROE
+    }
+    // If company has low ROE, apply modest discount
+    else if (financialData.ratios.roe && financialData.ratios.roe < 10) {
+      growthAdjustment = 0.9; // 10% discount
+    }
+  }
+
+  // Apply growth adjustment to multiples
+  const dynamicPE = Math.max(avgPE * growthAdjustment, 8); // Floor at 8x
+  const dynamicPS = Math.max(avgPS * growthAdjustment, 0.5); // Floor at 0.5x
+  const dynamicPB = Math.max(avgPB * growthAdjustment, 0.8); // Floor at 0.8x
+
+  return { dynamicPE, dynamicPB, dynamicPS, growthAdjustment };
 }
 
 // ============================================================================

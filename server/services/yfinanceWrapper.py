@@ -106,8 +106,20 @@ def get_stock_data(symbol):
             "quarterlyFinancials": []
         }
         
-        # Get annual financials (preferred over quarterly for YoY growth calculations)
+        # Get annual financials with FCF data
         try:
+            # Get cash flow statement for FCF data
+            cashflow = ticker.cashflow
+            fcf_data = {}
+            if cashflow is not None and not cashflow.empty and 'Free Cash Flow' in cashflow.index:
+                for col in cashflow.columns:
+                    try:
+                        fcf = float(cashflow.loc['Free Cash Flow', col])
+                        if not math.isnan(fcf):
+                            fcf_data[str(col)[:10]] = fcf
+                    except (ValueError, KeyError, TypeError):
+                        pass
+            
             # Use income_stmt which provides annual data
             income_stmt = ticker.income_stmt
             if income_stmt is not None and not income_stmt.empty:
@@ -117,6 +129,7 @@ def get_stock_data(symbol):
                         revenue = float(income_stmt.loc['Total Revenue', col]) if 'Total Revenue' in income_stmt.index else 0
                         net_income = float(income_stmt.loc['Net Income', col]) if 'Net Income' in income_stmt.index else 0
                         operating_income = float(income_stmt.loc['Operating Income', col]) if 'Operating Income' in income_stmt.index else 0
+                        fcf = fcf_data.get(str(col)[:10], 0)
                         
                         result["financials"].append({
                             "period": str(col)[:10],
@@ -125,7 +138,7 @@ def get_stock_data(symbol):
                             "netIncome": net_income,
                             "eps": float(info.get('trailingEps', 0)) or 0,
                             "operatingIncome": operating_income,
-                            "freeCashFlow": 0
+                            "freeCashFlow": fcf
                         })
                     except (ValueError, KeyError, TypeError):
                         pass
@@ -158,8 +171,20 @@ def get_stock_data(symbol):
             except Exception as e:
                 pass
         
-        # Get quarterly financials (for TTM calculations)
+        # Get quarterly financials with FCF data (for TTM calculations)
         try:
+            # Get quarterly cash flow statement for FCF data
+            quarterly_cf = ticker.quarterly_cashflow
+            quarterly_fcf_data = {}
+            if quarterly_cf is not None and not quarterly_cf.empty and 'Free Cash Flow' in quarterly_cf.index:
+                for col in quarterly_cf.columns:
+                    try:
+                        fcf = float(quarterly_cf.loc['Free Cash Flow', col])
+                        if not math.isnan(fcf):
+                            quarterly_fcf_data[str(col)[:10]] = fcf
+                    except (ValueError, KeyError, TypeError):
+                        pass
+            
             quarterly_fin = ticker.quarterly_financials
             if quarterly_fin is not None and not quarterly_fin.empty:
                 # Get the most recent quarters (up to 8 for 2 years of data)
@@ -168,6 +193,7 @@ def get_stock_data(symbol):
                         revenue = float(quarterly_fin.loc['Total Revenue', col]) if 'Total Revenue' in quarterly_fin.index else 0
                         net_income = float(quarterly_fin.loc['Net Income', col]) if 'Net Income' in quarterly_fin.index else 0
                         operating_income = float(quarterly_fin.loc['Operating Income', col]) if 'Operating Income' in quarterly_fin.index else 0
+                        fcf = quarterly_fcf_data.get(str(col)[:10], 0)
                         
                         # Parse quarter from date
                         period_str = str(col)[:10]
@@ -183,7 +209,7 @@ def get_stock_data(symbol):
                             "netIncome": net_income,
                             "eps": float(info.get('trailingEps', 0)) or 0,
                             "operatingIncome": operating_income,
-                            "freeCashFlow": 0
+                            "freeCashFlow": fcf
                         })
                     except (ValueError, KeyError, TypeError):
                         pass
