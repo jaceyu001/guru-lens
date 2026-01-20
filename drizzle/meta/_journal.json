@@ -1,20 +1,5 @@
 {
   "version": "7",
   "dialect": "mysql",
-  "entries": [
-    {
-      "idx": 0,
-      "version": "5",
-      "when": 1767893748441,
-      "tag": "0000_parched_garia",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "5",
-      "when": 1767893976264,
-      "tag": "0001_neat_prima",
-      "breakpoints": true
-    }
-  ]
+  "entries": []
 }
