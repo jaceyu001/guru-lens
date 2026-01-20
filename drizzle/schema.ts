@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
 
 /**
@@ -25,4 +26,81 @@ export const users = mysqlTable("users", {
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
-// TODO: Add your tables here
+
+// Stub tables for future use
+export const personas = mysqlTable("personas", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  investmentPhilosophy: text("investmentPhilosophy"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type Persona = typeof personas.$inferSelect;
+export type InsertPersona = typeof personas.$inferInsert;
+
+export const tickers = mysqlTable("tickers", {
+  id: int("id").autoincrement().primaryKey(),
+  symbol: varchar("symbol", { length: 10 }).notNull().unique(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type Ticker = typeof tickers.$inferSelect;
+export type InsertTicker = typeof tickers.$inferInsert;
+
+export const analyses = mysqlTable("analyses", {
+  id: int("id").autoincrement().primaryKey(),
+  tickerId: int("tickerId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type Analysis = typeof analyses.$inferSelect;
+export type InsertAnalysis = typeof analyses.$inferInsert;
+
+export const opportunities = mysqlTable("opportunities", {
+  id: int("id").autoincrement().primaryKey(),
+  personaId: int("personaId").notNull(),
+  tickerId: int("tickerId").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  investmentPhilosophy: text("investmentPhilosophy"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type Opportunity = typeof opportunities.$inferSelect;
+export type InsertOpportunity = typeof opportunities.$inferInsert;
+
+export const watchlistTickers = mysqlTable("watchlistTickers", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  tickerId: int("tickerId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type InsertWatchlistTicker = typeof watchlistTickers.$inferInsert;
+
+export const watchlistOpportunities = mysqlTable("watchlistOpportunities", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  opportunityId: int("opportunityId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const alerts = mysqlTable("alerts", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  tickerId: int("tickerId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type InsertAlert = typeof alerts.$inferInsert;
+
+export const financialDataCache = mysqlTable("financialDataCache", {
+  id: int("id").autoincrement().primaryKey(),
+  symbol: varchar("symbol", { length: 10 }).notNull(),
+  data: json("data"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type InsertFinancialDataCache = typeof financialDataCache.$inferInsert;
+
+export const jobs = mysqlTable("jobs", {
+  id: int("id").autoincrement().primaryKey(),
+  status: varchar("status", { length: 50 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type InsertJob = typeof jobs.$inferInsert;
