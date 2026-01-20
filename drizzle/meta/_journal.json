@@ -22,6 +22,13 @@
       "when": 1768925645199,
       "tag": "0002_stale_rocket_racer",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1768950044734,
+      "tag": "0003_white_rawhide_kid",
+      "breakpoints": true
     }
   ]
 }

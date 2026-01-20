@@ -187,12 +187,12 @@ async function calculateDCF(
         };
       }
 
-      currentFcf = fcfGrowthResult.currentValue;
-      priorFcf = priorFcf;
-      fcfGrowthRate = fcfGrowthResult.growthRate;
-      comparisonType = fcfGrowthResult.comparisonType as any;
-      currentPeriod = fcfGrowthResult.currentPeriod;
-      priorPeriod = fcfGrowthResult.priorPeriod;
+      // Use fallback values but keep the currentFcf from TTM calculation
+      priorFcf = fcfGrowthResult.priorValue;
+      fcfGrowthRate = ((currentFcf - priorFcf) / Math.abs(priorFcf)) * 100;
+      comparisonType = 'TTM_VS_FY' as any;
+      currentPeriod = 'Current TTM';
+      priorPeriod = 'Prior FY';
     } else {
       // Calculate growth rate from TTM vs Prior-Year TTM
       if (priorFcf !== 0) {
@@ -239,7 +239,17 @@ async function calculateDCF(
     // Calculate terminal value
     const terminalFcf = projectedFcf * (1 + terminalGrowthRate / 100);
     const terminalValue = terminalFcf / ((wacc - terminalGrowthRate) / 100);
-    const pvTerminalValue = terminalValue / Math.pow(1 + wacc / 100, 5);
+    let pvTerminalValue = terminalValue / Math.pow(1 + wacc / 100, 5);
+
+    // Cap terminal value to prevent unrealistic valuations
+    // Terminal value should not exceed 75% of total intrinsic value
+    const maxTerminalValuePct = 0.75;
+    const preliminaryIntrinsicValue = pvFcf + pvTerminalValue;
+    const maxTerminalValue = preliminaryIntrinsicValue * maxTerminalValuePct;
+    
+    if (pvTerminalValue > maxTerminalValue) {
+      pvTerminalValue = maxTerminalValue;
+    }
 
     // Calculate intrinsic value
     const intrinsicValue = pvFcf + pvTerminalValue;
