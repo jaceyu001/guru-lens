@@ -504,14 +504,12 @@ async function calculateAssetBased(
       };
     }
 
-    // Calculate tangible book value (adjust for intangible assets)
-    const tangibleEquity = balanceSheet.tangibleBookValuePerShare 
-      ? balanceSheet.tangibleBookValuePerShare * (financialData.sharesOutstanding || 1)
-      : shareholderEquity * 0.8; // Default: reduce by 20% for typical intangibles
-
-    // Calculate intrinsic value per share using tangible equity
-    const sharesOut = financialData.sharesOutstanding || 1;
-    const intrinsicValuePerShare = tangibleEquity / sharesOut;
+    // Calculate intrinsic value per share using tangible book value
+    // tangibleBookValuePerShare is already a per-share value from balance sheet
+    const intrinsicValuePerShare = balanceSheet.tangibleBookValuePerShare 
+      ? balanceSheet.tangibleBookValuePerShare
+      : (shareholderEquity * 0.8) / (financialData.sharesOutstanding || 1);
+    
     const intrinsicValue = intrinsicValuePerShare;
 
     // Determine confidence based on asset quality (ROE indicates how well assets are used)
