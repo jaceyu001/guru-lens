@@ -386,19 +386,20 @@ export const appRouter = router({
         const ticker = await db.getTickerBySymbol(input.symbol);
         if (!ticker) return [];
         
-        const analyses = await db.getLatestAnalysesForTicker(ticker.id);
-        const personas = await db.getAllPersonas();
-        const personaMap = new Map(personas.map(p => [p.id, p]));
-        
-        return analyses.map(a => {
-          const persona = personaMap.get(a.personaId);
-          return {
-            id: a.id,
-            runId: a.runId,
-            ticker: input.symbol,
-            personaId: persona?.personaId || "",
-            personaName: persona?.name || "",
-            score: a.score,
+        try {
+          const analyses = await db.getLatestAnalysesForTicker(ticker.id);
+          const personas = await db.getAllPersonas();
+          const personaMap = new Map(personas.map(p => [p.id, p]));
+          
+          return analyses.map(a => {
+            const persona = personaMap.get(a.personaId);
+            return {
+              id: a.id,
+              runId: a.runId,
+              ticker: input.symbol,
+              personaId: persona?.personaId || "",
+              personaName: persona?.name || "",
+              score: a.score,
             verdict: a.verdict,
             confidence: Number(a.confidence),
             summaryBullets: a.summaryBullets,
@@ -409,8 +410,12 @@ export const appRouter = router({
             citations: a.citations || [],
             runMetadata: a.runMetadata,
             runTimestamp: a.runTimestamp,
-          } as AnalysisOutput;
-        });
+            } as AnalysisOutput;
+          });
+        } catch (error) {
+          console.warn("[Router] Failed to get latest analyses for ticker:", error);
+          return [];
+        }
       }),
     
     getByRunId: publicProcedure

@@ -50,6 +50,9 @@ export type InsertTicker = typeof tickers.$inferInsert;
 export const analyses = mysqlTable("analyses", {
   id: int("id").autoincrement().primaryKey(),
   tickerId: int("tickerId").notNull(),
+  personaId: int("personaId"),
+  runId: varchar("runId", { length: 64 }).unique(),
+  runTimestamp: timestamp("runTimestamp").defaultNow(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 export type Analysis = typeof analyses.$inferSelect;

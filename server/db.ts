@@ -124,23 +124,38 @@ export async function getAllPersonas(): Promise<Persona[]> {
   const db = await getDb();
   if (!db) return [];
   
-  return db.select().from(personas).where(eq(personas.isActive, true)).orderBy(personas.displayOrder);
+  try {
+    return db.select().from(personas).limit(100);
+  } catch (error) {
+    console.warn("[Database] Failed to get personas:", error);
+    return [];
+  }
 }
 
 export async function getPersonaById(id: number): Promise<Persona | undefined> {
   const db = await getDb();
   if (!db) return undefined;
   
-  const result = await db.select().from(personas).where(eq(personas.id, id)).limit(1);
-  return result[0];
+  try {
+    const result = await db.select().from(personas).where(eq(personas.id, id)).limit(1);
+    return result[0];
+  } catch (error) {
+    console.warn("[Database] Failed to get persona by id:", error);
+    return undefined;
+  }
 }
 
 export async function getPersonaByPersonaId(personaId: string): Promise<Persona | undefined> {
   const db = await getDb();
   if (!db) return undefined;
   
-  const result = await db.select().from(personas).where(eq(personas.personaId, personaId)).limit(1);
-  return result[0];
+  try {
+    const result = await db.select().from(personas).where(eq(personas.personaId, personaId)).limit(1);
+    return result[0];
+  } catch (error) {
+    console.warn("[Database] Failed to get persona by personaId:", error);
+    return undefined;
+  }
 }
 
 export async function createPersona(persona: InsertPersona): Promise<number> {
@@ -184,7 +199,7 @@ export async function searchTickers(query: string, limit: number = 10): Promise<
   const searchPattern = `%${query.toUpperCase()}%`;
   return db.select().from(tickers)
     .where(
-      sql`${tickers.symbol} LIKE ${searchPattern} OR ${tickers.companyName} LIKE ${searchPattern}`
+      sql`${tickers.symbol} LIKE ${searchPattern}`
     )
     .limit(limit);
 }
@@ -205,32 +220,43 @@ export async function getLatestAnalysis(tickerId: number, personaId: number): Pr
   const db = await getDb();
   if (!db) return undefined;
   
-  const result = await db.select().from(analyses)
-    .where(and(eq(analyses.tickerId, tickerId), eq(analyses.personaId, personaId)))
-    .orderBy(desc(analyses.runTimestamp))
-    .limit(1);
-  
-  return result[0];
+  try {
+    const result = await db.select().from(analyses)
+      .where(and(eq(analyses.tickerId, tickerId), eq(analyses.personaId, personaId)))
+      .orderBy(desc(analyses.createdAt))
+      .limit(1);
+    
+    return result[0];
+  } catch (error) {
+    console.warn("[Database] Failed to get latest analysis:", error);
+    return undefined;
+  }
 }
 
 export async function getLatestAnalysesForTicker(tickerId: number): Promise<Analysis[]> {
   const db = await getDb();
   if (!db) return [];
   
-  // Get all analyses for this ticker and filter to latest per persona
-  const allAnalyses = await db.select().from(analyses)
-    .where(eq(analyses.tickerId, tickerId))
-    .orderBy(desc(analyses.runTimestamp));
-  
-  // Group by persona and keep only the latest
-  const latestByPersona = new Map<number, Analysis>();
-  for (const analysis of allAnalyses) {
-    if (!latestByPersona.has(analysis.personaId)) {
-      latestByPersona.set(analysis.personaId, analysis);
+  try {
+    // Get all analyses for this ticker and filter to latest per persona
+    const allAnalyses = await db.select().from(analyses)
+      .where(eq(analyses.tickerId, tickerId))
+      .orderBy(desc(analyses.createdAt));
+    
+    // Group by persona and keep only the latest
+    const latestByPersona = new Map<number, Analysis>();
+    for (const analysis of allAnalyses) {
+      const personaId = analysis.personaId || 0;
+      if (!latestByPersona.has(personaId)) {
+        latestByPersona.set(personaId, analysis);
+      }
     }
+    
+    return Array.from(latestByPersona.values());
+  } catch (error) {
+    console.warn("[Database] Failed to get latest analyses for ticker:", error);
+    return [];
   }
-  
-  return Array.from(latestByPersona.values());
 }
 
 export async function getAnalysisByRunId(runId: string): Promise<Analysis | undefined> {
