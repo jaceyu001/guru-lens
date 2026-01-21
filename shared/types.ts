@@ -320,7 +320,7 @@ export interface FundamentalsFindings {
 }
 
 export interface ValuationMethod {
-  name: "DCF" | "Comparable" | "DDM" | "AssetBased";
+  name: "EPV" | "Comparable" | "DDM" | "AssetBased";
   intrinsicValue: number;
   upside: number; // %
   assessment: "UNDERVALUED" | "FAIRLY_VALUED" | "OVERVALUED" | "UNABLE_TO_VALUE";
@@ -328,6 +328,16 @@ export interface ValuationMethod {
   narrative: string;
   assumptions: Record<string, string | number>;
   limitations: string[];
+  scenarios?: {
+    conservative: {
+      intrinsicValue: number;
+      growthRate: number;
+    };
+    baseCase: {
+      intrinsicValue: number;
+      growthRate: number;
+    };
+  };
 }
 
 export interface ValuationFindings {

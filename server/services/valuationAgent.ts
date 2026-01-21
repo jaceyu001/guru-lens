@@ -1,5 +1,6 @@
-import type { FinancialData } from "@shared/types";
-import { calculateGrowth } from "./growthCalculator";
+import { FinancialData } from "../../shared/types";
+import { calculateEPV, EPVValuation } from "./epvCalculator";
+import { extractMarketGrowthRate, validateGrowthRate, getConfidenceAdjustment } from "./growthRateExtractor";
 
 type DataQualityFlags = NonNullable<FinancialData['dataQualityFlags']>;
 
@@ -8,7 +9,7 @@ type DataQualityFlags = NonNullable<FinancialData['dataQualityFlags']>;
 // ============================================================================
 
 export interface ValuationMethod {
-  name: "DCF" | "Comparable" | "DDM" | "AssetBased";
+  name: "EPV" | "Comparable" | "DDM" | "AssetBased";
   intrinsicValue: number;
   upside: number; // %
   assessment: "UNDERVALUED" | "FAIRLY_VALUED" | "OVERVALUED" | "UNABLE_TO_VALUE";
@@ -16,6 +17,16 @@ export interface ValuationMethod {
   narrative: string;
   assumptions: Record<string, string | number>;
   limitations: string[];
+  scenarios?: {
+    conservative: {
+      intrinsicValue: number;
+      growthRate: number;
+    };
+    baseCase: {
+      intrinsicValue: number;
+      growthRate: number;
+    };
+  };
 }
 
 export interface ValuationFindings {
@@ -50,55 +61,244 @@ interface ValuationInput {
 export async function analyzeValuation(input: ValuationInput): Promise<ValuationFindings> {
   const { ticker, currentPrice, financialData, dataQualityFlags } = input;
 
-  // Run all 4 valuation methods in parallel
-  const [dcfMethod, comparableMethod, ddmMethod, assetBasedMethod] = await Promise.all([
-    calculateDCF(financialData, dataQualityFlags),
-    calculateComparable(financialData, currentPrice, dataQualityFlags),
-    calculateDDM(financialData, dataQualityFlags),
-    calculateAssetBased(financialData, dataQualityFlags),
-  ]);
+  // Initialize methods array
+  const methods: ValuationMethod[] = [];
+  const dataQualityWarnings: string[] = [];
 
-  const methods = [dcfMethod, comparableMethod, ddmMethod, assetBasedMethod];
+  // Add data quality warnings
+  if (dataQualityFlags.debtToEquityAnomalous) {
+    dataQualityWarnings.push("Debt-to-Equity ratio anomalous");
+  }
+  if (dataQualityFlags.roicZero) {
+    dataQualityWarnings.push("ROIC is zero");
+  }
+  if (dataQualityFlags.interestCoverageZero) {
+    dataQualityWarnings.push("Interest coverage is zero");
+  }
+  if (dataQualityFlags.peNegative) {
+    dataQualityWarnings.push("P/E ratio is negative");
+  }
+  if (dataQualityFlags.marketCapZero) {
+    dataQualityWarnings.push("Market cap is zero or unavailable");
+  }
+  if (dataQualityFlags.revenueDecline) {
+    dataQualityWarnings.push("Revenue is declining YoY");
+  }
+  if (dataQualityFlags.earningsCollapse) {
+    dataQualityWarnings.push("Earnings are collapsing significantly");
+  }
 
-  // Calculate consensus valuation (only from applicable methods)
-  const applicableMethods = methods.filter(m => m.assessment !== "UNABLE_TO_VALUE");
-  const consensusValuation = calculateConsensusValuation(applicableMethods);
-  const consensusUpside = calculateUpside(currentPrice, consensusValuation.midpoint);
-  const marginOfSafety = calculateMarginOfSafety(currentPrice, consensusValuation.midpoint);
-  const methodAgreement = calculateMethodAgreement(applicableMethods);
+  // ========================================================================
+  // EPV Valuation Method (Earning Power Value)
+  // ========================================================================
+  try {
+    // Extract market growth rate using LLM
+    const growthRateInfo = await extractMarketGrowthRate(ticker, financialData.profile?.description || ticker);
+    
+    // Validate growth rate (ensure g < WACC of 9%)
+    const validatedGrowthRate = validateGrowthRate(growthRateInfo.growthRate, 9);
 
-  // Determine overall assessment
-  const overallAssessment = determineOverallAssessment(
-    currentPrice,
-    consensusValuation.midpoint,
-    applicableMethods.length
-  );
+    // Calculate EPV
+    const epvValuation = calculateEPV(
+      financialData,
+      currentPrice,
+      validatedGrowthRate,
+      {
+        growthRate: growthRateInfo.growthRate,
+        confidence: growthRateInfo.confidence,
+        sources: growthRateInfo.sources,
+        reasoning: growthRateInfo.reasoning,
+        caveats: growthRateInfo.caveats,
+      }
+    );
 
-  // Build summary
-  const summary = buildValuationSummary(
-    ticker,
-    currentPrice,
-    consensusValuation,
-    consensusUpside,
-    marginOfSafety,
-    methodAgreement,
-    applicableMethods
-  );
+    // Use base case (market growth) as primary intrinsic value
+    const primaryIntrinsicValue = epvValuation.scenarios.baseCase.intrinsicValuePerShare;
+    const conservativeIntrinsicValue = epvValuation.scenarios.conservative.intrinsicValuePerShare;
 
-  // Collect data quality warnings
-  const dataQualityWarnings = collectDataQualityWarnings(
-    financialData,
-    dataQualityFlags,
-    methods
-  );
+    // Calculate upside based on base case
+    const upside = primaryIntrinsicValue > 0
+      ? ((primaryIntrinsicValue - currentPrice) / currentPrice) * 100
+      : 0;
 
-  // Generate recommendations for personas
-  const recommendationsForPersonas = generatePersonaRecommendations(
-    methods,
-    marginOfSafety,
-    methodAgreement,
-    dataQualityWarnings
-  );
+    // Determine assessment based on valuation range
+    let assessment: "UNDERVALUED" | "FAIRLY_VALUED" | "OVERVALUED" | "UNABLE_TO_VALUE";
+    if (primaryIntrinsicValue <= 0) {
+      assessment = "UNABLE_TO_VALUE";
+    } else if (currentPrice < conservativeIntrinsicValue * 0.9) {
+      assessment = "UNDERVALUED";
+    } else if (currentPrice > primaryIntrinsicValue * 1.1) {
+      assessment = "OVERVALUED";
+    } else {
+      assessment = "FAIRLY_VALUED";
+    }
+
+    // Adjust confidence based on LLM confidence
+    const confidenceAdjustment = getConfidenceAdjustment(growthRateInfo.confidence);
+    const adjustedConfidence = Math.max(0.3, Math.min(0.9, epvValuation.confidence + confidenceAdjustment));
+
+    const epvMethod: ValuationMethod = {
+      name: "EPV",
+      intrinsicValue: primaryIntrinsicValue,
+      upside,
+      assessment,
+      confidence: adjustedConfidence,
+      narrative: epvValuation.narrative,
+      assumptions: {
+        normalizedNopat: `$${(epvValuation.assumptions.normalizedNopat / 1000).toFixed(1)}B`,
+        wacc: `${epvValuation.assumptions.wacc.toFixed(1)}%`,
+        marketGrowthRate: `${epvValuation.assumptions.marketGrowthRate.toFixed(1)}%`,
+        zeroGrowthRate: `${epvValuation.assumptions.zeroGrowthRate.toFixed(1)}%`,
+        taxRate: `${epvValuation.assumptions.taxRate}%`,
+        dataAvailability: epvValuation.assumptions.dataAvailability,
+        llmConfidence: growthRateInfo.confidence,
+        llmSources: growthRateInfo.sources.join(", "),
+      },
+      limitations: epvValuation.limitations,
+      scenarios: {
+        conservative: {
+          intrinsicValue: conservativeIntrinsicValue,
+          growthRate: 0,
+        },
+        baseCase: {
+          intrinsicValue: primaryIntrinsicValue,
+          growthRate: validatedGrowthRate,
+        },
+      },
+    };
+
+    methods.push(epvMethod);
+  } catch (error) {
+    console.error(`Error in EPV valuation for ${ticker}:`, error);
+    dataQualityWarnings.push("EPV valuation calculation failed - check data quality");
+  }
+
+  // ========================================================================
+  // Placeholder Methods (for future implementation)
+  // ========================================================================
+
+  // Comparable Company Analysis (placeholder)
+  const comparableMethod: ValuationMethod = {
+    name: "Comparable",
+    intrinsicValue: 0,
+    upside: 0,
+    assessment: "UNABLE_TO_VALUE",
+    confidence: 0,
+    narrative: "Comparable company analysis not yet implemented",
+    assumptions: {},
+    limitations: ["Placeholder implementation"],
+  };
+  methods.push(comparableMethod);
+
+  // Dividend Discount Model (placeholder)
+  const ddmMethod: ValuationMethod = {
+    name: "DDM",
+    intrinsicValue: 0,
+    upside: 0,
+    assessment: "UNABLE_TO_VALUE",
+    confidence: 0,
+    narrative: "Dividend discount model not yet implemented",
+    assumptions: {},
+    limitations: ["Placeholder implementation"],
+  };
+  methods.push(ddmMethod);
+
+  // Asset-Based Valuation (placeholder)
+  const assetMethod: ValuationMethod = {
+    name: "AssetBased",
+    intrinsicValue: 0,
+    upside: 0,
+    assessment: "UNABLE_TO_VALUE",
+    confidence: 0,
+    narrative: "Asset-based valuation not yet implemented",
+    assumptions: {},
+    limitations: ["Placeholder implementation"],
+  };
+  methods.push(assetMethod);
+
+  // ========================================================================
+  // Consensus Analysis
+  // ========================================================================
+
+  // Filter out UNABLE_TO_VALUE methods for consensus
+  const validMethods = methods.filter(m => m.assessment !== "UNABLE_TO_VALUE" && m.intrinsicValue > 0);
+
+  let consensusValuation = { low: 0, high: 0, midpoint: 0 };
+  let consensusUpside = 0;
+  let marginOfSafety = 0;
+  let methodAgreement: "STRONG" | "MODERATE" | "WEAK" | "DIVERGENT" = "DIVERGENT";
+  let overallAssessment: "UNDERVALUED" | "FAIRLY_VALUED" | "OVERVALUED" | "UNABLE_TO_VALUE" = "UNABLE_TO_VALUE";
+
+  if (validMethods.length > 0) {
+    const intrinsicValues = validMethods.map(m => m.intrinsicValue);
+    consensusValuation.low = Math.min(...intrinsicValues);
+    consensusValuation.high = Math.max(...intrinsicValues);
+    consensusValuation.midpoint = (consensusValuation.low + consensusValuation.high) / 2;
+
+    // Calculate consensus upside
+    consensusUpside = ((consensusValuation.midpoint - currentPrice) / currentPrice) * 100;
+
+    // Calculate margin of safety
+    marginOfSafety = ((consensusValuation.low - currentPrice) / consensusValuation.low) * 100;
+
+    // Determine method agreement
+    const range = consensusValuation.high - consensusValuation.low;
+    const rangePercent = (range / consensusValuation.midpoint) * 100;
+
+    if (rangePercent < 10) {
+      methodAgreement = "STRONG";
+    } else if (rangePercent < 25) {
+      methodAgreement = "MODERATE";
+    } else if (rangePercent < 50) {
+      methodAgreement = "WEAK";
+    } else {
+      methodAgreement = "DIVERGENT";
+    }
+
+    // Determine overall assessment
+    if (currentPrice < consensusValuation.low * 0.9) {
+      overallAssessment = "UNDERVALUED";
+    } else if (currentPrice > consensusValuation.high * 1.1) {
+      overallAssessment = "OVERVALUED";
+    } else {
+      overallAssessment = "FAIRLY_VALUED";
+    }
+  }
+
+  // ========================================================================
+  // Confidence and Recommendations
+  // ========================================================================
+
+  const avgConfidence = validMethods.length > 0
+    ? validMethods.reduce((sum, m) => sum + m.confidence, 0) / validMethods.length
+    : 0;
+
+  const confidence = Math.round(avgConfidence * 100);
+
+  const recommendationsForPersonas: string[] = [];
+  if (overallAssessment === "UNDERVALUED") {
+    recommendationsForPersonas.push("Strong buy signal - significant upside potential");
+    recommendationsForPersonas.push("Consider for value-oriented portfolios");
+  } else if (overallAssessment === "OVERVALUED") {
+    recommendationsForPersonas.push("Avoid or reduce positions - limited upside");
+    recommendationsForPersonas.push("Consider for short or contrarian strategies");
+  } else {
+    recommendationsForPersonas.push("Fair valuation - hold or accumulate on dips");
+    recommendationsForPersonas.push("Monitor for changes in valuation drivers");
+  }
+
+  if (confidence < 40) {
+    recommendationsForPersonas.push("Low confidence - requires additional due diligence");
+  }
+
+  // ========================================================================
+  // Generate Summary
+  // ========================================================================
+
+  const summary = `${overallAssessment} at current price of $${currentPrice.toFixed(2)}. ` +
+    `Valuation range: $${consensusValuation.low.toFixed(2)} - $${consensusValuation.high.toFixed(2)}. ` +
+    `Consensus upside: ${consensusUpside.toFixed(1)}%. ` +
+    `Confidence: ${confidence}%.`;
 
   return {
     currentPrice,
@@ -108,9 +308,7 @@ export async function analyzeValuation(input: ValuationInput): Promise<Valuation
     marginOfSafety,
     methodAgreement,
     overallAssessment,
-    confidence: Math.round(
-      (applicableMethods.reduce((sum, m) => sum + m.confidence, 0) / applicableMethods.length) * 100
-    ),
+    confidence,
     summary,
     dataQualityWarnings,
     recommendationsForPersonas,
@@ -118,295 +316,27 @@ export async function analyzeValuation(input: ValuationInput): Promise<Valuation
 }
 
 // ============================================================================
-// Valuation Methods
-// ============================================================================
-
-async function calculateDCF(
-  financialData: FinancialData,
-  dataQualityFlags: DataQualityFlags
-): Promise<ValuationMethod> {
-  try {
-    // Use Operating Cash Flow from quarterly data for DCF calculation
-    const quarterlyData = (financialData as any).quarterlyFinancials || [];
-    
-    // Check if we have any quarterly data
-    if (quarterlyData.length === 0) {
-      return {
-        name: "DCF",
-        intrinsicValue: 0,
-        upside: 0,
-        assessment: "UNABLE_TO_VALUE",
-        confidence: 0,
-        narrative: "DCF analysis not possible - no quarterly financial data available.",
-        assumptions: {},
-        limitations: ["No quarterly data", "Cannot calculate TTM metrics"],
-      };
-    }
-    
-    // Get current TTM OCF (sum of last 4 quarters)
-    // Allow negative values - do NOT filter them out
-    let currentOcf = 0;
-    for (let i = 0; i < Math.min(4, quarterlyData.length); i++) {
-      currentOcf += quarterlyData[i].operatingCashFlow || 0;
-    }
-    
-    // Get prior-year TTM OCF (sum of quarters 4-7, if available)
-    // Allow negative values - do NOT filter them out
-    let priorOcf = 0;
-    let priorQuarterCount = 0;
-    for (let i = 4; i < Math.min(8, quarterlyData.length); i++) {
-      priorOcf += quarterlyData[i].operatingCashFlow || 0;
-      priorQuarterCount++;
-    }
-    
-    // Annualize prior OCF if we have fewer than 4 quarters
-    if (priorQuarterCount > 0 && priorQuarterCount < 4) {
-      priorOcf = (priorOcf / priorQuarterCount) * 4;
-    }
-    
-    // Calculate OCF growth rate
-    // Allow negative growth rates
-    let ocfGrowthRate = 0;
-    if (priorOcf !== 0) {
-      ocfGrowthRate = ((currentOcf - priorOcf) / Math.abs(priorOcf)) * 100;
-    }
-
-    // Use hardcoded WACC of 9% (typical for mature US companies)
-    const wacc = 9.0;
-
-    // Terminal growth rate (conservative)
-    const terminalGrowthRate = 2.5;
-
-    // Project OCF for 5 years using TTM vs Prior-Year TTM growth rate
-    // Allow negative OCF to continue through calculation
-    let projectedOcf = currentOcf;
-    let pvOcf = 0;
-    for (let year = 1; year <= 5; year++) {
-      projectedOcf = projectedOcf * (1 + ocfGrowthRate / 100);
-      pvOcf += projectedOcf / Math.pow(1 + wacc / 100, year);
-    }
-
-    // Calculate terminal value
-    const terminalOcf = projectedOcf * (1 + terminalGrowthRate / 100);
-    const terminalValue = terminalOcf / ((wacc - terminalGrowthRate) / 100);
-
-    // Calculate intrinsic value (may be negative)
-    const pvTerminalValue = terminalValue / Math.pow(1 + wacc / 100, 5);
-    const intrinsicValue = pvOcf + pvTerminalValue;
-
-    // Determine confidence
-    const confidence = ocfGrowthRate > -50 && ocfGrowthRate < 50 ? 0.65 : 0.4;
-
-    // Calculate upside (may be negative)
-    const upside = intrinsicValue !== 0 ? ((intrinsicValue - 0) / intrinsicValue) * 100 : 0;
-
-    // Determine assessment
-    const assessment = determineAssessment(intrinsicValue, 0, "DCF"); // Placeholder
-
-    const narrative = `DCF analysis based on Current TTM OCF of $${(currentOcf / 1e9).toFixed(1)}B (vs Prior-Year TTM $${(priorOcf / 1e9).toFixed(1)}B) ` +
-      `with ${ocfGrowthRate.toFixed(1)}% growth assumption (TTM_VS_TTM). ` +
-      `Terminal value represents ${((pvTerminalValue / intrinsicValue) * 100).toFixed(0)}% of total value. ` +
-      `WACC of ${wacc.toFixed(1)}% used for discounting.`;
-
-    return {
-      name: "DCF",
-      intrinsicValue,
-      upside,
-      assessment,
-      confidence,
-      narrative,
-      assumptions: {
-        ocfGrowthRate: `${ocfGrowthRate.toFixed(1)}%`,
-        comparisonType: "TTM_VS_TTM",
-        currentPeriod: "Current TTM",
-        priorPeriod: "Prior-Year TTM",
-        wacc: `${wacc.toFixed(1)}%`,
-        terminalGrowthRate: `${terminalGrowthRate}%`,
-        projectionPeriod: "5 years",
-      },
-      limitations: [
-        "Sensitive to growth rate assumptions",
-        "Sensitive to WACC assumptions",
-        "Terminal value represents majority of valuation",
-        "Uses Operating Cash Flow (allows negative values)",
-      ],
-    };
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : "Unknown error";
-    console.error("[DCF Error]", errorMsg, error);
-    return {
-      name: "DCF",
-      intrinsicValue: 0,
-      upside: 0,
-      assessment: "UNABLE_TO_VALUE",
-      confidence: 0,
-      narrative: `DCF analysis failed: ${errorMsg}`,
-      assumptions: {},
-      limitations: ["Calculation error"],
-    };
-  }
-}
-
-async function calculateComparable(
-  financialData: FinancialData,
-  currentPrice: number,
-  dataQualityFlags: DataQualityFlags
-): Promise<ValuationMethod> {
-  return {
-    name: "Comparable",
-    intrinsicValue: currentPrice,
-    upside: 0,
-    assessment: "FAIRLY_VALUED",
-    confidence: 0.5,
-    narrative: "Comparable company analysis placeholder",
-    assumptions: {},
-    limitations: ["Placeholder implementation"],
-  };
-}
-
-async function calculateDDM(
-  financialData: FinancialData,
-  dataQualityFlags: DataQualityFlags
-): Promise<ValuationMethod> {
-  return {
-    name: "DDM",
-    intrinsicValue: 0,
-    upside: 0,
-    assessment: "UNABLE_TO_VALUE",
-    confidence: 0,
-    narrative: "Dividend Discount Model not applicable",
-    assumptions: {},
-    limitations: ["No dividend data"],
-  };
-}
-
-async function calculateAssetBased(
-  financialData: FinancialData,
-  dataQualityFlags: DataQualityFlags
-): Promise<ValuationMethod> {
-  return {
-    name: "AssetBased",
-    intrinsicValue: 0,
-    upside: 0,
-    assessment: "UNABLE_TO_VALUE",
-    confidence: 0,
-    narrative: "Asset-based valuation not applicable",
-    assumptions: {},
-    limitations: ["No balance sheet data"],
-  };
-}
-
-// ============================================================================
 // Helper Functions
 // ============================================================================
 
-function calculateConsensusValuation(methods: ValuationMethod[]) {
-  const valuations = methods
-    .filter(m => m.intrinsicValue > 0)
-    .map(m => m.intrinsicValue);
-  
-  if (valuations.length === 0) {
-    return { low: 0, high: 0, midpoint: 0 };
-  }
-  
-  const sorted = valuations.sort((a, b) => a - b);
-  return {
-    low: sorted[0],
-    high: sorted[sorted.length - 1],
-    midpoint: (sorted[0] + sorted[sorted.length - 1]) / 2,
-  };
-}
-
-function calculateUpside(currentPrice: number, consensusValuation: number): number {
-  if (currentPrice === 0) return 0;
-  return ((consensusValuation - currentPrice) / currentPrice) * 100;
-}
-
-function calculateMarginOfSafety(currentPrice: number, consensusValuation: number): number {
-  if (consensusValuation === 0) return 0;
-  return ((consensusValuation - currentPrice) / consensusValuation) * 100;
-}
-
-function calculateMethodAgreement(methods: ValuationMethod[]): "STRONG" | "MODERATE" | "WEAK" | "DIVERGENT" {
-  if (methods.length === 0) return "WEAK";
-  
-  const assessments = methods.map(m => m.assessment);
-  const unique = new Set(assessments);
-  
-  if (unique.size === 1) return "STRONG";
-  if (unique.size === 2) return "MODERATE";
-  return "DIVERGENT";
-}
-
-function determineOverallAssessment(
-  currentPrice: number,
-  consensusValuation: number,
-  methodCount: number
-): "UNDERVALUED" | "FAIRLY_VALUED" | "OVERVALUED" | "UNABLE_TO_VALUE" {
-  if (methodCount === 0) return "UNABLE_TO_VALUE";
-  
-  const upside = calculateUpside(currentPrice, consensusValuation);
-  
-  if (upside > 20) return "UNDERVALUED";
-  if (upside < -20) return "OVERVALUED";
-  return "FAIRLY_VALUED";
-}
-
+/**
+ * Determine assessment based on intrinsic value vs current price
+ */
 function determineAssessment(
   intrinsicValue: number,
   currentPrice: number,
   method: string
 ): "UNDERVALUED" | "FAIRLY_VALUED" | "OVERVALUED" | "UNABLE_TO_VALUE" {
-  if (intrinsicValue === 0) return "UNABLE_TO_VALUE";
-  
-  const upside = ((intrinsicValue - currentPrice) / currentPrice) * 100;
-  
-  if (upside > 20) return "UNDERVALUED";
-  if (upside < -20) return "OVERVALUED";
-  return "FAIRLY_VALUED";
-}
-
-function buildValuationSummary(
-  ticker: string,
-  currentPrice: number,
-  consensusValuation: { low: number; high: number; midpoint: number },
-  consensusUpside: number,
-  marginOfSafety: number,
-  methodAgreement: string,
-  methods: ValuationMethod[]
-): string {
-  return `${ticker} trading at $${currentPrice.toFixed(2)}. Consensus valuation: $${consensusValuation.midpoint.toFixed(2)} (${consensusUpside.toFixed(1)}% upside). Method agreement: ${methodAgreement}.`;
-}
-
-function collectDataQualityWarnings(
-  financialData: FinancialData,
-  dataQualityFlags: DataQualityFlags,
-  methods: ValuationMethod[]
-): string[] {
-  const warnings: string[] = [];
-  
-  if (!financialData.quarterlyFinancials || financialData.quarterlyFinancials.length < 4) {
-    warnings.push("Limited quarterly data available - TTM calculations may be incomplete");
+  if (intrinsicValue <= 0) {
+    return "UNABLE_TO_VALUE";
   }
-  
-  return warnings;
-}
 
-function generatePersonaRecommendations(
-  methods: ValuationMethod[],
-  marginOfSafety: number,
-  methodAgreement: string,
-  dataQualityWarnings: string[]
-): string[] {
-  const recommendations: string[] = [];
-  
-  if (marginOfSafety > 30) {
-    recommendations.push("Strong margin of safety for value investors");
+  const margin = 0.1; // 10% margin of safety
+  if (currentPrice < intrinsicValue * (1 - margin)) {
+    return "UNDERVALUED";
+  } else if (currentPrice > intrinsicValue * (1 + margin)) {
+    return "OVERVALUED";
+  } else {
+    return "FAIRLY_VALUED";
   }
-  
-  if (methodAgreement === "STRONG") {
-    recommendations.push("High confidence in valuation across multiple methods");
-  }
-  
-  return recommendations;
 }

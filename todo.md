@@ -327,3 +327,16 @@
 - [x] Confirm preview loads correctly (home page renders)
 - [ ] Test ticker analysis page with real stock data
 - [ ] Implement simplified UI for period labels (Phase 3)
+
+
+## Phase 13: EPV Valuation Model Implementation
+- [x] Create epvCalculator.ts service with 4-year normalized NOPAT calculation
+- [x] Implement LLM-based market growth rate extraction
+- [x] Create EPV calculation with dual scenarios (zero growth + market growth)
+- [x] Replace DCF model with EPV in valuationAgent.ts
+- [x] Update UI to display dual valuation scenarios
+- [x] Add valuation range display (conservative to base case)
+- [x] Add margin of safety calculation
+- [x] Update confidence scoring based on LLM confidence
+- [x] Test EPV model with unit tests (10/10 passing)
+- [ ] Create checkpoint with EPV implementation

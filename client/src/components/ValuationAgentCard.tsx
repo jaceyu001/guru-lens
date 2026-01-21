@@ -214,9 +214,16 @@ export function ValuationAgentCard({ findings, isLoading }: ValuationAgentCardPr
                     {method.assessment.replace(/_/g, " ")}
                   </Badge>
                   {getComparisonTypeBadge(method.assumptions)}
-                  <span className="text-sm font-medium text-slate-600">
-                    ${method.intrinsicValue.toFixed(2)}
-                  </span>
+                  {method.name === "EPV" && method.scenarios ? (
+                    <div className="text-xs text-slate-600 space-y-0.5">
+                      <div>Conservative: ${method.scenarios.conservative.intrinsicValue.toFixed(2)}</div>
+                      <div>Base Case: ${method.scenarios.baseCase.intrinsicValue.toFixed(2)}</div>
+                    </div>
+                  ) : (
+                    <span className="text-sm font-medium text-slate-600">
+                      ${method.intrinsicValue.toFixed(2)}
+                    </span>
+                  )}
                 </div>
                 <ChevronDown
                   className={`w-5 h-5 transition-transform ${
@@ -226,20 +233,53 @@ export function ValuationAgentCard({ findings, isLoading }: ValuationAgentCardPr
               </button>
               {expandedMethods.has(method.name) && (
                 <div className="px-4 pb-4 border-t border-slate-200 space-y-3">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm text-slate-600">Intrinsic Value</p>
-                      <p className="text-lg font-semibold text-slate-900">
-                        ${method.intrinsicValue.toFixed(2)}
-                      </p>
+                  {method.name === "EPV" && method.scenarios ? (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-slate-50 rounded p-3">
+                          <p className="text-xs text-slate-600 font-medium mb-1">Conservative (0% Growth)</p>
+                          <p className="text-lg font-semibold text-slate-900">
+                            ${method.scenarios.conservative.intrinsicValue.toFixed(2)}
+                          </p>
+                        </div>
+                        <div className="bg-blue-50 rounded p-3 border border-blue-200">
+                          <p className="text-xs text-blue-700 font-medium mb-1">Base Case ({method.scenarios.baseCase.growthRate.toFixed(1)}% Growth)</p>
+                          <p className="text-lg font-semibold text-blue-900">
+                            ${method.scenarios.baseCase.intrinsicValue.toFixed(2)}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-sm text-slate-600">Intrinsic Value (Base Case)</p>
+                          <p className="text-lg font-semibold text-slate-900">
+                            ${method.intrinsicValue.toFixed(2)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-slate-600">Upside</p>
+                          <p className={`text-lg font-semibold ${method.upside > 0 ? "text-green-600" : "text-red-600"}`}>
+                            {method.upside > 0 ? "+" : ""}{method.upside.toFixed(1)}%
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm text-slate-600">Upside</p>
-                      <p className={`text-lg font-semibold ${method.upside > 0 ? "text-green-600" : "text-red-600"}`}>
-                        {method.upside > 0 ? "+" : ""}{method.upside.toFixed(1)}%
-                      </p>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm text-slate-600">Intrinsic Value</p>
+                        <p className="text-lg font-semibold text-slate-900">
+                          ${method.intrinsicValue.toFixed(2)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-slate-600">Upside</p>
+                        <p className={`text-lg font-semibold ${method.upside > 0 ? "text-green-600" : "text-red-600"}`}>
+                          {method.upside > 0 ? "+" : ""}{method.upside.toFixed(1)}%
+                        </p>
+                      </div>
                     </div>
-                  </div>
+                  )}
                   <div>
                     <p className="text-sm text-slate-600">Confidence</p>
                     <div className="flex items-center gap-2 mt-1">
