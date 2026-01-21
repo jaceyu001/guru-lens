@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useState } from "react";
 import { useParams, useLocation } from "wouter";
 import { ArrowLeft, RefreshCw, TrendingUp, TrendingDown, Clock, Star, AlertCircle } from "lucide-react";

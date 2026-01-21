@@ -1,5 +1,5 @@
 import { FinancialData } from "../../shared/types";
-import { calculateGrowth, getTTMValue, getPriorYearTTMValue } from "./growthCalculator";
+import { calculateGrowth } from "./growthCalculator";
 
 type DataQualityFlags = NonNullable<FinancialData['dataQualityFlags']>;
 
@@ -159,48 +159,31 @@ async function calculateDCF(
       };
     }
 
-    // For DCF, prefer TTM vs Prior-Year TTM comparison for more accurate growth rates
-    let currentFcf = getTTMValue(financialData, 'freeCashFlow');
-    let priorFcf = getPriorYearTTMValue(financialData, 'freeCashFlow');
-    let fcfGrowthRate = 0;
-    let comparisonType = 'TTM_VS_TTM';
-    let currentPeriod = 'Current TTM';
-    let priorPeriod = 'Prior Year TTM';
+    // Get FCF growth using TTM vs FY logic from growthCalculator
+    const fcfGrowthResult = calculateGrowth({
+      financialData,
+      metric: 'freeCashFlow',
+    });
 
-    // If prior-year TTM not available, fall back to TTM vs FY
-    if (priorFcf === 0) {
-      const fcfGrowthResult = calculateGrowth({
-        financialData,
-        metric: 'freeCashFlow',
-      });
-
-      if (fcfGrowthResult.comparisonType === 'INSUFFICIENT_DATA') {
-        return {
-          name: "DCF",
-          intrinsicValue: 0,
-          upside: 0,
-          assessment: "UNABLE_TO_VALUE",
-          confidence: 0,
-          narrative: `DCF analysis not possible - insufficient FCF data available.`,
-          assumptions: {},
-          limitations: ["No FCF history", "Cannot project future cash flows"],
-        };
-      }
-
-      // Use fallback values but keep the currentFcf from TTM calculation
-      priorFcf = fcfGrowthResult.priorValue;
-      fcfGrowthRate = ((currentFcf - priorFcf) / Math.abs(priorFcf)) * 100;
-      comparisonType = 'TTM_VS_FY' as any;
-      currentPeriod = 'Current TTM';
-      priorPeriod = 'Prior FY';
-    } else {
-      // Calculate growth rate from TTM vs Prior-Year TTM
-      if (priorFcf !== 0) {
-        fcfGrowthRate = ((currentFcf - priorFcf) / priorFcf) * 100;
-      }
+    // Check if we have sufficient data
+    if (fcfGrowthResult.comparisonType === 'INSUFFICIENT_DATA') {
+      return {
+        name: "DCF",
+        intrinsicValue: 0,
+        upside: 0,
+        assessment: "UNABLE_TO_VALUE",
+        confidence: 0,
+        narrative: `DCF analysis not possible - insufficient FCF data available. Comparison type: ${fcfGrowthResult.comparisonType}`,
+        assumptions: {},
+        limitations: ["No FCF history", "Cannot project future cash flows"],
+      };
     }
 
+    // Use TTM vs FY growth rate
+    const fcfGrowthRate = fcfGrowthResult.growthRate;
+
     // Validate FCF data
+    const currentFcf = fcfGrowthResult.currentValue;
     if (currentFcf <= 0) {
       return {
         name: "DCF",
@@ -208,8 +191,8 @@ async function calculateDCF(
         upside: 0,
         assessment: "UNABLE_TO_VALUE",
         confidence: 0.2,
-        narrative: `DCF analysis unreliable - current FCF is negative or zero. Using ${currentPeriod} data.`,
-        assumptions: { fcfGrowthRate: `${fcfGrowthRate.toFixed(1)}%`, comparisonType, currentPeriod, priorPeriod },
+        narrative: `DCF analysis unreliable - current FCF is negative or zero. Using ${fcfGrowthResult.currentPeriod} data.`,
+        assumptions: { fcfGrowthRate: `${fcfGrowthRate.toFixed(1)}%`, comparisonType: fcfGrowthResult.comparisonType, currentPeriod: fcfGrowthResult.currentPeriod, priorPeriod: fcfGrowthResult.priorPeriod },
         limitations: ["Negative FCF", "Cannot project positive future cash flows"],
       };
     }
@@ -218,55 +201,26 @@ async function calculateDCF(
     const wacc = 9.0;
 
     // Terminal growth rate (conservative)
-    let terminalGrowthRate = 2.5;
+    const terminalGrowthRate = 2.5;
 
-    // Validate growth rate - cap extreme values
-    let adjustedGrowthRate = fcfGrowthRate;
-    if (fcfGrowthRate < -50) {
-      adjustedGrowthRate = -50;
-    } else if (fcfGrowthRate > 50) {
-      adjustedGrowthRate = 50;
-    }
-
-    // Project FCF for 5 years using adjusted growth rate
+    // Project FCF for 5 years using TTM vs FY growth rate
     let projectedFcf = currentFcf;
     let pvFcf = 0;
     for (let year = 1; year <= 5; year++) {
-      projectedFcf = projectedFcf * (1 + adjustedGrowthRate / 100);
+      projectedFcf = projectedFcf * (1 + fcfGrowthRate / 100);
       pvFcf += projectedFcf / Math.pow(1 + wacc / 100, year);
     }
 
     // Calculate terminal value
     const terminalFcf = projectedFcf * (1 + terminalGrowthRate / 100);
     const terminalValue = terminalFcf / ((wacc - terminalGrowthRate) / 100);
-    let pvTerminalValue = terminalValue / Math.pow(1 + wacc / 100, 5);
-
-    // Cap terminal value to prevent unrealistic valuations
-    // Terminal value should not exceed 75% of total intrinsic value
-    const maxTerminalValuePct = 0.75;
-    const preliminaryIntrinsicValue = pvFcf + pvTerminalValue;
-    const maxTerminalValue = preliminaryIntrinsicValue * maxTerminalValuePct;
-    
-    if (pvTerminalValue > maxTerminalValue) {
-      pvTerminalValue = maxTerminalValue;
-    }
+    const pvTerminalValue = terminalValue / Math.pow(1 + wacc / 100, 5);
 
     // Calculate intrinsic value
     const intrinsicValue = pvFcf + pvTerminalValue;
 
-    // Determine confidence based on growth rate and data quality
-    let confidence = 0.75;
-    if (adjustedGrowthRate > 0 && adjustedGrowthRate < 30) {
-      confidence = 0.85;
-    } else if (adjustedGrowthRate < 0 && adjustedGrowthRate > -20) {
-      confidence = 0.70;
-    } else if (adjustedGrowthRate < -20 || adjustedGrowthRate > 30) {
-      confidence = 0.55;
-    }
-    
-    if (comparisonType === 'TTM_VS_TTM') {
-      confidence += 0.05;
-    }
+    // Determine confidence
+    const confidence = fcfGrowthRate > 0 && fcfGrowthRate < 50 ? 0.85 : 0.6;
 
     // Calculate upside
     const upside = ((intrinsicValue - 0) / intrinsicValue) * 100; // Placeholder for current price
@@ -274,8 +228,8 @@ async function calculateDCF(
     // Determine assessment
     const assessment = determineAssessment(intrinsicValue, 0, "DCF"); // Placeholder
 
-    const narrative = `DCF analysis based on ${currentPeriod} FCF of $${(currentFcf / 1e9).toFixed(1)}B (vs ${priorPeriod} $${(priorFcf / 1e9).toFixed(1)}B) ` +
-      `with ${adjustedGrowthRate.toFixed(1)}% growth assumption (${comparisonType}). ` +
+    const narrative = `DCF analysis based on ${fcfGrowthResult.currentPeriod} FCF of $${(currentFcf / 1e9).toFixed(1)}B (vs ${fcfGrowthResult.priorPeriod} $${(fcfGrowthResult.priorValue / 1e9).toFixed(1)}B) ` +
+      `with ${fcfGrowthRate.toFixed(1)}% growth assumption (${fcfGrowthResult.comparisonType}). ` +
       `Terminal value represents ${((pvTerminalValue / intrinsicValue) * 100).toFixed(0)}% of total value. ` +
       `WACC of ${wacc.toFixed(1)}% used for discounting.`;
 
@@ -287,10 +241,10 @@ async function calculateDCF(
       confidence,
       narrative,
       assumptions: {
-        fcfGrowthRate: `${adjustedGrowthRate.toFixed(1)}%`,
-        comparisonType,
-        currentPeriod,
-        priorPeriod,
+        fcfGrowthRate: `${fcfGrowthRate.toFixed(1)}%`,
+        comparisonType: fcfGrowthResult.comparisonType,
+        currentPeriod: fcfGrowthResult.currentPeriod,
+        priorPeriod: fcfGrowthResult.priorPeriod,
         wacc: `${wacc.toFixed(1)}%`,
         terminalGrowthRate: `${terminalGrowthRate}%`,
         projectionPeriod: "5 years",
@@ -550,12 +504,14 @@ async function calculateAssetBased(
       };
     }
 
-    // Calculate intrinsic value per share using tangible book value
-    // tangibleBookValuePerShare is already a per-share value from balance sheet
-    const intrinsicValuePerShare = balanceSheet.tangibleBookValuePerShare 
-      ? balanceSheet.tangibleBookValuePerShare
-      : (shareholderEquity * 0.8) / (financialData.sharesOutstanding || 1);
-    
+    // Calculate tangible book value (adjust for intangible assets)
+    const tangibleEquity = balanceSheet.tangibleBookValuePerShare 
+      ? balanceSheet.tangibleBookValuePerShare * (financialData.sharesOutstanding || 1)
+      : shareholderEquity * 0.8; // Default: reduce by 20% for typical intangibles
+
+    // Calculate intrinsic value per share using tangible equity
+    const sharesOut = financialData.sharesOutstanding || 1;
+    const intrinsicValuePerShare = tangibleEquity / sharesOut;
     const intrinsicValue = intrinsicValuePerShare;
 
     // Determine confidence based on asset quality (ROE indicates how well assets are used)

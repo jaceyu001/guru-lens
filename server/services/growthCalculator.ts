@@ -13,7 +13,7 @@ import {
 import type { FinancialData } from '@shared/types';
 
 export type GrowthMetric = 'revenue' | 'netIncome' | 'operatingIncome' | 'freeCashFlow';
-export type ComparisonType = 'TTM_VS_TTM' | 'TTM_VS_FY' | 'FY_VS_FY' | 'INSUFFICIENT_DATA';
+export type ComparisonType = 'TTM_VS_FY' | 'FY_VS_FY' | 'INSUFFICIENT_DATA';
 
 export interface GrowthCalculationInput {
   financialData: FinancialData;
@@ -123,7 +123,7 @@ export function calculateGrowth(input: GrowthCalculationInput): GrowthCalculatio
  * @param metric - Metric to calculate TTM for
  * @returns TTM value
  */
-export function getTTMValue(financialData: FinancialData, metric: GrowthMetric): number {
+function getTTMValue(financialData: FinancialData, metric: GrowthMetric): number {
   const quarterlyData = (financialData as any).quarterlyFinancials || [];
 
   if (quarterlyData.length < 4) {
@@ -139,58 +139,6 @@ export function getTTMValue(financialData: FinancialData, metric: GrowthMetric):
   }
 
   return ttmValue;
-}
-
-/**
- * Get prior-year TTM (Trailing Twelve Months) value for a metric
- * Calculates TTM from 4 quarters of the prior year
- * 
- * @param financialData - Financial data object
- * @param metric - Metric to calculate prior-year TTM for
- * @returns Prior-year TTM value, or 0 if insufficient data
- */
-export function getPriorYearTTMValue(financialData: FinancialData, metric: GrowthMetric): number {
-  const quarterlyData = (financialData as any).quarterlyFinancials || [];
-
-  if (quarterlyData.length < 5) {
-    // Need at least 5 quarters: 4 current year + 1 from prior year minimum
-    return 0;
-  }
-
-  // Get the current TTM year from the first quarter (most recent)
-  const currentQuarter = quarterlyData[0];
-  const currentYear = currentQuarter.fiscalYear;
-
-  // Find quarters from the prior year
-  const priorYearQuarters = quarterlyData.filter(
-    (q: any) => q.fiscalYear === currentYear - 1
-  );
-
-  if (priorYearQuarters.length === 0) {
-    return 0;
-  }
-
-  // If we have 4 full quarters from prior year, use them
-  if (priorYearQuarters.length >= 4) {
-    let priorTTMValue = 0;
-    for (let i = 0; i < 4; i++) {
-      const value = getMetricValue(priorYearQuarters[i], metric);
-      priorTTMValue += value;
-    }
-    return priorTTMValue;
-  }
-
-  // If we have fewer than 4 quarters from prior year, annualize what we have
-  // This handles cases where we only have Q4 and Q3 from the prior year
-  let priorTTMValue = 0;
-  for (const quarter of priorYearQuarters) {
-    const value = getMetricValue(quarter, metric);
-    priorTTMValue += value;
-  }
-
-  // Annualize: multiply by (4 / number of quarters available)
-  const annualizedPriorTTM = (priorTTMValue / priorYearQuarters.length) * 4;
-  return annualizedPriorTTM;
 }
 
 /**

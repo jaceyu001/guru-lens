@@ -69,13 +69,6 @@ interface YFinanceResponse {
     operatingIncome: number;
     freeCashFlow: number;
   }>;
-  balanceSheet?: {
-    totalAssets: number;
-    totalLiabilities: number;
-    totalEquity: number;
-    bookValuePerShare: number;
-    tangibleBookValuePerShare: number;
-  };
   historicalBars: Array<{
     date: string;
     open: number;
@@ -174,13 +167,6 @@ export async function getStockData(symbol: string): Promise<FinancialData> {
               operatingMargin: data.ratios.operatingMargin,
               netMargin: data.ratios.netMargin,
             },
-            balanceSheet: data.balanceSheet ? {
-              totalAssets: data.balanceSheet.totalAssets,
-              totalLiabilities: data.balanceSheet.totalLiabilities,
-              totalEquity: data.balanceSheet.totalEquity,
-              bookValuePerShare: data.balanceSheet.bookValuePerShare,
-              tangibleBookValuePerShare: data.balanceSheet.tangibleBookValuePerShare,
-            } : undefined,
           });
         } catch (parseError) {
           reject(new Error(`Failed to parse yfinance output: ${parseError}`));

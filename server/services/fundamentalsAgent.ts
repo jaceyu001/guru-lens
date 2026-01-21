@@ -12,7 +12,7 @@ export interface GrowthAnalysis {
   narrative: string;
   confidence: number; // 0-100
   // TTM vs FY period information
-  comparisonType: "TTM_VS_TTM" | "TTM_VS_FY" | "FY_VS_FY" | "INSUFFICIENT_DATA";
+  comparisonType: "TTM_VS_FY" | "FY_VS_FY" | "INSUFFICIENT_DATA";
   currentPeriod: string; // e.g., "2025 TTM" or "2024 FY"
   priorPeriod: string; // e.g., "2024 FY" or "2023 FY"
   dataQualityFlags: {
@@ -454,7 +454,7 @@ function buildGrowthNarrative(
     return "Insufficient financial data available to calculate growth rates.";
   }
 
-  const periodLabel = comparisonType === 'TTM_VS_TTM' || comparisonType === 'TTM_VS_FY' ? 'TTM' : 'FY';
+  const periodLabel = comparisonType === 'TTM_VS_FY' ? 'TTM' : 'FY';
   let narrative = `Revenue growing at ${revenueGrowth.toFixed(1)}% (${currentPeriod} vs ${priorPeriod}), with earnings growth of ${earningsGrowth.toFixed(1)}%. FCF growth of ${fcfGrowth.toFixed(1)}% shows ${trend.toLowerCase()} trend. ${
     earningsGrowth > revenueGrowth
       ? "Earnings outpacing revenue suggests margin expansion."

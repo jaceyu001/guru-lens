@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { Search, TrendingUp, Users, BarChart3, Shield } from "lucide-react";

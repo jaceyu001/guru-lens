@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useLocation } from "wouter";
 import { Trash2, TrendingUp, TrendingDown, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
