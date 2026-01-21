@@ -178,17 +178,25 @@ def get_stock_data(symbol):
             except Exception as e:
                 pass
         
-        # Get quarterly financials with FCF data (for TTM calculations)
+        # Get quarterly financials with OCF data (for TTM calculations)
         try:
-            # Get quarterly cash flow statement for FCF data
+            # Get quarterly cash flow statement for OCF and FCF data
             quarterly_cf = ticker.quarterly_cashflow
             quarterly_fcf_data = {}
-            if quarterly_cf is not None and not quarterly_cf.empty and 'Free Cash Flow' in quarterly_cf.index:
+            quarterly_ocf_data = {}
+            if quarterly_cf is not None and not quarterly_cf.empty:
                 for col in quarterly_cf.columns:
                     try:
-                        fcf = float(quarterly_cf.loc['Free Cash Flow', col])
-                        if not math.isnan(fcf):
-                            quarterly_fcf_data[str(col)[:10]] = fcf
+                        # Get Operating Cash Flow
+                        if 'Operating Cash Flow' in quarterly_cf.index:
+                            ocf = float(quarterly_cf.loc['Operating Cash Flow', col])
+                            if not math.isnan(ocf):
+                                quarterly_ocf_data[str(col)[:10]] = ocf
+                        # Get Free Cash Flow as fallback
+                        if 'Free Cash Flow' in quarterly_cf.index:
+                            fcf = float(quarterly_cf.loc['Free Cash Flow', col])
+                            if not math.isnan(fcf):
+                                quarterly_fcf_data[str(col)[:10]] = fcf
                     except (ValueError, KeyError, TypeError):
                         pass
             
@@ -200,6 +208,7 @@ def get_stock_data(symbol):
                         revenue = float(quarterly_fin.loc['Total Revenue', col]) if 'Total Revenue' in quarterly_fin.index else 0
                         net_income = float(quarterly_fin.loc['Net Income', col]) if 'Net Income' in quarterly_fin.index else 0
                         operating_income = float(quarterly_fin.loc['Operating Income', col]) if 'Operating Income' in quarterly_fin.index else 0
+                        ocf = quarterly_ocf_data.get(str(col)[:10], 0)
                         fcf = quarterly_fcf_data.get(str(col)[:10], 0)
                         
                         # Parse quarter from date
@@ -216,6 +225,7 @@ def get_stock_data(symbol):
                             "netIncome": net_income,
                             "eps": float(info.get('trailingEps', 0)) or 0,
                             "operatingIncome": operating_income,
+                            "operatingCashFlow": ocf,
                             "freeCashFlow": fcf
                         })
                     except (ValueError, KeyError, TypeError):

@@ -12,7 +12,7 @@ import {
 } from './dataAvailabilityDetector';
 import type { FinancialData } from '@shared/types';
 
-export type GrowthMetric = 'revenue' | 'netIncome' | 'operatingIncome' | 'freeCashFlow';
+export type GrowthMetric = 'revenue' | 'netIncome' | 'operatingIncome' | 'freeCashFlow' | 'operatingCashFlow';
 export type ComparisonType = 'TTM_VS_FY' | 'FY_VS_FY' | 'INSUFFICIENT_DATA';
 
 export interface GrowthCalculationInput {
@@ -182,6 +182,7 @@ function getMetricValue(
     netIncome: 'netIncome',
     operatingIncome: 'operatingIncome',
     freeCashFlow: 'freeCashFlow',
+    operatingCashFlow: 'operatingCashFlow',
   };
 
   const key = metricMap[metric];

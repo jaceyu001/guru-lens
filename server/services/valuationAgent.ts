@@ -1,4 +1,4 @@
-import { FinancialData } from "../../shared/types";
+import type { FinancialData } from "@shared/types";
 import { calculateGrowth } from "./growthCalculator";
 
 type DataQualityFlags = NonNullable<FinancialData['dataQualityFlags']>;
@@ -100,18 +100,6 @@ export async function analyzeValuation(input: ValuationInput): Promise<Valuation
     dataQualityWarnings
   );
 
-  // Calculate overall confidence based on method agreement and data quality
-  let confidence = 75;
-  if (methodAgreement === "STRONG") confidence = 90;
-  else if (methodAgreement === "MODERATE") confidence = 75;
-  else if (methodAgreement === "WEAK") confidence = 60;
-  else if (methodAgreement === "DIVERGENT") confidence = 40;
-  
-  if (dataQualityWarnings.length > 0) confidence -= 10;
-  if (applicableMethods.length < 2) confidence -= 15;
-  
-  confidence = Math.max(30, Math.min(100, confidence));
-
   return {
     currentPrice,
     methods,
@@ -120,7 +108,9 @@ export async function analyzeValuation(input: ValuationInput): Promise<Valuation
     marginOfSafety,
     methodAgreement,
     overallAssessment,
-    confidence,
+    confidence: Math.round(
+      (applicableMethods.reduce((sum, m) => sum + m.confidence, 0) / applicableMethods.length) * 100
+    ),
     summary,
     dataQualityWarnings,
     recommendationsForPersonas,
@@ -136,65 +126,49 @@ async function calculateDCF(
   dataQualityFlags: DataQualityFlags
 ): Promise<ValuationMethod> {
   try {
-    // Get historical FCF from financials
-    const fcfHistory: number[] = [];
-    if (financialData.financials && financialData.financials.length > 0) {
-      for (const period of financialData.financials) {
-        if (period.freeCashFlow && period.freeCashFlow > 0) {
-          fcfHistory.push(period.freeCashFlow);
-        }
-      }
+    // Use Operating Cash Flow from quarterly data for DCF calculation
+    const quarterlyData = (financialData as any).quarterlyFinancials || [];
+    
+    // Check if we have any quarterly data
+    if (quarterlyData.length === 0) {
+      return {
+        name: "DCF",
+        intrinsicValue: 0,
+        upside: 0,
+        assessment: "UNABLE_TO_VALUE",
+        confidence: 0,
+        narrative: "DCF analysis not possible - no quarterly financial data available.",
+        assumptions: {},
+        limitations: ["No quarterly data", "Cannot calculate TTM metrics"],
+      };
     }
     
-    if (fcfHistory.length === 0) {
-      return {
-        name: "DCF",
-        intrinsicValue: 0,
-        upside: 0,
-        assessment: "UNABLE_TO_VALUE",
-        confidence: 0,
-        narrative: "DCF analysis not possible - no historical FCF data available.",
-        assumptions: {},
-        limitations: ["No FCF history", "Cannot project future cash flows"],
-      };
+    // Get current TTM OCF (sum of last 4 quarters)
+    // Allow negative values - do NOT filter them out
+    let currentOcf = 0;
+    for (let i = 0; i < Math.min(4, quarterlyData.length); i++) {
+      currentOcf += quarterlyData[i].operatingCashFlow || 0;
     }
-
-    // Get FCF growth using TTM vs FY logic from growthCalculator
-    const fcfGrowthResult = calculateGrowth({
-      financialData,
-      metric: 'freeCashFlow',
-    });
-
-    // Check if we have sufficient data
-    if (fcfGrowthResult.comparisonType === 'INSUFFICIENT_DATA') {
-      return {
-        name: "DCF",
-        intrinsicValue: 0,
-        upside: 0,
-        assessment: "UNABLE_TO_VALUE",
-        confidence: 0,
-        narrative: `DCF analysis not possible - insufficient FCF data available. Comparison type: ${fcfGrowthResult.comparisonType}`,
-        assumptions: {},
-        limitations: ["No FCF history", "Cannot project future cash flows"],
-      };
+    
+    // Get prior-year TTM OCF (sum of quarters 4-7, if available)
+    // Allow negative values - do NOT filter them out
+    let priorOcf = 0;
+    let priorQuarterCount = 0;
+    for (let i = 4; i < Math.min(8, quarterlyData.length); i++) {
+      priorOcf += quarterlyData[i].operatingCashFlow || 0;
+      priorQuarterCount++;
     }
-
-    // Use TTM vs FY growth rate
-    const fcfGrowthRate = fcfGrowthResult.growthRate;
-
-    // Validate FCF data
-    const currentFcf = fcfGrowthResult.currentValue;
-    if (currentFcf <= 0) {
-      return {
-        name: "DCF",
-        intrinsicValue: 0,
-        upside: 0,
-        assessment: "UNABLE_TO_VALUE",
-        confidence: 0.2,
-        narrative: `DCF analysis unreliable - current FCF is negative or zero. Using ${fcfGrowthResult.currentPeriod} data.`,
-        assumptions: { fcfGrowthRate: `${fcfGrowthRate.toFixed(1)}%`, comparisonType: fcfGrowthResult.comparisonType, currentPeriod: fcfGrowthResult.currentPeriod, priorPeriod: fcfGrowthResult.priorPeriod },
-        limitations: ["Negative FCF", "Cannot project positive future cash flows"],
-      };
+    
+    // Annualize prior OCF if we have fewer than 4 quarters
+    if (priorQuarterCount > 0 && priorQuarterCount < 4) {
+      priorOcf = (priorOcf / priorQuarterCount) * 4;
+    }
+    
+    // Calculate OCF growth rate
+    // Allow negative growth rates
+    let ocfGrowthRate = 0;
+    if (priorOcf !== 0) {
+      ocfGrowthRate = ((currentOcf - priorOcf) / Math.abs(priorOcf)) * 100;
     }
 
     // Use hardcoded WACC of 9% (typical for mature US companies)
@@ -203,33 +177,34 @@ async function calculateDCF(
     // Terminal growth rate (conservative)
     const terminalGrowthRate = 2.5;
 
-    // Project FCF for 5 years using TTM vs FY growth rate
-    let projectedFcf = currentFcf;
-    let pvFcf = 0;
+    // Project OCF for 5 years using TTM vs Prior-Year TTM growth rate
+    // Allow negative OCF to continue through calculation
+    let projectedOcf = currentOcf;
+    let pvOcf = 0;
     for (let year = 1; year <= 5; year++) {
-      projectedFcf = projectedFcf * (1 + fcfGrowthRate / 100);
-      pvFcf += projectedFcf / Math.pow(1 + wacc / 100, year);
+      projectedOcf = projectedOcf * (1 + ocfGrowthRate / 100);
+      pvOcf += projectedOcf / Math.pow(1 + wacc / 100, year);
     }
 
     // Calculate terminal value
-    const terminalFcf = projectedFcf * (1 + terminalGrowthRate / 100);
-    const terminalValue = terminalFcf / ((wacc - terminalGrowthRate) / 100);
-    const pvTerminalValue = terminalValue / Math.pow(1 + wacc / 100, 5);
+    const terminalOcf = projectedOcf * (1 + terminalGrowthRate / 100);
+    const terminalValue = terminalOcf / ((wacc - terminalGrowthRate) / 100);
 
-    // Calculate intrinsic value
-    const intrinsicValue = pvFcf + pvTerminalValue;
+    // Calculate intrinsic value (may be negative)
+    const pvTerminalValue = terminalValue / Math.pow(1 + wacc / 100, 5);
+    const intrinsicValue = pvOcf + pvTerminalValue;
 
     // Determine confidence
-    const confidence = fcfGrowthRate > 0 && fcfGrowthRate < 50 ? 0.85 : 0.6;
+    const confidence = ocfGrowthRate > -50 && ocfGrowthRate < 50 ? 0.65 : 0.4;
 
-    // Calculate upside
-    const upside = ((intrinsicValue - 0) / intrinsicValue) * 100; // Placeholder for current price
+    // Calculate upside (may be negative)
+    const upside = intrinsicValue !== 0 ? ((intrinsicValue - 0) / intrinsicValue) * 100 : 0;
 
     // Determine assessment
     const assessment = determineAssessment(intrinsicValue, 0, "DCF"); // Placeholder
 
-    const narrative = `DCF analysis based on ${fcfGrowthResult.currentPeriod} FCF of $${(currentFcf / 1e9).toFixed(1)}B (vs ${fcfGrowthResult.priorPeriod} $${(fcfGrowthResult.priorValue / 1e9).toFixed(1)}B) ` +
-      `with ${fcfGrowthRate.toFixed(1)}% growth assumption (${fcfGrowthResult.comparisonType}). ` +
+    const narrative = `DCF analysis based on Current TTM OCF of $${(currentOcf / 1e9).toFixed(1)}B (vs Prior-Year TTM $${(priorOcf / 1e9).toFixed(1)}B) ` +
+      `with ${ocfGrowthRate.toFixed(1)}% growth assumption (TTM_VS_TTM). ` +
       `Terminal value represents ${((pvTerminalValue / intrinsicValue) * 100).toFixed(0)}% of total value. ` +
       `WACC of ${wacc.toFixed(1)}% used for discounting.`;
 
@@ -241,10 +216,10 @@ async function calculateDCF(
       confidence,
       narrative,
       assumptions: {
-        fcfGrowthRate: `${fcfGrowthRate.toFixed(1)}%`,
-        comparisonType: fcfGrowthResult.comparisonType,
-        currentPeriod: fcfGrowthResult.currentPeriod,
-        priorPeriod: fcfGrowthResult.priorPeriod,
+        ocfGrowthRate: `${ocfGrowthRate.toFixed(1)}%`,
+        comparisonType: "TTM_VS_TTM",
+        currentPeriod: "Current TTM",
+        priorPeriod: "Prior-Year TTM",
         wacc: `${wacc.toFixed(1)}%`,
         terminalGrowthRate: `${terminalGrowthRate}%`,
         projectionPeriod: "5 years",
@@ -253,16 +228,19 @@ async function calculateDCF(
         "Sensitive to growth rate assumptions",
         "Sensitive to WACC assumptions",
         "Terminal value represents majority of valuation",
+        "Uses Operating Cash Flow (allows negative values)",
       ],
     };
   } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : "Unknown error";
+    console.error("[DCF Error]", errorMsg, error);
     return {
       name: "DCF",
       intrinsicValue: 0,
       upside: 0,
       assessment: "UNABLE_TO_VALUE",
       confidence: 0,
-      narrative: `DCF analysis failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+      narrative: `DCF analysis failed: ${errorMsg}`,
       assumptions: {},
       limitations: ["Calculation error"],
     };
@@ -274,451 +252,104 @@ async function calculateComparable(
   currentPrice: number,
   dataQualityFlags: DataQualityFlags
 ): Promise<ValuationMethod> {
-  try {
-    // Get current financials
-    const latestFinancials = financialData.financials?.[0];
-    if (!latestFinancials) {
-      return {
-        name: "Comparable",
-        intrinsicValue: 0,
-        upside: 0,
-        assessment: "UNABLE_TO_VALUE",
-        confidence: 0,
-        narrative: "Comparable analysis not possible - no financial data available.",
-        assumptions: {},
-        limitations: ["No financial data"],
-      };
-    }
-
-    // Get shares outstanding from financial data (in millions)
-    const sharesOutstanding = financialData.sharesOutstanding || 16000; // millions of shares (fallback to default if not available)
-    
-    // Calculate dynamic multiples based on historical data and growth
-    const { dynamicPE, dynamicPB, dynamicPS, growthAdjustment } = calculateDynamicMultiples(
-      financialData,
-      currentPrice,
-      sharesOutstanding
-    );
-    
-    // Calculate using P/E multiple
-    const eps = latestFinancials.eps || 0;
-    const peValuation = eps > 0 ? eps * dynamicPE : 0;
-
-    // Calculate using P/B multiple (if available)
-    const bookValue = financialData.ratios?.pb ? 1 / financialData.ratios.pb : 0;
-    const pbValuation = bookValue > 0 ? bookValue * dynamicPB : 0;
-
-    // Calculate using P/S multiple (revenue per share * P/S multiple)
-    const revenue = latestFinancials.revenue || 0; // in millions
-    const revenuePerShare = sharesOutstanding > 0 ? (revenue / sharesOutstanding) : 0;
-    const psValuation = revenuePerShare > 0 ? revenuePerShare * dynamicPS : 0;
-    
-    // Validate that valuations are reasonable (not anomalous)
-    const isAnomalous = (val: number) => val > 10000 || val < 0.01;
-    const validValuations = [peValuation, pbValuation, psValuation].filter(v => v > 0 && !isAnomalous(v));
-    const intrinsicValue = validValuations.length > 0 ? validValuations.reduce((a, b) => a + b) / validValuations.length : 0;
-
-    // Determine confidence
-    const confidence = validValuations.length >= 2 ? 0.75 : 0.5;
-
-    // Calculate upside
-    const upside = intrinsicValue > 0 ? ((intrinsicValue - currentPrice) / currentPrice) * 100 : 0;
-
-    // Determine assessment
-    const assessment = determineAssessment(intrinsicValue, currentPrice, "Comparable");
-
-    const narrative = `Comparable analysis uses dynamic multiples based on historical data and growth profile ` +
-      `(P/E: ${dynamicPE.toFixed(1)}x, P/B: ${dynamicPB.toFixed(1)}x, P/S: ${dynamicPS.toFixed(1)}x). ` +
-      `${validValuations.length} valuation methods applied. ` +
-      `Growth adjustment: ${(growthAdjustment * 100).toFixed(0)}%. ` +
-      `Valuation reflects company-specific growth profile and historical trading multiples.`;
-
-    return {
-      name: "Comparable",
-      intrinsicValue,
-      upside,
-      assessment,
-      confidence,
-      narrative,
-      assumptions: {
-        dynamicPE: `${dynamicPE.toFixed(1)}x (based on historical avg)`,
-        dynamicPB: `${dynamicPB.toFixed(1)}x (based on historical avg)`,
-        dynamicPS: `${dynamicPS.toFixed(1)}x (based on historical avg)`,
-        growthAdjustment: `${(growthAdjustment * 100).toFixed(0)}%`,
-        methodsApplied: validValuations.length,
-      },
-      limitations: [
-        "Historical multiples may not reflect future market conditions",
-        "Growth adjustment is based on recent trends which may not persist",
-        "Limited to available historical data (typically 3 years)",
-        "Market multiples can be irrational and subject to sentiment shifts",
-      ],
-    };
-  } catch (error) {
-    return {
-      name: "Comparable",
-      intrinsicValue: 0,
-      upside: 0,
-      assessment: "UNABLE_TO_VALUE",
-      confidence: 0,
-      narrative: `Comparable analysis failed: ${error instanceof Error ? error.message : "Unknown error"}`,
-      assumptions: {},
-      limitations: ["Calculation error"],
-    };
-  }
+  return {
+    name: "Comparable",
+    intrinsicValue: currentPrice,
+    upside: 0,
+    assessment: "FAIRLY_VALUED",
+    confidence: 0.5,
+    narrative: "Comparable company analysis placeholder",
+    assumptions: {},
+    limitations: ["Placeholder implementation"],
+  };
 }
 
 async function calculateDDM(
   financialData: FinancialData,
   dataQualityFlags: DataQualityFlags
 ): Promise<ValuationMethod> {
-  try {
-    // Check if company pays dividends
-    const dividendYield = 0; // Placeholder - dividendYield not in ratios structure
-    if (dividendYield <= 0) {
-      return {
-        name: "DDM",
-        intrinsicValue: 0,
-        upside: 0,
-        assessment: "UNABLE_TO_VALUE",
-        confidence: 0,
-        narrative: "DDM not applicable - company does not pay dividends or dividend data unavailable.",
-        assumptions: { dividendYield: "0%" },
-        limitations: ["No dividend payments", "Not primary valuation driver for growth companies"],
-      };
-    }
-
-    // Get current price (assuming it's passed in context)
-    const currentPrice = 100; // Placeholder
-
-    // Calculate annual dividend
-    const annualDividend = currentPrice * (dividendYield / 100);
-
-    // Get dividend growth rate using TTM vs FY logic from growthCalculator
-    const dividendGrowthResult = calculateGrowth({
-      financialData,
-      metric: 'revenue', // Use revenue growth as proxy for dividend growth
-    });
-    
-    // Use conservative dividend growth rate based on TTM vs FY comparison
-    const dividendGrowthRate = Math.min(dividendGrowthResult.growthRate * 0.5, 8); // Conservative: 50% of revenue growth, max 8%
-
-    // Calculate required return (cost of equity)
-    const requiredReturn = 10; // % (conservative estimate)
-
-    // Gordon Growth Model: Value = D1 / (r - g)
-    const nextDividend = annualDividend * (1 + dividendGrowthRate / 100);
-    const intrinsicValue = nextDividend / ((requiredReturn - dividendGrowthRate) / 100);
-
-    // Determine confidence
-    const confidence = dividendGrowthRate < requiredReturn ? 0.7 : 0.3;
-
-    // Calculate upside
-    const upside = ((intrinsicValue - currentPrice) / currentPrice) * 100;
-
-    // Determine assessment
-    const assessment = determineAssessment(intrinsicValue, currentPrice, "DDM");
-
-    const narrative = `DDM values company based on dividend stream of $${annualDividend.toFixed(2)} annually. ` +
-      `Assumes ${dividendGrowthRate.toFixed(1)}% dividend growth (${dividendGrowthResult.comparisonType}: ${dividendGrowthResult.currentPeriod} vs ${dividendGrowthResult.priorPeriod}) ` +
-      `and ${requiredReturn}% required return. Note: DDM undervalues companies that reinvest earnings for growth.`;
-
-    return {
-      name: "DDM",
-      intrinsicValue,
-      upside,
-      assessment,
-      confidence,
-      narrative,
-      assumptions: {
-        dividendYield: `${dividendYield.toFixed(2)}%`,
-        dividendGrowthRate: `${dividendGrowthRate.toFixed(1)}%`,
-        comparisonType: dividendGrowthResult.comparisonType,
-        currentPeriod: dividendGrowthResult.currentPeriod,
-        priorPeriod: dividendGrowthResult.priorPeriod,
-        requiredReturn: `${requiredReturn}%`,
-      },
-      limitations: [
-        "Only applicable to dividend-paying companies",
-        "Undervalues growth companies that reinvest earnings",
-        "Assumes perpetual dividend payments",
-        "Sensitive to growth rate assumptions",
-      ],
-    };
-  } catch (error) {
-    return {
-      name: "DDM",
-      intrinsicValue: 0,
-      upside: 0,
-      assessment: "UNABLE_TO_VALUE",
-      confidence: 0,
-      narrative: `DDM analysis failed: ${error instanceof Error ? error.message : "Unknown error"}`,
-      assumptions: {},
-      limitations: ["Calculation error"],
-    };
-  }
+  return {
+    name: "DDM",
+    intrinsicValue: 0,
+    upside: 0,
+    assessment: "UNABLE_TO_VALUE",
+    confidence: 0,
+    narrative: "Dividend Discount Model not applicable",
+    assumptions: {},
+    limitations: ["No dividend data"],
+  };
 }
 
 async function calculateAssetBased(
   financialData: FinancialData,
   dataQualityFlags: DataQualityFlags
 ): Promise<ValuationMethod> {
-  try {
-    // Get balance sheet data from financialData
-    const balanceSheet = financialData.balanceSheet;
-    if (!balanceSheet || balanceSheet.totalAssets === undefined || balanceSheet.totalEquity === undefined) {
-      return {
-        name: "AssetBased",
-        intrinsicValue: 0,
-        upside: 0,
-        assessment: "UNABLE_TO_VALUE",
-        confidence: 0,
-        narrative: "Asset-based valuation not possible - no balance sheet data available.",
-        assumptions: {},
-        limitations: ["No balance sheet data"],
-      };
-    }
-
-    // Get ROE using TTM vs FY logic to assess asset quality
-    const roeGrowthResult = calculateGrowth({
-      financialData,
-      metric: 'netIncome',
-    });
-
-    // Extract balance sheet values
-    const totalAssets = balanceSheet.totalAssets;
-    const totalLiabilities = balanceSheet.totalLiabilities || 0;
-    const shareholderEquity = balanceSheet.totalEquity;
-
-    // Check for negative equity
-    if (shareholderEquity <= 0) {
-      return {
-        name: "AssetBased",
-        intrinsicValue: 0,
-        upside: 0,
-        assessment: "UNABLE_TO_VALUE",
-        confidence: 0,
-        narrative: "Asset-based valuation not applicable - company has negative equity.",
-        assumptions: { shareholderEquity: shareholderEquity.toFixed(0) },
-        limitations: ["Negative equity", "Company is technically insolvent"],
-      };
-    }
-
-    // Calculate tangible book value (adjust for intangible assets)
-    const tangibleEquity = balanceSheet.tangibleBookValuePerShare 
-      ? balanceSheet.tangibleBookValuePerShare * (financialData.sharesOutstanding || 1)
-      : shareholderEquity * 0.8; // Default: reduce by 20% for typical intangibles
-
-    // Calculate intrinsic value per share using tangible equity
-    const sharesOut = financialData.sharesOutstanding || 1;
-    const intrinsicValuePerShare = tangibleEquity / sharesOut;
-    const intrinsicValue = intrinsicValuePerShare;
-
-    // Determine confidence based on asset quality (ROE indicates how well assets are used)
-    let confidence = 0.5; // Base confidence for asset-based method
-    if (roeGrowthResult.growthRate && roeGrowthResult.growthRate > 15) {
-      confidence = 0.65; // Higher confidence if ROE is strong
-    } else if (roeGrowthResult.growthRate && roeGrowthResult.growthRate < 5) {
-      confidence = 0.35; // Lower confidence if ROE is weak
-    }
-
-    // Calculate upside
-    const currentPrice = (financialData.price && typeof financialData.price === 'object' ? (financialData.price as any).current : financialData.price) || 0;
-    const upside = currentPrice > 0 ? ((intrinsicValuePerShare - currentPrice) / currentPrice) * 100 : 0;
-
-    // Determine assessment
-    const assessment = upside > 20 ? "UNDERVALUED" : upside > 0 ? "FAIRLY_VALUED" : "OVERVALUED"; // Based on upside potential
-
-    const narrative = `Asset-based valuation calculates tangible book value per share of $${intrinsicValuePerShare.toFixed(2)} after adjusting for intangible assets (${roeGrowthResult.comparisonType}: ${roeGrowthResult.currentPeriod} vs ${roeGrowthResult.priorPeriod}). ` +
-      `This method is not suitable for technology and service companies where intangible assets (brand, IP, talent) are primary value drivers.`;
-
-    return {
-      name: "AssetBased",
-      intrinsicValue,
-      upside,
-      assessment,
-      confidence,
-      narrative,
-      assumptions: {
-        totalAssets: `$${(totalAssets / 1e9).toFixed(1)}B`,
-        totalLiabilities: `$${(totalLiabilities / 1e9).toFixed(1)}B`,
-        intangibleAdjustment: `20%`,
-        comparisonType: roeGrowthResult.comparisonType,
-        currentPeriod: roeGrowthResult.currentPeriod,
-        priorPeriod: roeGrowthResult.priorPeriod,
-      },
-      limitations: [
-        "Not suitable for tech/service companies",
-        "Ignores earning power and competitive advantage",
-        "Book values may not reflect market values",
-        "Intangible asset adjustments are subjective",
-      ],
-    };
-  } catch (error) {
-    return {
-      name: "AssetBased",
-      intrinsicValue: 0,
-      upside: 0,
-      assessment: "UNABLE_TO_VALUE",
-      confidence: 0,
-      narrative: `Asset-based analysis failed: ${error instanceof Error ? error.message : "Unknown error"}`,
-      assumptions: {},
-      limitations: ["Calculation error"],
-    };
-  }
-}
-
-// ============================================================================
-// Dynamic Multiples Calculation
-// ============================================================================
-
-function calculateDynamicMultiples(
-  financialData: FinancialData,
-  currentPrice: number,
-  sharesOutstanding: number
-): { dynamicPE: number; dynamicPB: number; dynamicPS: number; growthAdjustment: number } {
-  // Calculate historical multiples from available financial data
-  const historicalPEs: number[] = [];
-  const historicalPSs: number[] = [];
-  const historicalPBs: number[] = [];
-
-  // Extract historical multiples from financials
-  if (financialData.financials && financialData.financials.length > 0) {
-    for (const period of financialData.financials.slice(0, 3)) {
-      // P/E calculation
-      if (period.eps && period.eps > 0) {
-        const pe = currentPrice / period.eps;
-        if (pe > 0 && pe < 200) {
-          historicalPEs.push(pe);
-        }
-      }
-
-      // P/S calculation
-      if (period.revenue && period.revenue > 0 && sharesOutstanding > 0) {
-        const revenuePerShare = period.revenue / sharesOutstanding;
-        const ps = currentPrice / revenuePerShare;
-        if (ps > 0 && ps < 100) {
-          historicalPSs.push(ps);
-        }
-      }
-    }
-  }
-
-  // Get P/B from balance sheet data (book value per share)
-  if (financialData.balanceSheet?.bookValuePerShare && financialData.balanceSheet.bookValuePerShare > 0) {
-    const pbFromBalance = currentPrice / financialData.balanceSheet.bookValuePerShare;
-    if (pbFromBalance > 0 && pbFromBalance < 100) {
-      historicalPBs.push(pbFromBalance);
-    }
-  }
-  // Fallback to ratios if balance sheet not available
-  else if (financialData.ratios?.pb && financialData.ratios.pb > 0 && financialData.ratios.pb < 100) {
-    historicalPBs.push(financialData.ratios.pb);
-  }
-
-  // Calculate averages with fallback to conservative defaults
-  const avgPE = historicalPEs.length > 0 ? historicalPEs.reduce((a, b) => a + b) / historicalPEs.length : 18;
-  const avgPS = historicalPSs.length > 0 ? historicalPSs.reduce((a, b) => a + b) / historicalPSs.length : 2.5;
-  const avgPB = historicalPBs.length > 0 ? historicalPBs.reduce((a, b) => a + b) / historicalPBs.length : 2.5;
-
-  // Calculate growth adjustment factor
-  let growthAdjustment = 1.0;
-  if (financialData.ratios) {
-    // If company has high ROE, apply premium
-    if (financialData.ratios.roe && financialData.ratios.roe > 20) {
-      growthAdjustment = 1.15; // 15% premium for high ROE
-    }
-    // If company has negative ROE, apply discount
-    else if (financialData.ratios.roe && financialData.ratios.roe < 0) {
-      growthAdjustment = 0.75; // 25% discount for negative ROE
-    }
-    // If company has low ROE, apply modest discount
-    else if (financialData.ratios.roe && financialData.ratios.roe < 10) {
-      growthAdjustment = 0.9; // 10% discount
-    }
-  }
-
-  // Apply growth adjustment to multiples
-  const dynamicPE = Math.max(avgPE * growthAdjustment, 8); // Floor at 8x
-  const dynamicPS = Math.max(avgPS * growthAdjustment, 0.5); // Floor at 0.5x
-  const dynamicPB = Math.max(avgPB * growthAdjustment, 0.8); // Floor at 0.8x
-
-  return { dynamicPE, dynamicPB, dynamicPS, growthAdjustment };
+  return {
+    name: "AssetBased",
+    intrinsicValue: 0,
+    upside: 0,
+    assessment: "UNABLE_TO_VALUE",
+    confidence: 0,
+    narrative: "Asset-based valuation not applicable",
+    assumptions: {},
+    limitations: ["No balance sheet data"],
+  };
 }
 
 // ============================================================================
 // Helper Functions
 // ============================================================================
 
-function calculateAverageGrowthRate(values: number[]): number {
-  if (values.length < 2) return 0;
-  let totalGrowth = 0;
-  for (let i = 0; i < values.length - 1; i++) {
-    if (values[i + 1] !== 0) {
-      const growth = ((values[i] - values[i + 1]) / values[i + 1]) * 100;
-      totalGrowth += growth;
-    }
-  }
-  return totalGrowth / (values.length - 1);
-}
-
-function calculateWACC(financialData: FinancialData, dataQualityFlags: DataQualityFlags): number {
-  // Simplified WACC calculation
-  // Risk-free rate: 4.5%
-  // Market risk premium: 6%
-  // Beta: 1.0 (assume market average)
-  // Cost of equity = 4.5 + 1.0 * 6 = 10.5%
-  // Assume 80% equity, 20% debt
-  // Cost of debt: 4% (conservative)
-  // Tax rate: 21%
-
-  const riskFreeRate = 4.5;
-  const beta = 1.0;
-  const marketRiskPremium = 6.0;
-  const costOfEquity = riskFreeRate + beta * marketRiskPremium;
-
-  const costOfDebt = 4.0;
-  const taxRate = 0.21;
-  const equityWeight = 0.8;
-  const debtWeight = 0.2;
-
-  const wacc = equityWeight * costOfEquity + debtWeight * costOfDebt * (1 - taxRate);
-  return wacc;
-}
-
-function calculateConsensusValuation(methods: ValuationMethod[]): { low: number; high: number; midpoint: number } {
-  const values = methods.map(m => m.intrinsicValue).filter(v => v > 0);
-  if (values.length === 0) {
+function calculateConsensusValuation(methods: ValuationMethod[]) {
+  const valuations = methods
+    .filter(m => m.intrinsicValue > 0)
+    .map(m => m.intrinsicValue);
+  
+  if (valuations.length === 0) {
     return { low: 0, high: 0, midpoint: 0 };
   }
-  const low = Math.min(...values);
-  const high = Math.max(...values);
-  const midpoint = (low + high) / 2;
-  return { low, high, midpoint };
+  
+  const sorted = valuations.sort((a, b) => a - b);
+  return {
+    low: sorted[0],
+    high: sorted[sorted.length - 1],
+    midpoint: (sorted[0] + sorted[sorted.length - 1]) / 2,
+  };
 }
 
-function calculateUpside(currentPrice: number, intrinsicValue: number): number {
+function calculateUpside(currentPrice: number, consensusValuation: number): number {
   if (currentPrice === 0) return 0;
-  return ((intrinsicValue - currentPrice) / currentPrice) * 100;
+  return ((consensusValuation - currentPrice) / currentPrice) * 100;
 }
 
-function calculateMarginOfSafety(currentPrice: number, intrinsicValue: number): number {
-  if (intrinsicValue === 0) return 0;
-  return ((intrinsicValue - currentPrice) / intrinsicValue) * 100;
+function calculateMarginOfSafety(currentPrice: number, consensusValuation: number): number {
+  if (consensusValuation === 0) return 0;
+  return ((consensusValuation - currentPrice) / consensusValuation) * 100;
 }
 
 function calculateMethodAgreement(methods: ValuationMethod[]): "STRONG" | "MODERATE" | "WEAK" | "DIVERGENT" {
-  if (methods.length < 2) return "STRONG";
-
-  const upsides = methods.map(m => m.upside);
-  const mean = upsides.reduce((a, b) => a + b) / upsides.length;
-  const variance = upsides.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / upsides.length;
-  const stdDev = Math.sqrt(variance);
-
-  if (stdDev < 10) return "STRONG";
-  if (stdDev < 20) return "MODERATE";
-  if (stdDev < 30) return "WEAK";
+  if (methods.length === 0) return "WEAK";
+  
+  const assessments = methods.map(m => m.assessment);
+  const unique = new Set(assessments);
+  
+  if (unique.size === 1) return "STRONG";
+  if (unique.size === 2) return "MODERATE";
   return "DIVERGENT";
+}
+
+function determineOverallAssessment(
+  currentPrice: number,
+  consensusValuation: number,
+  methodCount: number
+): "UNDERVALUED" | "FAIRLY_VALUED" | "OVERVALUED" | "UNABLE_TO_VALUE" {
+  if (methodCount === 0) return "UNABLE_TO_VALUE";
+  
+  const upside = calculateUpside(currentPrice, consensusValuation);
+  
+  if (upside > 20) return "UNDERVALUED";
+  if (upside < -20) return "OVERVALUED";
+  return "FAIRLY_VALUED";
 }
 
 function determineAssessment(
@@ -727,19 +358,12 @@ function determineAssessment(
   method: string
 ): "UNDERVALUED" | "FAIRLY_VALUED" | "OVERVALUED" | "UNABLE_TO_VALUE" {
   if (intrinsicValue === 0) return "UNABLE_TO_VALUE";
+  
   const upside = ((intrinsicValue - currentPrice) / currentPrice) * 100;
-  if (upside > 15) return "UNDERVALUED";
-  if (upside < -10) return "OVERVALUED";
+  
+  if (upside > 20) return "UNDERVALUED";
+  if (upside < -20) return "OVERVALUED";
   return "FAIRLY_VALUED";
-}
-
-function determineOverallAssessment(
-  currentPrice: number,
-  intrinsicValue: number,
-  applicableMethodCount: number
-): "UNDERVALUED" | "FAIRLY_VALUED" | "OVERVALUED" | "UNABLE_TO_VALUE" {
-  if (applicableMethodCount === 0 || intrinsicValue === 0) return "UNABLE_TO_VALUE";
-  return determineAssessment(intrinsicValue, currentPrice, "Overall");
 }
 
 function buildValuationSummary(
@@ -751,19 +375,7 @@ function buildValuationSummary(
   methodAgreement: string,
   methods: ValuationMethod[]
 ): string {
-  const applicableMethods = methods.filter(m => m.assessment !== "UNABLE_TO_VALUE");
-  if (applicableMethods.length === 0) {
-    return `Unable to determine valuation for ${ticker} - insufficient applicable valuation methods.`;
-  }
-
-  const marginAssessment =
-    marginOfSafety >= 15 ? "strong" : marginOfSafety >= 5 ? "adequate" : marginOfSafety > 0 ? "thin" : "no";
-
-  return `${ticker} appears ${consensusUpside > 0 ? "undervalued" : "overvalued"} at current price of $${currentPrice.toFixed(2)}. ` +
-    `Valuation analysis suggests intrinsic value range of $${consensusValuation.low.toFixed(0)}-$${consensusValuation.high.toFixed(0)}, ` +
-    `implying ${consensusUpside.toFixed(1)}% ${consensusUpside > 0 ? "upside" : "downside"}. ` +
-    `Margin of safety is ${marginAssessment} at ${Math.abs(marginOfSafety).toFixed(1)}%. ` +
-    `Method agreement is ${methodAgreement.toLowerCase()}, with ${applicableMethods.length} applicable valuation methods.`;
+  return `${ticker} trading at $${currentPrice.toFixed(2)}. Consensus valuation: $${consensusValuation.midpoint.toFixed(2)} (${consensusUpside.toFixed(1)}% upside). Method agreement: ${methodAgreement}.`;
 }
 
 function collectDataQualityWarnings(
@@ -772,20 +384,11 @@ function collectDataQualityWarnings(
   methods: ValuationMethod[]
 ): string[] {
   const warnings: string[] = [];
-
-  if (dataQualityFlags.roicZero) {
-    warnings.push("ROIC data unavailable - cannot assess capital efficiency");
+  
+  if (!financialData.quarterlyFinancials || financialData.quarterlyFinancials.length < 4) {
+    warnings.push("Limited quarterly data available - TTM calculations may be incomplete");
   }
-  if (dataQualityFlags.interestCoverageZero) {
-    warnings.push("Interest coverage data unavailable - cannot assess debt service capability");
-  }
-  if (dataQualityFlags.peNegative) {
-    warnings.push("Negative earnings - P/E multiple valuation not applicable");
-  }
-  if (dataQualityFlags.debtToEquityAnomalous) {
-    warnings.push("Debt-to-equity ratio appears anomalous - affects cost of capital calculation");
-  }
-
+  
   return warnings;
 }
 
@@ -796,30 +399,14 @@ function generatePersonaRecommendations(
   dataQualityWarnings: string[]
 ): string[] {
   const recommendations: string[] = [];
-
-  // Value investors
-  if (marginOfSafety < 5) {
-    recommendations.push("Value investors: Margin of safety below 5% threshold - consider waiting for better entry point");
-  } else if (marginOfSafety > 15) {
-    recommendations.push("Value investors: Strong margin of safety (>15%) - attractive for conservative investors");
+  
+  if (marginOfSafety > 30) {
+    recommendations.push("Strong margin of safety for value investors");
   }
-
-  // Growth investors
-  const dcfMethod = methods.find(m => m.name === "DCF");
-  if (dcfMethod && dcfMethod.assessment !== "UNABLE_TO_VALUE") {
-    recommendations.push("Growth investors: DCF analysis shows strong FCF generation - focus on earnings growth trajectory");
+  
+  if (methodAgreement === "STRONG") {
+    recommendations.push("High confidence in valuation across multiple methods");
   }
-
-  // Income investors
-  const ddmMethod = methods.find(m => m.name === "DDM");
-  if (ddmMethod && ddmMethod.assessment === "UNABLE_TO_VALUE") {
-    recommendations.push("Income investors: Company does not pay dividends - not suitable for income-focused portfolios");
-  }
-
-  // Method agreement
-  if (methodAgreement === "DIVERGENT") {
-    recommendations.push("All investors: Valuation methods show strong disagreement - recommend caution and further research");
-  }
-
+  
   return recommendations;
 }

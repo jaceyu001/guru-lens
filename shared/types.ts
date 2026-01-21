@@ -208,6 +208,7 @@ export interface FinancialData {
     fiscalYear: number;
     operatingIncome?: number;
     freeCashFlow?: number;
+    operatingCashFlow?: number;
   }[];
   ratios?: {
     pe?: number;

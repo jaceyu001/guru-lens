@@ -68,6 +68,7 @@ interface YFinanceResponse {
     eps: number;
     operatingIncome: number;
     freeCashFlow: number;
+    operatingCashFlow?: number;
   }>;
   historicalBars: Array<{
     date: string;
@@ -154,6 +155,7 @@ export async function getStockData(symbol: string): Promise<FinancialData> {
               eps: q.eps,
               operatingIncome: q.operatingIncome,
               freeCashFlow: q.freeCashFlow,
+              operatingCashFlow: q.operatingCashFlow,
             })),
             ratios: {
               pe: data.ratios.pe,
