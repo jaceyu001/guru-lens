@@ -1,19 +1,16 @@
 /**
  * Growth Calculator Service
  * 
- * Centralized service for calculating growth rates using TTM vs Full Year logic.
- * Intelligently chooses comparison periods based on data availability.
+ * Calculates growth rates using intelligent strategy selection:
+ * Strategy 1: TTM vs Prior Year FY (when Q2+ available)
+ * Strategy 2: TTM vs Prior Year TTM (when Q1+ available with prior year quarters)
+ * Strategy 3: FY vs FY (fallback)
  */
 
-import {
-  detectDataAvailability,
-  determineComparisonType,
-  getDataQualityFlags,
-} from './dataAvailabilityDetector';
 import type { FinancialData } from '@shared/types';
 
 export type GrowthMetric = 'revenue' | 'netIncome' | 'operatingIncome' | 'freeCashFlow' | 'operatingCashFlow';
-export type ComparisonType = 'TTM_VS_FY' | 'FY_VS_FY' | 'INSUFFICIENT_DATA';
+export type ComparisonType = 'TTM_VS_FY' | 'TTM_VS_TTM' | 'FY_VS_FY' | 'INSUFFICIENT_DATA';
 
 export interface GrowthCalculationInput {
   financialData: FinancialData;
@@ -26,7 +23,7 @@ export interface GrowthCalculationResult {
   currentValue: number;
   priorValue: number;
   currentPeriod: string; // "2025 TTM" or "2024 FY"
-  priorPeriod: string; // "2024 FY"
+  priorPeriod: string; // "2024 FY" or "2024 TTM"
   comparisonType: ComparisonType;
   metricName: GrowthMetric;
   dataQualityFlags: {
@@ -38,177 +35,102 @@ export interface GrowthCalculationResult {
 }
 
 /**
- * Calculate growth rate using TTM vs FY logic
- * 
- * @param input - Growth calculation input with financial data and metric
- * @returns Growth calculation result with rate, periods, and metadata
+ * Calculate growth rate using intelligent strategy selection
  */
 export function calculateGrowth(input: GrowthCalculationInput): GrowthCalculationResult {
   const { financialData, metric } = input;
+  const quarterlyData = (financialData as any).quarterlyFinancials || [];
+  const annualData = financialData.financials || [];
 
-  // Detect data availability
-  const availability = detectDataAvailability(financialData);
+  // Detect current year and quarter
+  const latestQuarter = quarterlyData[0];
+  if (!latestQuarter) {
+    return createInsufficientDataResult(metric);
+  }
 
-  // Determine comparison type
-  const comparison = determineComparisonType(availability);
+  const currentYear = latestQuarter.fiscalYear;
+  const currentQuarter = getQuarterFromPeriod(latestQuarter.period);
+  const currentYearQuartersCount = quarterlyData.filter((q: any) => q.fiscalYear === currentYear).length;
 
-  // Get data quality flags
-  const qualityFlags = getDataQualityFlags(availability);
-
-  let currentValue = 0;
-  let priorValue = 0;
-  let growthRate = 0;
-  let comparisonType: ComparisonType = comparison.type;
-  let currentPeriod = comparison.currentPeriod;
-  let priorPeriod = comparison.priorPeriod;
-
-  if (comparison.type === 'TTM_VS_FY') {
-    // Use TTM vs Full Year
-    currentValue = getTTMValue(financialData, metric);
-    priorValue = getFullYearValue(financialData, metric, availability.ttmYear - 1);
-  } else if (comparison.type === 'FY_VS_FY') {
-    // Use Full Year vs Full Year
-    currentValue = getFullYearValue(
-      financialData,
-      metric,
-      availability.latestQuarterlyYear - 1
-    );
-    priorValue = getFullYearValue(
-      financialData,
-      metric,
-      availability.latestQuarterlyYear - 2
-    );
+  // Strategy 1: TTM vs Prior Year FY (when Q2+ available)
+  if (currentQuarter !== 'Q1' && currentYearQuartersCount >= 2) {
+    const ttmValue = getTTMValue(quarterlyData, metric);
+    const priorFYValue = getFullYearValue(annualData, metric, currentYear - 1);
     
-    // If FY_VS_FY returns zeros, try to calculate TTM from available quarters
-    if (currentValue === 0 || priorValue === 0) {
-      const ttmResult = tryCalculateTTMGrowth(financialData, metric, availability);
-      if (ttmResult) {
-        currentValue = ttmResult.currentValue;
-        priorValue = ttmResult.priorValue;
-        currentPeriod = ttmResult.currentPeriod;
-        priorPeriod = ttmResult.priorPeriod;
-        comparisonType = 'TTM_VS_FY';
-      }
-    }
-  } else {
-    // Insufficient data - try TTM as fallback
-    const ttmResult = tryCalculateTTMGrowth(financialData, metric, availability);
-    if (ttmResult) {
-      currentValue = ttmResult.currentValue;
-      priorValue = ttmResult.priorValue;
-      currentPeriod = ttmResult.currentPeriod;
-      priorPeriod = ttmResult.priorPeriod;
-      comparisonType = 'TTM_VS_FY';
-    } else {
+    if (ttmValue !== 0 && priorFYValue !== 0) {
+      const growthRate = ((ttmValue - priorFYValue) / Math.abs(priorFYValue)) * 100;
       return {
-        growthRate: 0,
-        currentValue: 0,
-        priorValue: 0,
-        currentPeriod: 'N/A',
-        priorPeriod: 'N/A',
-        comparisonType: 'INSUFFICIENT_DATA',
+        growthRate,
+        currentValue: ttmValue,
+        priorValue: priorFYValue,
+        currentPeriod: `${currentYear} TTM`,
+        priorPeriod: `${currentYear - 1} FY`,
+        comparisonType: 'TTM_VS_FY',
+        metricName: metric,
+        dataQualityFlags: {},
+      };
+    }
+  }
+
+  // Strategy 2: TTM vs Prior Year TTM (when Q1+ available with prior year quarters)
+  if (currentYearQuartersCount >= 1) {
+    const ttmValue = getTTMValue(quarterlyData, metric);
+    const priorYearTTM = getPriorYearTTMValue(quarterlyData, annualData, metric, currentYear);
+    
+    if (ttmValue !== 0 && priorYearTTM !== 0) {
+      const growthRate = ((ttmValue - priorYearTTM) / Math.abs(priorYearTTM)) * 100;
+      return {
+        growthRate,
+        currentValue: ttmValue,
+        priorValue: priorYearTTM,
+        currentPeriod: `${currentYear} TTM`,
+        priorPeriod: `${currentYear - 1} TTM`,
+        comparisonType: 'TTM_VS_TTM',
         metricName: metric,
         dataQualityFlags: {
-          insufficientData: true,
+          onlyQ1Available: currentQuarter === 'Q1',
+          ttmNotAvailable: currentYearQuartersCount < 4,
         },
       };
     }
   }
 
-  // Calculate growth rate
-  if (priorValue !== 0) {
-    growthRate = ((currentValue - priorValue) / Math.abs(priorValue)) * 100;
+  // Strategy 3: FY vs FY (fallback)
+  const currentFYValue = getFullYearValue(annualData, metric, currentYear - 1);
+  const priorFYValue = getFullYearValue(annualData, metric, currentYear - 2);
+  
+  if (currentFYValue !== 0 && priorFYValue !== 0) {
+    const growthRate = ((currentFYValue - priorFYValue) / Math.abs(priorFYValue)) * 100;
+    return {
+      growthRate,
+      currentValue: currentFYValue,
+      priorValue: priorFYValue,
+      currentPeriod: `${currentYear - 1} FY`,
+      priorPeriod: `${currentYear - 2} FY`,
+      comparisonType: 'FY_VS_FY',
+      metricName: metric,
+      dataQualityFlags: {
+        onlyQ1Available: currentQuarter === 'Q1',
+        ttmNotAvailable: true,
+      },
+    };
   }
 
-  // Check for negative comparison (company swung from loss to profit)
-  const negativeComparison = priorValue < 0 && currentValue > 0;
-
-  return {
-    growthRate,
-    currentValue,
-    priorValue,
-    currentPeriod,
-    priorPeriod,
-    comparisonType,
-    metricName: metric,
-    dataQualityFlags: {
-      onlyQ1Available: qualityFlags.onlyQ1Available,
-      ttmNotAvailable: qualityFlags.ttmNotAvailable,
-      negativeComparison,
-    },
-  };
+  // No valid comparison possible
+  return createInsufficientDataResult(metric);
 }
 
 /**
- * Try to calculate TTM growth when standard methods fail
- * This handles cases where we have Q1 + prior year quarters
+ * Get TTM (Trailing Twelve Months) value from last 4 quarters
  */
-function tryCalculateTTMGrowth(
-  financialData: FinancialData,
-  metric: GrowthMetric,
-  availability: any
-): { currentValue: number; priorValue: number; currentPeriod: string; priorPeriod: string } | null {
-  const quarterlyData = (financialData as any).quarterlyFinancials || [];
-  
-  if (quarterlyData.length < 4) {
-    return null;
-  }
-
-  // Calculate current TTM from last 4 quarters
-  const currentTTM = getTTMValue(financialData, metric);
-  if (currentTTM === 0) {
-    return null;
-  }
-
-  // Try to get prior year TTM
-  let priorTTM = 0;
-  const priorYear = availability.latestQuarterlyYear - 1;
-  
-  // Find quarters from prior year
-  const priorYearQuarters = quarterlyData.filter((q: any) => q.fiscalYear === priorYear);
-  
-  if (priorYearQuarters.length >= 4) {
-    // If we have 4 quarters from prior year, sum them
-    for (const q of priorYearQuarters.slice(0, 4)) {
-      priorTTM += getMetricValue(q, metric);
-    }
-  } else if (priorYearQuarters.length > 0) {
-    // If we have fewer quarters, try to get full year from annual data
-    priorTTM = getFullYearValue(financialData, metric, priorYear);
-  }
-
-  if (priorTTM === 0) {
-    return null;
-  }
-
-  return {
-    currentValue: currentTTM,
-    priorValue: priorTTM,
-    currentPeriod: `${availability.latestQuarterlyYear} TTM`,
-    priorPeriod: `${priorYear} ${priorYearQuarters.length >= 4 ? 'TTM' : 'FY'}`,
-  };
-}
-
-/**
- * Get TTM (Trailing Twelve Months) value for a metric
- * Sums the last 4 quarters of quarterly financial data
- * 
- * @param financialData - Financial data object
- * @param metric - Metric to calculate TTM for
- * @returns TTM value
- */
-function getTTMValue(financialData: FinancialData, metric: GrowthMetric): number {
-  const quarterlyData = (financialData as any).quarterlyFinancials || [];
-
+function getTTMValue(quarterlyData: any[], metric: GrowthMetric): number {
   if (quarterlyData.length < 4) {
     return 0;
   }
 
-  // Sum last 4 quarters
   let ttmValue = 0;
-  for (let i = 0; i < Math.min(4, quarterlyData.length); i++) {
-    const quarter = quarterlyData[i];
-    const value = getMetricValue(quarter, metric);
+  for (let i = 0; i < 4; i++) {
+    const value = getMetricValue(quarterlyData[i], metric);
     ttmValue += value;
   }
 
@@ -216,42 +138,56 @@ function getTTMValue(financialData: FinancialData, metric: GrowthMetric): number
 }
 
 /**
- * Get full year value for a metric
- * 
- * @param financialData - Financial data object
- * @param metric - Metric to get
- * @param year - Fiscal year
- * @returns Full year value for the metric
+ * Get prior year TTM by summing all quarters from prior year
+ * Falls back to annual data if full 4 quarters not available
  */
-function getFullYearValue(
-  financialData: FinancialData,
+function getPriorYearTTMValue(
+  quarterlyData: any[],
+  annualData: any[],
   metric: GrowthMetric,
-  year: number
+  currentYear: number
 ): number {
-  const annualData = financialData.financials || [];
+  const priorYear = currentYear - 1;
 
-  // Find the annual data for the specified year
+  // Find all quarters from prior year
+  const priorYearQuarters = quarterlyData.filter((q: any) => q.fiscalYear === priorYear);
+
+  if (priorYearQuarters.length >= 4) {
+    // Sum all 4 quarters from prior year
+    let ttmValue = 0;
+    for (const q of priorYearQuarters.slice(0, 4)) {
+      ttmValue += getMetricValue(q, metric);
+    }
+    return ttmValue;
+  } else if (priorYearQuarters.length > 0) {
+    // Partial quarters available - annualize them
+    let sum = 0;
+    for (const q of priorYearQuarters) {
+      sum += getMetricValue(q, metric);
+    }
+    const averageQuarter = sum / priorYearQuarters.length;
+    return averageQuarter * 4;
+  } else {
+    // No prior year quarters - use full year data
+    return getFullYearValue(annualData, metric, priorYear);
+  }
+}
+
+/**
+ * Get full year value for a specific fiscal year
+ */
+function getFullYearValue(annualData: any[], metric: GrowthMetric, year: number): number {
   const annual = annualData.find((f: any) => f.fiscalYear === year);
-
   if (!annual) {
     return 0;
   }
-
   return getMetricValue(annual, metric);
 }
 
 /**
  * Extract metric value from financial data object
- * Used by both quarterly and annual data extraction
- * 
- * @param data - Financial data object (annual or quarterly)
- * @param metric - Metric name
- * @returns Metric value
  */
-function getMetricValue(
-  data: any,
-  metric: GrowthMetric
-): number {
+function getMetricValue(data: any, metric: GrowthMetric): number {
   const metricMap: Record<GrowthMetric, string> = {
     revenue: 'revenue',
     netIncome: 'netIncome',
@@ -262,17 +198,42 @@ function getMetricValue(
 
   const key = metricMap[metric];
   const value = data[key];
-
   return typeof value === 'number' ? value : 0;
 }
 
 /**
+ * Extract quarter from period string (e.g., "2025-03-31" -> "Q1")
+ */
+function getQuarterFromPeriod(period: string): 'Q1' | 'Q2' | 'Q3' | 'Q4' {
+  const date = new Date(period);
+  const month = date.getMonth() + 1;
+  
+  if (month <= 3) return 'Q1';
+  if (month <= 6) return 'Q2';
+  if (month <= 9) return 'Q3';
+  return 'Q4';
+}
+
+/**
+ * Create insufficient data result
+ */
+function createInsufficientDataResult(metric: GrowthMetric): GrowthCalculationResult {
+  return {
+    growthRate: 0,
+    currentValue: 0,
+    priorValue: 0,
+    currentPeriod: 'N/A',
+    priorPeriod: 'N/A',
+    comparisonType: 'INSUFFICIENT_DATA',
+    metricName: metric,
+    dataQualityFlags: {
+      insufficientData: true,
+    },
+  };
+}
+
+/**
  * Calculate multiple growth metrics at once
- * Useful for calculating revenue, earnings, and FCF growth in one call
- * 
- * @param financialData - Financial data object
- * @param metrics - Array of metrics to calculate
- * @returns Array of growth calculation results
  */
 export function calculateMultipleGrowths(
   financialData: FinancialData,
@@ -289,9 +250,6 @@ export function calculateMultipleGrowths(
 
 /**
  * Format growth result for display
- * 
- * @param result - Growth calculation result
- * @returns Formatted string for display
  */
 export function formatGrowthForDisplay(result: GrowthCalculationResult): string {
   if (result.comparisonType === 'INSUFFICIENT_DATA') {
@@ -304,9 +262,6 @@ export function formatGrowthForDisplay(result: GrowthCalculationResult): string 
 
 /**
  * Get human-readable description of growth comparison
- * 
- * @param result - Growth calculation result
- * @returns Description string
  */
 export function getGrowthDescription(result: GrowthCalculationResult): string {
   if (result.comparisonType === 'INSUFFICIENT_DATA') {
