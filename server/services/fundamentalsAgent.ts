@@ -1,5 +1,5 @@
 import { FinancialData } from "../../shared/types";
-import { calculateGrowth, type GrowthCalculationResult } from "./growthCalculator";
+import { calculateGrowth } from "./growthCalculator";
 
 type DataQualityFlags = NonNullable<FinancialData['dataQualityFlags']>;
 
@@ -43,9 +43,9 @@ export interface CapitalEfficiencyAnalysis {
 
 export interface FinancialHealthAnalysis {
   assessment: "STRONG" | "STABLE" | "CONCERNING" | "WEAK" | "UNCLEAR";
-  debtToEquity: number; // %
-  currentRatio: number;
-  interestCoverage: number;
+  debtToEquity: number | null; // % or null if unavailable
+  currentRatio: number | null; // or null if unavailable
+  interestCoverage: number | null; // or null if unavailable
   narrative: string;
   confidence: number; // 0-100
 }
@@ -73,72 +73,26 @@ export async function analyzeFundamentals(
   financialData: FinancialData,
   dataQualityFlags: DataQualityFlags
 ): Promise<FundamentalsFindings> {
-  // Analyze each category
-  const growth = analyzeGrowth(financialData);
-  const profitability = analyzeProfitability(financialData, dataQualityFlags);
+  const growth = analyzeGrowth(financialData, dataQualityFlags);
+  const profitability = analyzeProfitability(financialData);
   const capitalEfficiency = analyzeCapitalEfficiency(financialData, dataQualityFlags);
   const financialHealth = analyzeFinancialHealth(financialData, dataQualityFlags);
   const cashFlow = analyzeCashFlow(financialData);
 
+  // Generate summary
+  const summary = generateFundamentalsSummary(growth, profitability, capitalEfficiency, financialHealth, cashFlow);
+
   // Collect data quality warnings
   const dataQualityWarnings: string[] = [];
-  if (dataQualityFlags.roicZero) {
-    dataQualityWarnings.push("ROIC data is zero (flagged as anomalous)");
-  }
-  if (dataQualityFlags.interestCoverageZero) {
-    dataQualityWarnings.push("Interest Coverage data is zero (flagged as anomalous)");
-  }
-  if (dataQualityFlags.peNegative) {
-    dataQualityWarnings.push("P/E ratio is negative (flagged as anomalous)");
-  }
-  if (dataQualityFlags.peAnomalous) {
-    dataQualityWarnings.push("P/E ratio appears anomalously high (>200)");
-  }
-  if (dataQualityFlags.pbAnomalous) {
-    dataQualityWarnings.push("P/B ratio appears anomalously high (>100)");
-  }
-  if (dataQualityFlags.roeNegative) {
-    dataQualityWarnings.push("ROE is negative (flagged as anomalous)");
-  }
-  if (dataQualityFlags.currentRatioAnomalous) {
-    dataQualityWarnings.push("Current ratio appears anomalous");
-  }
-  if (dataQualityFlags.debtToEquityAnomalous) {
-    dataQualityWarnings.push("Debt-to-Equity ratio appears anomalously high (>150%)");
-  }
-  if (dataQualityFlags.marketCapZero) {
-    dataQualityWarnings.push("Market cap data is zero or unavailable");
-  }
 
-  // Add TTM-related data quality warnings
-  if (growth.dataQualityFlags.onlyQ1Available) {
-    dataQualityWarnings.push("Only Q1 data available - using FY vs FY comparison instead of TTM");
+  // Recommendations for personas
+  const recommendationsForPersonas: string[] = [];
+  if (growth.assessment === "STRONG") {
+    recommendationsForPersonas.push("Growth investors should find this company attractive");
   }
-  if (growth.dataQualityFlags.ttmNotAvailable) {
-    dataQualityWarnings.push("TTM not available - using FY vs FY comparison");
+  if (profitability.assessment === "EXCELLENT") {
+    recommendationsForPersonas.push("Value investors may appreciate the strong profitability");
   }
-  if (growth.dataQualityFlags.insufficientData) {
-    dataQualityWarnings.push("Insufficient financial data for growth calculation");
-  }
-
-  // Generate recommendations for personas
-  const recommendationsForPersonas = generateRecommendations(
-    growth,
-    profitability,
-    capitalEfficiency,
-    financialHealth,
-    cashFlow,
-    dataQualityWarnings
-  );
-
-  // Generate summary
-  const summary = generateSummary(
-    growth,
-    profitability,
-    capitalEfficiency,
-    financialHealth,
-    cashFlow
-  );
 
   return {
     growth,
@@ -152,88 +106,42 @@ export async function analyzeFundamentals(
   };
 }
 
-function analyzeGrowth(financialData: FinancialData): GrowthAnalysis {
-  // Calculate growth using TTM vs FY logic
-  const revenueResult = calculateGrowth({
-    financialData,
-    metric: 'revenue',
-  });
+function analyzeGrowth(
+  financialData: FinancialData,
+  dataQualityFlags: DataQualityFlags
+): GrowthAnalysis {
+  const revenueResult = calculateGrowth({ financialData, metric: "revenue" });
+  const earningsResult = calculateGrowth({ financialData, metric: "netIncome" });
+  const fcfResult = calculateGrowth({ financialData, metric: "freeCashFlow" });
 
-  const earningsResult = calculateGrowth({
-    financialData,
-    metric: 'netIncome',
-  });
-
-  const fcfResult = calculateGrowth({
-    financialData,
-    metric: 'freeCashFlow',
-  });
-
-  // Use the growth rates from calculations
   const revenueGrowth = revenueResult.growthRate;
   const earningsGrowth = earningsResult.growthRate;
   const fcfGrowth = fcfResult.growthRate;
 
-  // Get comparison type and period information from revenue result (all should be same)
-  const comparisonType = revenueResult.comparisonType;
-  const currentPeriod = revenueResult.currentPeriod;
-  const priorPeriod = revenueResult.priorPeriod;
-  const dataQualityFlags = revenueResult.dataQualityFlags;
-
-  // Calculate confidence based on data availability and comparison type
-  let confidence = 85;
-  if (comparisonType === 'INSUFFICIENT_DATA') {
-    confidence = 50; // Low confidence if insufficient data
-  }
-  if (dataQualityFlags.onlyQ1Available) {
-    confidence -= 10; // Reduce confidence for Q1-only data
-  }
-  if (dataQualityFlags.ttmNotAvailable) {
-    confidence -= 5; // Slight reduction if TTM not available
-  }
-
-  // Reduce confidence if growth is highly negative (indicates structural issues)
-  if (earningsGrowth < -30) confidence -= 10;
-
-  // Determine assessment based on growth rates
-  let assessment: "STRONG" | "MODERATE" | "WEAK" | "UNCLEAR" = "UNCLEAR";
-
-  if (comparisonType === 'INSUFFICIENT_DATA') {
-    assessment = "UNCLEAR";
-  } else {
-    // Handle negative growth (contraction)
-    if (revenueGrowth < -10 || earningsGrowth < -20) {
-      assessment = "WEAK"; // Significant contraction
-    } else if (revenueGrowth < 0 || earningsGrowth < 0) {
-      assessment = "WEAK"; // Any negative growth
-    } else if (revenueGrowth > 15 && earningsGrowth > 15) {
-      assessment = "STRONG"; // Strong growth
-    } else if (revenueGrowth > 5 && earningsGrowth > 5) {
-      assessment = "MODERATE"; // Moderate growth
-    } else if (revenueGrowth > 0 && earningsGrowth > 0) {
-      assessment = "WEAK"; // Weak positive growth
-    }
-  }
-
   // Determine trend
   let trend: "ACCELERATING" | "STABLE" | "DECELERATING" | "UNKNOWN" = "UNKNOWN";
-  if (earningsGrowth > revenueGrowth + 2) {
-    trend = "ACCELERATING"; // Earnings growing faster than revenue
-  } else if (Math.abs(earningsGrowth - revenueGrowth) <= 2) {
-    trend = "STABLE"; // Growth rates aligned
-  } else if (earningsGrowth < revenueGrowth - 2) {
-    trend = "DECELERATING"; // Earnings growing slower than revenue (margin compression)
+  if (revenueGrowth > 10 && earningsGrowth > 10) {
+    trend = "ACCELERATING";
+  } else if (revenueGrowth > 0 && earningsGrowth > 0) {
+    trend = "STABLE";
+  } else if (revenueGrowth < 0 || earningsGrowth < 0) {
+    trend = "DECELERATING";
   }
 
-  const narrative = buildGrowthNarrative(
-    revenueGrowth,
-    earningsGrowth,
-    fcfGrowth,
-    trend,
-    currentPeriod,
-    priorPeriod,
-    comparisonType
-  );
+  // Determine assessment
+  let assessment: "STRONG" | "MODERATE" | "WEAK" | "UNCLEAR" = "MODERATE";
+  if (revenueGrowth > 15) {
+    assessment = "STRONG";
+  } else if (revenueGrowth < 0) {
+    assessment = "WEAK";
+  } else if (revenueGrowth === 0 && earningsGrowth === 0) {
+    assessment = "UNCLEAR";
+  }
+
+  const narrative = buildGrowthNarrative(revenueGrowth, earningsGrowth, fcfGrowth, trend);
+
+  // Calculate confidence
+  let confidence = 75;
 
   return {
     assessment,
@@ -243,42 +151,36 @@ function analyzeGrowth(financialData: FinancialData): GrowthAnalysis {
     trend,
     narrative,
     confidence,
-    comparisonType,
-    currentPeriod,
-    priorPeriod,
-    dataQualityFlags,
+    comparisonType: revenueResult.comparisonType,
+    currentPeriod: revenueResult.currentPeriod,
+    priorPeriod: revenueResult.priorPeriod,
+    dataQualityFlags: {
+      insufficientData: revenueResult.comparisonType === "INSUFFICIENT_DATA",
+    },
   };
 }
 
-function analyzeProfitability(
-  financialData: FinancialData,
-  dataQualityFlags: DataQualityFlags
-): ProfitabilityAnalysis {
+function analyzeProfitability(financialData: FinancialData): ProfitabilityAnalysis {
   const netMargin = financialData.ratios?.netMargin || 0;
   const operatingMargin = financialData.ratios?.operatingMargin || 0;
   const grossMargin = financialData.ratios?.grossMargin || 0;
 
+  // Determine trend (simplified - would need historical data for real trend)
+  let trend: "IMPROVING" | "STABLE" | "DETERIORATING" | "UNKNOWN" = "STABLE";
+
   // Determine assessment
   let assessment: "EXCELLENT" | "GOOD" | "FAIR" | "POOR" | "UNCLEAR" = "FAIR";
-  if (netMargin > 20) {
+  if (netMargin > 20 && operatingMargin > 15) {
     assessment = "EXCELLENT";
-  } else if (netMargin > 10) {
+  } else if (netMargin > 10 && operatingMargin > 8) {
     assessment = "GOOD";
-  } else if (netMargin > 5) {
+  } else if (netMargin > 5 && operatingMargin > 3) {
     assessment = "FAIR";
-  } else if (netMargin > 0) {
+  } else if (netMargin < 0) {
     assessment = "POOR";
   }
 
-  // Determine trend (simplified - would need historical data for real trend)
-  let trend: "IMPROVING" | "STABLE" | "DETERIORATING" | "UNKNOWN" = "UNKNOWN";
-
   const narrative = buildProfitabilityNarrative(netMargin, operatingMargin, grossMargin);
-
-  // Calculate confidence based on data quality
-  let confidence = 90;
-  if (dataQualityFlags.peAnomalous) confidence -= 10;
-  if (dataQualityFlags.pbAnomalous) confidence -= 5;
 
   return {
     assessment,
@@ -287,7 +189,7 @@ function analyzeProfitability(
     grossMargin,
     trend,
     narrative,
-    confidence,
+    confidence: 90,
   };
 }
 
@@ -318,50 +220,41 @@ function analyzeCapitalEfficiency(
     } else if (metric && metric > 10) {
       assessment = "FAIR";
     } else if (metric && metric > 5) {
-      assessment = "FAIR";
-    } else if (metric && metric > 0) {
       assessment = "POOR";
+    } else {
+      assessment = "UNCLEAR";
     }
   } else if (availableMetrics === 2) {
-    // Two metrics assessment
+    // Two metric assessment
     const metrics = [roe, roic, roa].filter(m => m !== null) as number[];
-    const avg = metrics.reduce((a, b) => a + b, 0) / metrics.length;
-    if (metrics.every(m => m > 20)) {
+    const avgMetric = metrics.reduce((a, b) => a + b, 0) / metrics.length;
+    if (avgMetric > 20) {
       assessment = "EXCELLENT";
-    } else if (metrics.every(m => m > 15)) {
+    } else if (avgMetric > 15) {
       assessment = "GOOD";
-    } else if (metrics.every(m => m > 10)) {
-      assessment = "GOOD";
-    } else if (metrics.every(m => m > 5)) {
+    } else if (avgMetric > 10) {
       assessment = "FAIR";
-    } else if (avg > 10) {
-      assessment = "FAIR";
-    } else if (avg > 5) {
-      assessment = "FAIR";
-    } else {
+    } else if (avgMetric > 5) {
       assessment = "POOR";
     }
   } else {
     // All three metrics available
-    if (roe! > 20 && roic! > 15 && roa! > 10) {
+    const avgMetric = ((roe ?? 0) + (roic ?? 0) + (roa ?? 0)) / 3;
+    if (avgMetric > 20) {
       assessment = "EXCELLENT";
-    } else if (roe! > 15 && roic! > 10 && roa! > 8) {
+    } else if (avgMetric > 15) {
       assessment = "GOOD";
-    } else if (roe! > 10 && roic! > 5 && roa! > 5) {
+    } else if (avgMetric > 10) {
       assessment = "FAIR";
-    } else if (roe! > 5 && roic! > 0 && roa! > 0) {
-      assessment = "FAIR";
-    } else {
+    } else if (avgMetric > 5) {
       assessment = "POOR";
     }
   }
 
-  const narrative = buildCapitalEfficiencyNarrative(roe, roic, roa, dataQualityFlags);
+  const narrative = buildCapitalEfficiencyNarrative(roe, roic, roa, availableMetrics);
 
-  // Calculate confidence based on data quality and available metrics
-  let confidence = 85;
-  if (availableMetrics < 3) confidence -= (3 - availableMetrics) * 10;
-  if (dataQualityFlags.roeNegative) confidence -= 15;
+  // Calculate confidence based on available metrics
+  let confidence = 50 + (availableMetrics * 15);
 
   return {
     assessment,
@@ -377,35 +270,44 @@ function analyzeFinancialHealth(
   financialData: FinancialData,
   dataQualityFlags: DataQualityFlags
 ): FinancialHealthAnalysis {
-  const debtToEquity = financialData.ratios?.debtToEquity || 0;
-  const currentRatio = financialData.ratios?.currentRatio || 0;
-  const interestCoverage = 0; // Interest coverage not in ratios
+  // Get metrics, using null for unavailable/zero data
+  const debtToEquity = (financialData.ratios?.debtToEquity && financialData.ratios.debtToEquity > 0) ? financialData.ratios.debtToEquity : null;
+  const currentRatio = (financialData.ratios?.currentRatio && financialData.ratios.currentRatio > 0) ? financialData.ratios.currentRatio : null;
+  const interestCoverage = null; // Not available in current ratios
 
-  // Determine assessment
+  // Count available metrics
+  const availableMetrics = [debtToEquity, currentRatio, interestCoverage].filter(m => m !== null).length;
+
+  // Assess based only on available metrics
   let assessment: "STRONG" | "STABLE" | "CONCERNING" | "WEAK" | "UNCLEAR" = "STABLE";
 
-  // D/E is now in percentage format (0-100% range)
-  if (debtToEquity < 50 && currentRatio > 1.5 && interestCoverage > 5) {
-    assessment = "STRONG";
-  } else if (debtToEquity < 100 && currentRatio > 1 && interestCoverage > 2) {
-    assessment = "STABLE";
-  } else if (debtToEquity > 100 || currentRatio < 0.8 || interestCoverage < 1) {
-    assessment = "CONCERNING";
-  } else if (debtToEquity > 150 || currentRatio < 0.5) {
-    assessment = "WEAK";
-  }
-  // Check for data quality issues
-  if (dataQualityFlags.interestCoverageZero || dataQualityFlags.currentRatioAnomalous) {
+  if (availableMetrics === 0) {
     assessment = "UNCLEAR";
+  } else if (availableMetrics === 1) {
+    if (debtToEquity !== null) {
+      if (debtToEquity < 50) assessment = "STRONG";
+      else if (debtToEquity < 100) assessment = "STABLE";
+      else if (debtToEquity < 150) assessment = "CONCERNING";
+      else assessment = "WEAK";
+    } else if (currentRatio !== null) {
+      if (currentRatio > 1.5) assessment = "STRONG";
+      else if (currentRatio > 1) assessment = "STABLE";
+      else if (currentRatio > 0.8) assessment = "CONCERNING";
+      else assessment = "WEAK";
+    }
+  } else if (availableMetrics === 2) {
+    if (debtToEquity !== null && currentRatio !== null) {
+      if (debtToEquity < 50 && currentRatio > 1.5) assessment = "STRONG";
+      else if (debtToEquity < 100 && currentRatio > 1) assessment = "STABLE";
+      else if (debtToEquity > 100 || currentRatio < 0.8) assessment = "CONCERNING";
+      else if (debtToEquity > 150 || currentRatio < 0.5) assessment = "WEAK";
+    }
   }
 
-  const narrative = buildFinancialHealthNarrative(debtToEquity, currentRatio, interestCoverage, dataQualityFlags);
+  const narrative = buildFinancialHealthNarrative(debtToEquity, currentRatio, interestCoverage, availableMetrics);
 
-  // Calculate confidence based on data quality
-  let confidence = 80;
-  if (dataQualityFlags.debtToEquityAnomalous) confidence = 50;
-  if (dataQualityFlags.currentRatioAnomalous) confidence -= 15;
-  if (dataQualityFlags.interestCoverageZero) confidence -= 10;
+  // Calculate confidence based on available metrics
+  let confidence = 50 + (availableMetrics * 20);
 
   return {
     assessment,
@@ -449,127 +351,94 @@ function analyzeCashFlow(financialData: FinancialData): CashFlowAnalysis {
   };
 }
 
-// Helper functions for calculating metrics
-function calculateRevenueGrowth(financials?: any[]): number {
-  if (!financials || financials.length < 2) return 0;
-  const current = financials[0]?.revenue || 0;
-  const previous = financials[1]?.revenue || 0;
-  if (previous === 0) return 0;
-  return ((current - previous) / previous) * 100;
+function generateFundamentalsSummary(
+  growth: GrowthAnalysis,
+  profitability: ProfitabilityAnalysis,
+  capitalEfficiency: CapitalEfficiencyAnalysis,
+  financialHealth: FinancialHealthAnalysis,
+  cashFlow: CashFlowAnalysis
+): string {
+  return `Growth is ${growth.assessment.toLowerCase()}, profitability is ${profitability.assessment.toLowerCase()}, capital efficiency is ${capitalEfficiency.assessment.toLowerCase()}, financial health is ${financialHealth.assessment.toLowerCase()}, and cash flow is ${cashFlow.assessment.toLowerCase()}.`;
 }
 
-function calculateEarningsGrowth(financials?: any[]): number {
-  if (!financials || financials.length < 2) return 0;
-  const current = financials[0]?.netIncome || 0;
-  const previous = financials[1]?.netIncome || 0;
-  if (previous === 0) return 0;
-  return ((current - previous) / previous) * 100;
-}
-
-function calculateFcfGrowth(financials?: any[]): number {
-  if (!financials || financials.length < 2) return 0;
-  const current = financials[0]?.freeCashFlow || 0;
-  const previous = financials[1]?.freeCashFlow || 0;
-  if (previous === 0) return 0;
-  return ((current - previous) / previous) * 100;
-}
-
-function calculateFcfMargin(financials?: any[]): number {
-  if (!financials || financials.length === 0) return 0;
-  const fcf = financials[0]?.freeCashFlow || 0;
-  const revenue = financials[0]?.revenue || 0;
-  if (revenue === 0) return 0;
-  return (fcf / revenue) * 100;
-}
-
-// Narrative builders
 function buildGrowthNarrative(
   revenueGrowth: number,
   earningsGrowth: number,
   fcfGrowth: number,
-  trend: string,
-  currentPeriod: string,
-  priorPeriod: string,
-  comparisonType: string
+  trend: string
 ): string {
-  if (comparisonType === 'INSUFFICIENT_DATA') {
-    return "Insufficient financial data available to calculate growth rates.";
-  }
-
-  const periodLabel = comparisonType === 'TTM_VS_FY' ? 'TTM' : 'FY';
-  let narrative = `Revenue growing at ${revenueGrowth.toFixed(1)}% (${currentPeriod} vs ${priorPeriod}), with earnings growth of ${earningsGrowth.toFixed(1)}%. FCF growth of ${fcfGrowth.toFixed(1)}% shows ${trend.toLowerCase()} trend. ${
-    earningsGrowth > revenueGrowth
-      ? "Earnings outpacing revenue suggests margin expansion."
-      : "Revenue outpacing earnings suggests margin pressure."
-  }`;
-
-  if (earningsGrowth < -100) {
-    narrative += " WARNING: Extreme earnings decline indicates significant structural changes or swing from profitability to losses.";
-  }
-
-  return narrative;
+  return `Revenue growth of ${revenueGrowth.toFixed(1)}%, earnings growth of ${earningsGrowth.toFixed(1)}%, and FCF growth of ${fcfGrowth.toFixed(1)}%. Trend is ${trend.toLowerCase()}.`;
 }
 
-function buildProfitabilityNarrative(
-  netMargin: number,
-  operatingMargin: number,
-  grossMargin: number
-): string {
-  return `Net margin of ${netMargin.toFixed(1)}%, operating margin of ${operatingMargin.toFixed(1)}%, and gross margin of ${grossMargin.toFixed(1)}%. ${
-    netMargin > 15
-      ? "Exceptional profitability with industry-leading margins."
-      : netMargin > 5
-        ? "Solid profitability metrics."
-        : "Profitability concerns with thin margins."
-  }`;
+function buildProfitabilityNarrative(netMargin: number, operatingMargin: number, grossMargin: number): string {
+  return `Net margin of ${netMargin.toFixed(1)}%, operating margin of ${operatingMargin.toFixed(1)}%, and gross margin of ${grossMargin.toFixed(1)}%.`;
 }
 
 function buildCapitalEfficiencyNarrative(
   roe: number | null,
   roic: number | null,
   roa: number | null,
-  dataQualityFlags: DataQualityFlags
+  availableMetrics: number
 ): string {
-  const parts: string[] = [];
+  const metrics: string[] = [];
+  if (roe !== null) metrics.push(`ROE of ${roe.toFixed(1)}%`);
+  if (roic !== null) metrics.push(`ROIC of ${roic.toFixed(1)}%`);
+  if (roa !== null) metrics.push(`ROA of ${roa.toFixed(1)}%`);
 
-  if (roe !== null) parts.push(`ROE of ${roe.toFixed(1)}%`);
-  if (roic !== null) parts.push(`ROIC of ${roic.toFixed(1)}%`);
-  if (roa !== null) parts.push(`ROA of ${roa.toFixed(1)}%`);
-
-  if (parts.length === 0) {
-    return "Capital efficiency metrics are unavailable. Cannot assess capital efficiency.";
+  if (metrics.length === 0) {
+    return "Capital efficiency data unavailable.";
   }
 
-  const metricsStr = parts.join(", ");
-  const assessment =
-    roe && roe > 20 ? "Excellent capital efficiency." : roe && roe > 10 ? "Good capital efficiency." : "Moderate capital efficiency.";
+  const metricsStr = metrics.join(", ");
+  let assessment = "Moderate capital efficiency.";
+  
+  if (availableMetrics === 1) {
+    const metric = roe ?? roic ?? roa;
+    if (metric && metric > 20) assessment = "Excellent capital efficiency.";
+    else if (metric && metric > 15) assessment = "Good capital efficiency.";
+    else if (metric && metric > 10) assessment = "Fair capital efficiency.";
+    else if (metric && metric > 5) assessment = "Poor capital efficiency.";
+  }
 
   return `${metricsStr}. ${assessment}`;
 }
 
 function buildFinancialHealthNarrative(
-  debtToEquity: number,
-  currentRatio: number,
-  interestCoverage: number,
-  dataQualityFlags: DataQualityFlags
+  debtToEquity: number | null,
+  currentRatio: number | null,
+  interestCoverage: number | null,
+  availableMetrics: number
 ): string {
-  let narrative = `Debt-to-Equity of ${debtToEquity.toFixed(1)}%, current ratio of ${currentRatio.toFixed(2)}%`;
+  const metrics: string[] = [];
+  if (debtToEquity !== null) metrics.push(`Debt-to-Equity of ${debtToEquity.toFixed(1)}%`);
+  if (currentRatio !== null) metrics.push(`current ratio of ${currentRatio.toFixed(2)}x`);
+  if (interestCoverage !== null) metrics.push(`interest coverage of ${interestCoverage.toFixed(1)}x`);
 
-  if (dataQualityFlags.interestCoverageZero) {
-    narrative += ". Interest coverage data unavailable.";
-  } else {
-    narrative += `, and interest coverage of ${interestCoverage.toFixed(1)}x.`;
+  if (metrics.length === 0) {
+    return "Financial health data unavailable.";
   }
 
-  // D/E is in percentage format (0-100% range)
-  if (debtToEquity < 50) {
-    narrative += " Financial health is strong with conservative leverage.";
-  } else if (debtToEquity < 100) {
-    narrative += " Financial health is stable with manageable leverage.";
-  } else if (debtToEquity < 150) {
-    narrative += " Elevated leverage but manageable for cash-generative businesses.";
-  } else {
-    narrative += " High leverage with potential concerns.";
+  let narrative = metrics.join(", ") + ".";
+
+  // Add assessment narrative based on available metrics
+  if (debtToEquity !== null) {
+    if (debtToEquity < 50) {
+      narrative += " Financial health is strong with conservative leverage.";
+    } else if (debtToEquity < 100) {
+      narrative += " Financial health is stable with manageable leverage.";
+    } else if (debtToEquity < 150) {
+      narrative += " Elevated leverage but manageable for cash-generative businesses.";
+    } else {
+      narrative += " High leverage with potential concerns.";
+    }
+  } else if (currentRatio !== null) {
+    if (currentRatio > 1.5) {
+      narrative += " Strong liquidity position.";
+    } else if (currentRatio > 1) {
+      narrative += " Adequate liquidity.";
+    } else {
+      narrative += " Liquidity concerns.";
+    }
   }
 
   return narrative;
@@ -578,116 +447,26 @@ function buildFinancialHealthNarrative(
 function buildCashFlowNarrative(fcfMargin: number, fcfGrowth: number): string {
   return `Free cash flow margin of ${fcfMargin.toFixed(1)}% with growth of ${fcfGrowth.toFixed(1)}%. ${
     fcfMargin > 15
-      ? "Strong cash generation supporting dividends and buybacks."
-      : fcfMargin > 5
-        ? "Healthy cash flow generation."
-        : fcfMargin > 0
-          ? "Weak cash flow generation."
-          : "Negative free cash flow indicates cash burn."
+      ? "Strong cash generation."
+      : fcfMargin > 10
+        ? "Healthy cash generation."
+        : fcfMargin > 5
+          ? "Weak cash generation."
+          : "Negative cash flow concerns."
   }`;
 }
 
-function generateRecommendations(
-  growth: GrowthAnalysis,
-  profitability: ProfitabilityAnalysis,
-  capitalEfficiency: CapitalEfficiencyAnalysis,
-  financialHealth: FinancialHealthAnalysis,
-  cashFlow: CashFlowAnalysis,
-  dataQualityWarnings: string[]
-): string[] {
-  const recommendations: string[] = [];
-
-  // Growth recommendations
-  if (growth.assessment === "STRONG") {
-    recommendations.push("Growth investors should emphasize strong revenue and earnings growth.");
-  } else if (growth.assessment === "WEAK") {
-    recommendations.push("Growth investors should be cautious about modest growth rates.");
-  }
-
-  // Profitability recommendations
-  if (profitability.assessment === "EXCELLENT") {
-    recommendations.push("Focus on excellent profitability metrics - these are reliable and strong.");
-  } else if (profitability.assessment === "POOR") {
-    recommendations.push("Profitability concerns with thin margins - use caution in valuation.");
-  }
-
-  // Capital efficiency recommendations
-  if (capitalEfficiency.assessment === "UNCLEAR") {
-    recommendations.push("Use caution when evaluating capital efficiency - key metrics are unavailable or anomalous.");
-  } else if (capitalEfficiency.assessment === "EXCELLENT") {
-    recommendations.push("Capital efficiency metrics support competitive advantage thesis.");
-  }
-
-  // Financial health recommendations
-  if (financialHealth.assessment === "STRONG") {
-    recommendations.push("Strong financial position with low leverage and good liquidity.");
-  } else if (financialHealth.assessment === "CONCERNING" || financialHealth.assessment === "WEAK") {
-    recommendations.push("Financial health concerns - evaluate debt sustainability and liquidity carefully.");
-  }
-
-  // Cash flow recommendations
-  if (cashFlow.assessment === "STRONG" || cashFlow.assessment === "HEALTHY") {
-    recommendations.push("Strong cash flow generation supports valuation and dividend sustainability.");
-  } else if (cashFlow.assessment === "NEGATIVE") {
-    recommendations.push("Negative free cash flow indicates cash burn - evaluate sustainability.");
-  }
-
-  // Data quality recommendations
-  if (dataQualityWarnings.length > 0) {
-    recommendations.push(`Be aware of ${dataQualityWarnings.length} data quality issues that may affect analysis reliability.`);
-  }
-
-  return recommendations;
+function calculateFcfMargin(financials: FinancialData["financials"]): number {
+  if (!financials || financials.length === 0) return 0;
+  const latest = financials[0];
+  if (!latest || latest.revenue === 0 || !latest.freeCashFlow) return 0;
+  return (latest.freeCashFlow / latest.revenue) * 100;
 }
 
-function generateSummary(
-  growth: GrowthAnalysis,
-  profitability: ProfitabilityAnalysis,
-  capitalEfficiency: CapitalEfficiencyAnalysis,
-  financialHealth: FinancialHealthAnalysis,
-  cashFlow: CashFlowAnalysis
-): string {
-  const parts: string[] = [];
-
-  // Profitability highlight
-  if (profitability.assessment === "EXCELLENT" || profitability.assessment === "GOOD") {
-    parts.push(`excellent profitability (${profitability.netMargin.toFixed(1)}% net margin)`);
-  }
-
-  // Growth highlight
-  if (growth.assessment === "STRONG") {
-    parts.push("strong growth");
-  } else if (growth.assessment === "WEAK") {
-    parts.push("modest growth");
-  }
-
-  // Cash flow highlight
-  if (cashFlow.assessment === "STRONG" || cashFlow.assessment === "HEALTHY") {
-    parts.push("strong cash flow");
-  }
-
-  // Financial health highlight
-  if (financialHealth.assessment === "STRONG") {
-    parts.push("strong financial position");
-  } else if (financialHealth.assessment === "CONCERNING" || financialHealth.assessment === "WEAK") {
-    parts.push("financial health concerns");
-  }
-
-  let summary = `Company demonstrates ${parts.join(", ")}. `;
-
-  // Add capital efficiency note
-  if (capitalEfficiency.assessment === "UNCLEAR") {
-    summary += "Capital efficiency metrics are unreliable due to data quality issues. ";
-  }
-
-  summary += "Overall fundamentals suggest ";
-  if (profitability.assessment === "EXCELLENT" && cashFlow.assessment !== "NEGATIVE") {
-    summary += "a financially healthy business with strong operational performance.";
-  } else if (profitability.assessment === "POOR" || cashFlow.assessment === "NEGATIVE") {
-    summary += "operational challenges that warrant careful evaluation.";
-  } else {
-    summary += "a moderately healthy business with mixed signals.";
-  }
-
-  return summary;
+function calculateFcfGrowth(financials: FinancialData["financials"]): number {
+  if (!financials || financials.length < 2) return 0;
+  const latest = financials[0];
+  const prior = financials[1];
+  if (!latest || !prior || !latest.freeCashFlow || !prior.freeCashFlow || prior.freeCashFlow === 0) return 0;
+  return ((latest.freeCashFlow - prior.freeCashFlow) / Math.abs(prior.freeCashFlow)) * 100;
 }
