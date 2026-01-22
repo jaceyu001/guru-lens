@@ -41,10 +41,13 @@ export function calculateGrowth(input: GrowthCalculationInput): GrowthCalculatio
   const { financialData, metric } = input;
   const quarterlyData = (financialData as any).quarterlyFinancials || [];
   const annualData = financialData.financials || [];
+  
+
 
   // Detect current year and quarter
   const latestQuarter = quarterlyData[0];
   if (!latestQuarter) {
+
     return createInsufficientDataResult(metric);
   }
 
@@ -56,6 +59,7 @@ export function calculateGrowth(input: GrowthCalculationInput): GrowthCalculatio
   if (currentQuarter !== 'Q1' && currentYearQuartersCount >= 2) {
     const ttmValue = getTTMValue(quarterlyData, metric);
     const priorFYValue = getFullYearValue(annualData, metric, currentYear - 1);
+
     
     if (ttmValue !== 0 && priorFYValue !== 0) {
       const growthRate = ((ttmValue - priorFYValue) / Math.abs(priorFYValue)) * 100;
@@ -76,6 +80,7 @@ export function calculateGrowth(input: GrowthCalculationInput): GrowthCalculatio
   if (currentYearQuartersCount >= 1) {
     const ttmValue = getTTMValue(quarterlyData, metric);
     const priorYearTTM = getPriorYearTTMValue(quarterlyData, annualData, metric, currentYear);
+
     
     if (ttmValue !== 0 && priorYearTTM !== 0) {
       const growthRate = ((ttmValue - priorYearTTM) / Math.abs(priorYearTTM)) * 100;
@@ -98,6 +103,7 @@ export function calculateGrowth(input: GrowthCalculationInput): GrowthCalculatio
   // Strategy 3: FY vs FY (fallback)
   const currentFYValue = getFullYearValue(annualData, metric, currentYear - 1);
   const priorFYValue = getFullYearValue(annualData, metric, currentYear - 2);
+
   
   if (currentFYValue !== 0 && priorFYValue !== 0) {
     const growthRate = ((currentFYValue - priorFYValue) / Math.abs(priorFYValue)) * 100;
@@ -117,6 +123,7 @@ export function calculateGrowth(input: GrowthCalculationInput): GrowthCalculatio
   }
 
   // No valid comparison possible
+
   return createInsufficientDataResult(metric);
 }
 

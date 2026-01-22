@@ -234,47 +234,65 @@ def get_stock_data(symbol):
                         revenue = float(income_stmt.loc['Total Revenue', col]) if 'Total Revenue' in income_stmt.index else 0
                         net_income = float(income_stmt.loc['Net Income', col]) if 'Net Income' in income_stmt.index else 0
                         operating_income = float(income_stmt.loc['Operating Income', col]) if 'Operating Income' in income_stmt.index else 0
-                        fcf = fcf_data.get(str(col)[:10], 0)
+                        
+                        # Get FCF for this year if available
+                        year_str = str(col)[:10]
+                        fcf = fcf_data.get(year_str, 0)
                         
                         result["financials"].append({
-                            "period": str(col)[:10],
+                            "period": year_str,
                             "fiscalYear": int(str(col)[:4]),
-                            "revenue": (revenue / 1e9) * conversion_rate,  # Convert to billions and apply currency conversion
-                            "netIncome": (net_income / 1e9) * conversion_rate,  # Convert to billions and apply currency conversion
-                            "eps": float(info.get('trailingEps', 0)) or 0,
-                            "operatingIncome": (operating_income / 1e9) * conversion_rate,  # Convert to billions and apply currency conversion
-                            "freeCashFlow": (fcf / 1e9) * conversion_rate  # Convert to billions and apply currency conversion
+                            "revenue": (revenue / 1e9) * conversion_rate,
+                            "netIncome": (net_income / 1e9) * conversion_rate,
+                            "eps": 0,
+                            "operatingIncome": (operating_income / 1e9) * conversion_rate,
+                            "freeCashFlow": (fcf / 1e9) * conversion_rate
                         })
                     except (ValueError, KeyError, TypeError):
                         pass
         except Exception as e:
             pass
         
-        # If no annual data, try quarterly as fallback
-        if len(result["financials"]) == 0:
-            try:
-                quarterly_fin = ticker.quarterly_financials
-                if quarterly_fin is not None and not quarterly_fin.empty:
-                    for idx, col in enumerate(quarterly_fin.columns[:8]):  # Last 8 quarters
-                        try:
-                            revenue = float(quarterly_fin.loc['Total Revenue', col]) if 'Total Revenue' in quarterly_fin.index else 0
-                            net_income = float(quarterly_fin.loc['Net Income', col]) if 'Net Income' in quarterly_fin.index else 0
-                            operating_income = float(quarterly_fin.loc['Operating Income', col]) if 'Operating Income' in quarterly_fin.index else 0
-                            
-                            result["quarterlyFinancials"].append({
-                                "period": str(col)[:10],
-                                "quarter": f"Q{(int(str(col)[5:7]) - 1) // 3 + 1}",
-                                "fiscalYear": int(str(col)[:4]),
-                                "revenue": (revenue / 1e9) * conversion_rate,
-                                "netIncome": (net_income / 1e9) * conversion_rate,
-                                "eps": 0,
-                                "operatingIncome": (operating_income / 1e9) * conversion_rate,
-                                "freeCashFlow": 0
-                            })
-                        except (ValueError, KeyError, TypeError):
-                            pass
-            except Exception as e:
-                pass
+        # ALWAYS add quarterly financials (not just as fallback)
+        # This is critical for TTM-based growth rate calculations
+        try:
+            quarterly_fin = ticker.quarterly_financials
+            quarterly_cf = ticker.quarterly_cashflow
+            quarterly_fcf_data = {}
+            
+            # Get FCF data from quarterly cash flow
+            if quarterly_cf is not None and not quarterly_cf.empty and 'Free Cash Flow' in quarterly_cf.index:
+                for col in quarterly_cf.columns[:8]:  # Last 8 quarters
+                    try:
+                        fcf = float(quarterly_cf.loc['Free Cash Flow', col])
+                        if not math.isnan(fcf):
+                            quarterly_fcf_data[str(col)[:10]] = fcf
+                    except (ValueError, KeyError, TypeError):
+                        pass
+            
+            if quarterly_fin is not None and not quarterly_fin.empty:
+                for idx, col in enumerate(quarterly_fin.columns[:8]):  # Last 8 quarters
+                    try:
+                        revenue = float(quarterly_fin.loc['Total Revenue', col]) if 'Total Revenue' in quarterly_fin.index else 0
+                        net_income = float(quarterly_fin.loc['Net Income', col]) if 'Net Income' in quarterly_fin.index else 0
+                        operating_income = float(quarterly_fin.loc['Operating Income', col]) if 'Operating Income' in quarterly_fin.index else 0
+                        period_str = str(col)[:10]
+                        fcf = quarterly_fcf_data.get(period_str, 0)
+                        
+                        result["quarterlyFinancials"].append({
+                            "period": period_str,
+                            "quarter": f"Q{(int(str(col)[5:7]) - 1) // 3 + 1}",
+                            "fiscalYear": int(str(col)[:4]),
+                            "revenue": (revenue / 1e9) * conversion_rate,
+                            "netIncome": (net_income / 1e9) * conversion_rate,
+                            "eps": 0,
+                            "operatingIncome": (operating_income / 1e9) * conversion_rate,
+                            "freeCashFlow": (fcf / 1e9) * conversion_rate
+                        })
+                    except (ValueError, KeyError, TypeError):
+                        pass
+        except Exception as e:
+            pass
         
         # Get balance sheet data
         try:
@@ -320,31 +338,24 @@ def get_stock_data(symbol):
                         except:
                             pass
                 
-                # Get debt data - try Total Debt first, then sum current + long term
-                total_debt = 0
-                if 'Total Debt' in balance_sheet.index:
-                    try:
-                        total_debt = float(balance_sheet.loc['Total Debt', col])
-                    except:
-                        pass
+                # Get debt data
+                current_debt = 0
+                for name in ['Current Debt', 'Current Portion Of Long Term Debt']:
+                    if name in balance_sheet.index:
+                        try:
+                            current_debt = float(balance_sheet.loc[name, col])
+                            break
+                        except:
+                            pass
                 
-                if total_debt == 0:
-                    current_debt = 0
-                    long_term_debt = 0
-                    for name in ['Current Debt', 'Current Debt And Capital Lease Obligation']:
-                        if name in balance_sheet.index:
-                            try:
-                                current_debt = float(balance_sheet.loc[name, col])
-                                break
-                            except:
-                                pass
-                    for name in ['Long Term Debt', 'Long Term Debt And Capital Lease Obligation']:
-                        if name in balance_sheet.index:
-                            try:
-                                long_term_debt = float(balance_sheet.loc[name, col])
-                                break
-                            except:
-                                pass
+                long_term_debt = 0
+                for name in ['Long Term Debt', 'Long Term Debt And Capital Lease Obligation']:
+                    if name in balance_sheet.index:
+                        try:
+                            long_term_debt = float(balance_sheet.loc[name, col])
+                            break
+                        except:
+                            pass
                     total_debt = current_debt + long_term_debt
                 
                 # Get cash data
@@ -389,10 +400,23 @@ def get_stock_data(symbol):
             "symbol": symbol
         }
 
+def clean_nan_values(obj):
+    """Recursively convert NaN and Inf values to None for JSON serialization"""
+    if isinstance(obj, dict):
+        return {k: clean_nan_values(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [clean_nan_values(item) for item in obj]
+    elif isinstance(obj, float):
+        if math.isnan(obj) or math.isinf(obj):
+            return 0
+        return obj
+    return obj
+
 if __name__ == "__main__":
     if len(sys.argv) > 1:
         symbol = sys.argv[1]
         data = get_stock_data(symbol)
+        data = clean_nan_values(data)
         print(json.dumps(data, indent=2))
     else:
         print(json.dumps({"error": "Symbol required"}, indent=2))
