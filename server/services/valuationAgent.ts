@@ -223,16 +223,28 @@ export async function analyzeValuation(input: ValuationInput): Promise<Valuation
   // Filter out UNABLE_TO_VALUE methods for consensus
   const validMethods = methods.filter(m => m.assessment !== "UNABLE_TO_VALUE" && m.intrinsicValue > 0);
 
+  // Collect all valuation points including scenarios
+  const allValuationPoints: number[] = [];
+  for (const method of validMethods) {
+    allValuationPoints.push(method.intrinsicValue);
+    // Include scenario values if available
+    if (method.scenarios?.conservative?.intrinsicValue) {
+      allValuationPoints.push(method.scenarios.conservative.intrinsicValue);
+    }
+    if (method.scenarios?.baseCase?.intrinsicValue) {
+      allValuationPoints.push(method.scenarios.baseCase.intrinsicValue);
+    }
+  }
+
   let consensusValuation = { low: 0, high: 0, midpoint: 0 };
   let consensusUpside = 0;
   let marginOfSafety = 0;
   let methodAgreement: "STRONG" | "MODERATE" | "WEAK" | "DIVERGENT" = "DIVERGENT";
   let overallAssessment: "UNDERVALUED" | "FAIRLY_VALUED" | "OVERVALUED" | "UNABLE_TO_VALUE" = "UNABLE_TO_VALUE";
 
-  if (validMethods.length > 0) {
-    const intrinsicValues = validMethods.map(m => m.intrinsicValue);
-    consensusValuation.low = Math.min(...intrinsicValues);
-    consensusValuation.high = Math.max(...intrinsicValues);
+  if (allValuationPoints.length > 0) {
+    consensusValuation.low = Math.min(...allValuationPoints);
+    consensusValuation.high = Math.max(...allValuationPoints);
     consensusValuation.midpoint = (consensusValuation.low + consensusValuation.high) / 2;
 
     // Calculate consensus upside
@@ -241,9 +253,9 @@ export async function analyzeValuation(input: ValuationInput): Promise<Valuation
     // Calculate margin of safety
     marginOfSafety = ((consensusValuation.low - currentPrice) / consensusValuation.low) * 100;
 
-    // Determine method agreement
+    // Determine method agreement based on spread of all valuation points
     const range = consensusValuation.high - consensusValuation.low;
-    const rangePercent = (range / consensusValuation.midpoint) * 100;
+    const rangePercent = consensusValuation.midpoint > 0 ? (range / consensusValuation.midpoint) * 100 : 100;
 
     if (rangePercent < 10) {
       methodAgreement = "STRONG";
