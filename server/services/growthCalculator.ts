@@ -58,6 +58,9 @@ export function calculateGrowth(input: GrowthCalculationInput): GrowthCalculatio
   let currentValue = 0;
   let priorValue = 0;
   let growthRate = 0;
+  let comparisonType: ComparisonType = comparison.type;
+  let currentPeriod = comparison.currentPeriod;
+  let priorPeriod = comparison.priorPeriod;
 
   if (comparison.type === 'TTM_VS_FY') {
     // Use TTM vs Full Year
@@ -75,20 +78,41 @@ export function calculateGrowth(input: GrowthCalculationInput): GrowthCalculatio
       metric,
       availability.latestQuarterlyYear - 2
     );
+    
+    // If FY_VS_FY returns zeros, try to calculate TTM from available quarters
+    if (currentValue === 0 || priorValue === 0) {
+      const ttmResult = tryCalculateTTMGrowth(financialData, metric, availability);
+      if (ttmResult) {
+        currentValue = ttmResult.currentValue;
+        priorValue = ttmResult.priorValue;
+        currentPeriod = ttmResult.currentPeriod;
+        priorPeriod = ttmResult.priorPeriod;
+        comparisonType = 'TTM_VS_FY';
+      }
+    }
   } else {
-    // Insufficient data
-    return {
-      growthRate: 0,
-      currentValue: 0,
-      priorValue: 0,
-      currentPeriod: 'N/A',
-      priorPeriod: 'N/A',
-      comparisonType: 'INSUFFICIENT_DATA',
-      metricName: metric,
-      dataQualityFlags: {
-        insufficientData: true,
-      },
-    };
+    // Insufficient data - try TTM as fallback
+    const ttmResult = tryCalculateTTMGrowth(financialData, metric, availability);
+    if (ttmResult) {
+      currentValue = ttmResult.currentValue;
+      priorValue = ttmResult.priorValue;
+      currentPeriod = ttmResult.currentPeriod;
+      priorPeriod = ttmResult.priorPeriod;
+      comparisonType = 'TTM_VS_FY';
+    } else {
+      return {
+        growthRate: 0,
+        currentValue: 0,
+        priorValue: 0,
+        currentPeriod: 'N/A',
+        priorPeriod: 'N/A',
+        comparisonType: 'INSUFFICIENT_DATA',
+        metricName: metric,
+        dataQualityFlags: {
+          insufficientData: true,
+        },
+      };
+    }
   }
 
   // Calculate growth rate
@@ -103,15 +127,65 @@ export function calculateGrowth(input: GrowthCalculationInput): GrowthCalculatio
     growthRate,
     currentValue,
     priorValue,
-    currentPeriod: comparison.currentPeriod,
-    priorPeriod: comparison.priorPeriod,
-    comparisonType: comparison.type,
+    currentPeriod,
+    priorPeriod,
+    comparisonType,
     metricName: metric,
     dataQualityFlags: {
       onlyQ1Available: qualityFlags.onlyQ1Available,
       ttmNotAvailable: qualityFlags.ttmNotAvailable,
       negativeComparison,
     },
+  };
+}
+
+/**
+ * Try to calculate TTM growth when standard methods fail
+ * This handles cases where we have Q1 + prior year quarters
+ */
+function tryCalculateTTMGrowth(
+  financialData: FinancialData,
+  metric: GrowthMetric,
+  availability: any
+): { currentValue: number; priorValue: number; currentPeriod: string; priorPeriod: string } | null {
+  const quarterlyData = (financialData as any).quarterlyFinancials || [];
+  
+  if (quarterlyData.length < 4) {
+    return null;
+  }
+
+  // Calculate current TTM from last 4 quarters
+  const currentTTM = getTTMValue(financialData, metric);
+  if (currentTTM === 0) {
+    return null;
+  }
+
+  // Try to get prior year TTM
+  let priorTTM = 0;
+  const priorYear = availability.latestQuarterlyYear - 1;
+  
+  // Find quarters from prior year
+  const priorYearQuarters = quarterlyData.filter((q: any) => q.fiscalYear === priorYear);
+  
+  if (priorYearQuarters.length >= 4) {
+    // If we have 4 quarters from prior year, sum them
+    for (const q of priorYearQuarters.slice(0, 4)) {
+      priorTTM += getMetricValue(q, metric);
+    }
+  } else if (priorYearQuarters.length > 0) {
+    // If we have fewer quarters, try to get full year from annual data
+    priorTTM = getFullYearValue(financialData, metric, priorYear);
+  }
+
+  if (priorTTM === 0) {
+    return null;
+  }
+
+  return {
+    currentValue: currentTTM,
+    priorValue: priorTTM,
+    currentPeriod: `${availability.latestQuarterlyYear} TTM`,
+    priorPeriod: `${priorYear} ${priorYearQuarters.length >= 4 ? 'TTM' : 'FY'}`,
   };
 }
 
@@ -168,6 +242,7 @@ function getFullYearValue(
 
 /**
  * Extract metric value from financial data object
+ * Used by both quarterly and annual data extraction
  * 
  * @param data - Financial data object (annual or quarterly)
  * @param metric - Metric name
