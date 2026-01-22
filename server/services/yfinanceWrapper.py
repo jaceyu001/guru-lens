@@ -123,6 +123,7 @@ def get_stock_data(symbol):
                 "interestCoverage": float(info.get('interestCoverage', 0)) or 0,
                 "roe": (float(info.get('returnOnEquity', 0)) or 0) * 100,
                 "roic": (float(info.get('returnOnCapital', 0)) or 0) * 100,
+                "roa": (float(info.get('returnOnAssets', 0)) or 0) * 100,
                 "grossMargin": (float(info.get('grossMargins', 0)) or 0) * 100,
                 "operatingMargin": (float(info.get('operatingMargins', 0)) or 0) * 100,
                 "netMargin": (float(info.get('profitMargins', 0)) or 0) * 100,

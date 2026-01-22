@@ -43,6 +43,7 @@ interface YFinanceResponse {
     ps: number;
     roe: number;
     roic: number;
+    roa: number;
     currentRatio: number;
     debtToEquity: number;
     grossMargin: number;
@@ -174,6 +175,7 @@ export async function getStockData(symbol: string): Promise<FinancialData> {
               ps: data.ratios.ps,
               roe: data.ratios.roe,
               roic: data.ratios.roic,
+              roa: data.ratios.roa,
               debtToEquity: data.ratios.debtToEquity,
               currentRatio: data.ratios.currentRatio,
               grossMargin: data.ratios.grossMargin,
