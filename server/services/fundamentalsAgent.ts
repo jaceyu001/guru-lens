@@ -34,9 +34,9 @@ export interface ProfitabilityAnalysis {
 
 export interface CapitalEfficiencyAnalysis {
   assessment: "EXCELLENT" | "GOOD" | "FAIR" | "POOR" | "UNCLEAR";
-  roe: number; // %
-  roic: number; // %
-  roa: number; // %
+  roe: number | null; // % or null if unavailable
+  roic: number | null; // % or null if unavailable
+  roa: number | null; // % or null if unavailable
   narrative: string;
   confidence: number; // 0-100
 }
@@ -295,30 +295,72 @@ function analyzeCapitalEfficiency(
   financialData: FinancialData,
   dataQualityFlags: DataQualityFlags
 ): CapitalEfficiencyAnalysis {
-  const roe = financialData.ratios?.roe || 0;
-  const roic = financialData.ratios?.roic || 0;
-  const roa = 0; // ROA not in ratios, calculate from financials if needed
+  // Get metrics, using null for unavailable data
+  const roe = (financialData.ratios?.roe && financialData.ratios.roe > 0) ? financialData.ratios.roe : null;
+  const roic = (financialData.ratios?.roic && financialData.ratios.roic > 0) ? financialData.ratios.roic : null;
+  const roa = (financialData.ratios?.roa && financialData.ratios.roa > 0) ? financialData.ratios.roa : null;
 
-  // Check for data quality issues
+  // Count available metrics
+  const availableMetrics = [roe, roic, roa].filter(m => m !== null).length;
+
+  // Assess based only on available metrics
   let assessment: "EXCELLENT" | "GOOD" | "FAIR" | "POOR" | "UNCLEAR" = "FAIR";
 
-  if (dataQualityFlags.roicZero || dataQualityFlags.roeNegative) {
+  if (availableMetrics === 0) {
     assessment = "UNCLEAR";
-  } else if (roe > 20 && roic > 15) {
-    assessment = "EXCELLENT";
-  } else if (roe > 15 && roic > 10) {
-    assessment = "GOOD";
-  } else if (roe > 5 && roic > 5) {
-    assessment = "FAIR";
-  } else if (roe > 0) {
-    assessment = "POOR";
+  } else if (availableMetrics === 1) {
+    // Single metric assessment
+    const metric = roe ?? roic ?? roa;
+    if (metric && metric > 20) {
+      assessment = "EXCELLENT";
+    } else if (metric && metric > 15) {
+      assessment = "GOOD";
+    } else if (metric && metric > 10) {
+      assessment = "FAIR";
+    } else if (metric && metric > 5) {
+      assessment = "FAIR";
+    } else if (metric && metric > 0) {
+      assessment = "POOR";
+    }
+  } else if (availableMetrics === 2) {
+    // Two metrics assessment
+    const metrics = [roe, roic, roa].filter(m => m !== null) as number[];
+    const avg = metrics.reduce((a, b) => a + b, 0) / metrics.length;
+    if (metrics.every(m => m > 20)) {
+      assessment = "EXCELLENT";
+    } else if (metrics.every(m => m > 15)) {
+      assessment = "GOOD";
+    } else if (metrics.every(m => m > 10)) {
+      assessment = "GOOD";
+    } else if (metrics.every(m => m > 5)) {
+      assessment = "FAIR";
+    } else if (avg > 10) {
+      assessment = "FAIR";
+    } else if (avg > 5) {
+      assessment = "FAIR";
+    } else {
+      assessment = "POOR";
+    }
+  } else {
+    // All three metrics available
+    if (roe! > 20 && roic! > 15 && roa! > 10) {
+      assessment = "EXCELLENT";
+    } else if (roe! > 15 && roic! > 10 && roa! > 8) {
+      assessment = "GOOD";
+    } else if (roe! > 10 && roic! > 5 && roa! > 5) {
+      assessment = "FAIR";
+    } else if (roe! > 5 && roic! > 0 && roa! > 0) {
+      assessment = "FAIR";
+    } else {
+      assessment = "POOR";
+    }
   }
 
   const narrative = buildCapitalEfficiencyNarrative(roe, roic, roa, dataQualityFlags);
 
-  // Calculate confidence based on data quality
+  // Calculate confidence based on data quality and available metrics
   let confidence = 85;
-  if (dataQualityFlags.roicZero) confidence = 50;
+  if (availableMetrics < 3) confidence -= (3 - availableMetrics) * 10;
   if (dataQualityFlags.roeNegative) confidence -= 15;
 
   return {
@@ -483,22 +525,26 @@ function buildProfitabilityNarrative(
 }
 
 function buildCapitalEfficiencyNarrative(
-  roe: number,
-  roic: number,
-  roa: number,
+  roe: number | null,
+  roic: number | null,
+  roa: number | null,
   dataQualityFlags: DataQualityFlags
 ): string {
-  if (dataQualityFlags.roicZero || dataQualityFlags.roeNegative) {
-    return "Capital efficiency metrics are unreliable due to data quality issues. Cannot reliably assess capital efficiency.";
+  const parts: string[] = [];
+
+  if (roe !== null) parts.push(`ROE of ${roe.toFixed(1)}%`);
+  if (roic !== null) parts.push(`ROIC of ${roic.toFixed(1)}%`);
+  if (roa !== null) parts.push(`ROA of ${roa.toFixed(1)}%`);
+
+  if (parts.length === 0) {
+    return "Capital efficiency metrics are unavailable. Cannot assess capital efficiency.";
   }
 
-  return `ROE of ${roe.toFixed(1)}%, ROIC of ${roic.toFixed(1)}%, and ROA of ${roa.toFixed(1)}%. ${
-    roe > 20
-      ? "Excellent capital efficiency."
-      : roe > 10
-        ? "Good capital efficiency."
-        : "Moderate capital efficiency."
-  }`;
+  const metricsStr = parts.join(", ");
+  const assessment =
+    roe && roe > 20 ? "Excellent capital efficiency." : roe && roe > 10 ? "Good capital efficiency." : "Moderate capital efficiency.";
+
+  return `${metricsStr}. ${assessment}`;
 }
 
 function buildFinancialHealthNarrative(

@@ -253,19 +253,19 @@ export function FundamentalsAgentCard({ findings, isLoading }: FundamentalsAgent
                 <div>
                   <p className="text-sm text-slate-600">ROE</p>
                   <p className="text-lg font-semibold text-slate-900">
-                    {findings.capitalEfficiency.roe.toFixed(1)}%
+                    {findings.capitalEfficiency.roe !== null ? `${findings.capitalEfficiency.roe.toFixed(1)}%` : "N/A"}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-slate-600">ROIC</p>
                   <p className="text-lg font-semibold text-slate-900">
-                    {findings.capitalEfficiency.roic.toFixed(1)}%
+                    {findings.capitalEfficiency.roic !== null ? `${findings.capitalEfficiency.roic.toFixed(1)}%` : "N/A"}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-slate-600">ROA</p>
                   <p className="text-lg font-semibold text-slate-900">
-                    {findings.capitalEfficiency.roa.toFixed(1)}%
+                    {findings.capitalEfficiency.roa !== null ? `${findings.capitalEfficiency.roa.toFixed(1)}%` : "N/A"}
                   </p>
                 </div>
               </div>

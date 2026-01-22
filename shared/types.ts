@@ -217,6 +217,7 @@ export interface FinancialData {
     ps?: number;
     roe?: number;
     roic?: number;
+    roa?: number;
     debtToEquity?: number;
     currentRatio?: number;
     grossMargin?: number;
@@ -224,6 +225,8 @@ export interface FinancialData {
     netMargin?: number;
     revenueGrowth?: number; // YoY revenue growth
     earningsGrowth?: number; // YoY earnings growth
+    fcfMargin?: number;
+    fcfGrowth?: number;
   };
   balanceSheet?: {
     totalAssets?: number;
@@ -286,9 +289,9 @@ export interface ProfitabilityAnalysis {
 
 export interface CapitalEfficiencyAnalysis {
   assessment: "EXCELLENT" | "GOOD" | "FAIR" | "POOR" | "UNCLEAR";
-  roe: number; // %
-  roic: number; // %
-  roa: number; // %
+  roe: number | null; // % or null if unavailable
+  roic: number | null; // % or null if unavailable
+  roa: number | null; // % or null if unavailable
   narrative: string;
   confidence: number; // 0-100
 }

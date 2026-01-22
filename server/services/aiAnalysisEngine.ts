@@ -204,7 +204,9 @@ Free Cash Flow: $${(latestFinancials.freeCashFlow / 1e9).toFixed(2)}B`
     
     agentFindingsSummary += `- Growth: ${fund.growth.assessment} ${growthPeriodInfo} (Revenue: ${fund.growth.revenueGrowth.toFixed(1)}%, Earnings: ${fund.growth.earningsGrowth.toFixed(1)}%, FCF: ${fund.growth.fcfGrowth.toFixed(1)}%)\n`;
     agentFindingsSummary += `- Profitability: ${fund.profitability.assessment} (Net Margin: ${fund.profitability.netMargin.toFixed(1)}%, Operating: ${fund.profitability.operatingMargin.toFixed(1)}%)\n`;
-    agentFindingsSummary += `- Capital Efficiency: ${fund.capitalEfficiency.assessment} (ROE: ${fund.capitalEfficiency.roe.toFixed(1)}%, ROIC: ${fund.capitalEfficiency.roic.toFixed(1)}%)\n`;
+    const roeStr = fund.capitalEfficiency.roe !== null ? `${fund.capitalEfficiency.roe.toFixed(1)}%` : 'N/A';
+    const roicStr = fund.capitalEfficiency.roic !== null ? `${fund.capitalEfficiency.roic.toFixed(1)}%` : 'N/A';
+    agentFindingsSummary += `- Capital Efficiency: ${fund.capitalEfficiency.assessment} (ROE: ${roeStr}, ROIC: ${roicStr})\n`;
     agentFindingsSummary += `- Financial Health: ${fund.financialHealth.assessment} (D/E: ${fund.financialHealth.debtToEquity.toFixed(1)}%, Current Ratio: ${fund.financialHealth.currentRatio.toFixed(2)}x)\n`;
     agentFindingsSummary += `- Cash Flow: ${fund.cashFlow.assessment} (FCF Margin: ${fund.cashFlow.fcfMargin.toFixed(1)}%, Growth: ${fund.cashFlow.fcfGrowth.toFixed(1)}%)\n`;
     
