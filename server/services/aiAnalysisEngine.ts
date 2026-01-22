@@ -207,7 +207,9 @@ Free Cash Flow: $${(latestFinancials.freeCashFlow / 1e9).toFixed(2)}B`
     const roeStr = fund.capitalEfficiency.roe !== null ? `${fund.capitalEfficiency.roe.toFixed(1)}%` : 'N/A';
     const roicStr = fund.capitalEfficiency.roic !== null ? `${fund.capitalEfficiency.roic.toFixed(1)}%` : 'N/A';
     agentFindingsSummary += `- Capital Efficiency: ${fund.capitalEfficiency.assessment} (ROE: ${roeStr}, ROIC: ${roicStr})\n`;
-    agentFindingsSummary += `- Financial Health: ${fund.financialHealth.assessment} (D/E: ${fund.financialHealth.debtToEquity.toFixed(1)}%, Current Ratio: ${fund.financialHealth.currentRatio.toFixed(2)}x)\n`;
+    const deStr = fund.financialHealth.debtToEquity !== null ? `${fund.financialHealth.debtToEquity.toFixed(1)}%` : 'N/A';
+    const crStr = fund.financialHealth.currentRatio !== null ? `${fund.financialHealth.currentRatio.toFixed(2)}x` : 'N/A';
+    agentFindingsSummary += `- Financial Health: ${fund.financialHealth.assessment} (D/E: ${deStr}, Current Ratio: ${crStr})\n`;
     agentFindingsSummary += `- Cash Flow: ${fund.cashFlow.assessment} (FCF Margin: ${fund.cashFlow.fcfMargin.toFixed(1)}%, Growth: ${fund.cashFlow.fcfGrowth.toFixed(1)}%)\n`;
     
     // Add data quality flags if present

@@ -301,19 +301,19 @@ export function FundamentalsAgentCard({ findings, isLoading }: FundamentalsAgent
                 <div>
                   <p className="text-sm text-slate-600">Debt/Equity</p>
                   <p className="text-lg font-semibold text-slate-900">
-                    {findings.financialHealth.debtToEquity.toFixed(1)}%
+                    {findings.financialHealth.debtToEquity !== null ? `${findings.financialHealth.debtToEquity.toFixed(1)}%` : "N/A"}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-slate-600">Current Ratio</p>
                   <p className="text-lg font-semibold text-slate-900">
-                    {findings.financialHealth.currentRatio.toFixed(2)}x
+                    {findings.financialHealth.currentRatio !== null ? `${findings.financialHealth.currentRatio.toFixed(2)}x` : "N/A"}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-slate-600">Interest Coverage</p>
                   <p className="text-lg font-semibold text-slate-900">
-                    {findings.financialHealth.interestCoverage.toFixed(1)}x
+                    {findings.financialHealth.interestCoverage !== null ? `${findings.financialHealth.interestCoverage.toFixed(1)}x` : "N/A"}
                   </p>
                 </div>
               </div>

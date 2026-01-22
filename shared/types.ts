@@ -298,9 +298,9 @@ export interface CapitalEfficiencyAnalysis {
 
 export interface FinancialHealthAnalysis {
   assessment: "STRONG" | "STABLE" | "CONCERNING" | "WEAK" | "UNCLEAR";
-  debtToEquity: number; // %
-  currentRatio: number;
-  interestCoverage: number;
+  debtToEquity: number | null; // % or null if unavailable
+  currentRatio: number | null; // or null if unavailable
+  interestCoverage: number | null; // or null if unavailable
   narrative: string;
   confidence: number; // 0-100
 }
