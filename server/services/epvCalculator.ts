@@ -194,8 +194,12 @@ export function calculateEPV(
 
   // Validate and cap market growth rate
   let validatedGrowthRate = marketGrowthRate;
+  // Cap growth rate at 4% maximum
+  if (validatedGrowthRate > 0.04) {
+    validatedGrowthRate = 0.04; // Cap at 4%
+  }
   if (validatedGrowthRate >= WACC) {
-    validatedGrowthRate = WACC - 0.01; // Cap at 8%
+    validatedGrowthRate = WACC - 0.01; // Cap at 8% if still too high
   }
   if (validatedGrowthRate < 0) {
     validatedGrowthRate = 0;

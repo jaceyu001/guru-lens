@@ -109,8 +109,9 @@ Format your response as valid JSON (no markdown, no code blocks):
       growthData.growthRate = 3;
     }
 
-    // Cap growth rate between -20% and 20%
-    growthData.growthRate = Math.max(-20, Math.min(20, growthData.growthRate));
+    // Cap growth rate at 4% maximum (even if LLM suggests higher)
+    // This prevents unrealistic valuations when growth rate is too close to WACC
+    growthData.growthRate = Math.max(-20, Math.min(4, growthData.growthRate));
 
     // Ensure confidence is valid
     if (!["high", "medium", "low"].includes(growthData.confidence)) {
@@ -144,20 +145,24 @@ Format your response as valid JSON (no markdown, no code blocks):
 
 /**
  * Validate and adjust growth rate for EPV formula
- * Ensures g < WACC (9%)
+ * Ensures g < WACC (9%) and caps at 4% maximum
  */
 export function validateGrowthRate(growthRate: number, wacc: number = 9): number {
   // Convert from percentage to decimal if needed
   const rateAsDecimal = growthRate > 1 ? growthRate / 100 : growthRate;
   const waccAsDecimal = wacc > 1 ? wacc / 100 : wacc;
 
+  // Cap growth rate at 4% maximum
+  let cappedRate = Math.min(growthRate, 4);
+
   // If growth rate >= WACC, cap at WACC - 1%
-  if (rateAsDecimal >= waccAsDecimal) {
+  const cappedRateAsDecimal = cappedRate > 1 ? cappedRate / 100 : cappedRate;
+  if (cappedRateAsDecimal >= waccAsDecimal) {
     return (waccAsDecimal - 0.01) * 100;
   }
 
   // If growth rate is negative, keep it (company in decline)
-  return growthRate;
+  return cappedRate;
 }
 
 /**
