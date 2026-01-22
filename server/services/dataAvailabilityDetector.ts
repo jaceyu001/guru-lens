@@ -143,7 +143,16 @@ export function determineComparisonType(availability: DataAvailability) {
       priorPeriod: `${availability.ttmYear - 1} FY`,
       description: `Trailing Twelve Months (${availability.ttmYear}) vs Full Year (${availability.ttmYear - 1})`,
     };
-  } else if (availability.latestQuarterlyQ === 'Q1' || !ttmAvailable) {
+  } else if (availability.latestQuarterlyQ === 'Q1') {
+    // When only Q1 available, don't use FY_VS_FY (current year FY doesn't exist)
+    // Let growthCalculator handle TTM fallback
+    return {
+      type: 'INSUFFICIENT_DATA' as const,
+      currentPeriod: 'N/A',
+      priorPeriod: 'N/A',
+      description: 'Only Q1 data available - insufficient for FY comparison',
+    };
+  } else if (!ttmAvailable) {
     // Use Full Year vs Full Year (most recent complete years)
     return {
       type: 'FY_VS_FY' as const,
