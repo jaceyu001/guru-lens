@@ -1,38 +1,29 @@
 import { FinancialData } from "../../shared/types";
 
-/**
- * EPV (Earning Power Value) Valuation Model
- * 
- * Calculates intrinsic value using:
- * 1. 4-year normalized NOPAT (average of TTM, FY 2024, FY 2023, FY 2022)
- * 2. Fixed 9% WACC
- * 3. Dual growth scenarios: Zero growth + Market growth
- */
-
 export interface EPVScenario {
   name: string;
-  growthRate: number; // as decimal (e.g., 0.04 for 4%)
-  nopat: number; // in millions
-  epv: number; // Enterprise Value in millions
-  equityValue: number; // in millions
+  growthRate: number;
+  nopat: number;
+  epv: number;
+  equityValue: number;
   intrinsicValuePerShare: number;
   assessment: "UNDERVALUED" | "FAIRLY_VALUED" | "OVERVALUED" | "UNABLE_TO_VALUE";
 }
 
 export interface EPVValuation {
   scenarios: {
-    conservative: EPVScenario; // Zero growth
-    baseCase: EPVScenario; // Market growth
+    conservative: EPVScenario;
+    baseCase: EPVScenario;
   };
   valuationRange: {
     low: number;
     high: number;
     midpoint: number;
   };
-  marginOfSafety: number; // as percentage
-  upsideToBaseCase: number; // as percentage
-  downsideToConservative: number; // as percentage
-  confidence: number; // 0-1
+  marginOfSafety: number;
+  upsideToBaseCase: number;
+  downsideToConservative: number;
+  confidence: number;
   llmGrowthRateInfo?: {
     growthRate: number;
     confidence: "high" | "medium" | "low";
@@ -57,91 +48,42 @@ export interface EPVValuation {
 
 /**
  * Calculate 4-year normalized NOPAT
- * Uses: TTM, FY 2024, FY 2023, FY 2022
+ * Uses: TTM, FY2024, FY2023, FY2022
+ * Formula: Average Operating Income × (1 - 15% Tax Rate)
  */
 export function calculateNormalizedNOPAT(financialData: FinancialData): {
   nopat: number;
   dataPoints: number;
   dataAvailability: string;
 } {
-  const nopats: number[] = [];
+  const operatingIncomes: number[] = [];
   const dataPoints: string[] = [];
+  const TAX_RATE = 0.15; // Fixed 15% tax rate
 
-  // TTM NOPAT (from quarterly financials if available)
-  if (financialData.quarterlyFinancials && financialData.quarterlyFinancials.length >= 4) {
-    let ttmRevenue = 0;
-    let ttmOperatingProfit = 0;
-    
-    for (let i = 0; i < Math.min(4, financialData.quarterlyFinancials.length); i++) {
-      ttmRevenue += financialData.quarterlyFinancials[i].revenue || 0;
-      ttmOperatingProfit += financialData.quarterlyFinancials[i].operatingIncome || 0;
-    }
-    
-    if (ttmRevenue > 0) {
-      const ttmOperatingMargin = ttmOperatingProfit / ttmRevenue;
-      const ttmTaxRate = financialData.ratios?.netMargin ? 
-        (1 - financialData.ratios.netMargin / (financialData.ratios.operatingMargin || 0.1)) : 0.15;
-      const ttmNopat = ttmRevenue * ttmOperatingMargin * (1 - Math.max(0, Math.min(1, ttmTaxRate)));
-      
-      if (ttmNopat > 0) {
-        nopats.push(ttmNopat);
-        dataPoints.push("TTM");
-      }
-    }
-  }
-
-  // FY 2024 NOPAT
+  // Extract operating income from financials array
+  // Expected order: [TTM, FY2024, FY2023, FY2022]
   if (financialData.financials && financialData.financials.length > 0) {
-    const fy2024 = financialData.financials[0];
-    if (fy2024.revenue > 0 && fy2024.operatingIncome !== undefined) {
-      const operatingMargin = fy2024.operatingIncome / fy2024.revenue;
-      const taxRate = 0.15;
-      const nopat = fy2024.revenue * operatingMargin * (1 - taxRate);
-      
-      if (!isNaN(nopat) && isFinite(nopat)) {
-        nopats.push(Math.abs(nopat));
-        dataPoints.push("FY2024");
+    for (let i = 0; i < Math.min(4, financialData.financials.length); i++) {
+      const fin = financialData.financials[i];
+      if (fin.operatingIncome !== undefined && fin.operatingIncome > 0) {
+        operatingIncomes.push(fin.operatingIncome);
+        dataPoints.push(fin.period);
       }
     }
   }
 
-  // FY 2023 NOPAT
-  if (financialData.financials && financialData.financials.length > 1) {
-    const fy2023 = financialData.financials[1];
-    if (fy2023.revenue > 0 && fy2023.operatingIncome !== undefined) {
-      const operatingMargin = fy2023.operatingIncome / fy2023.revenue;
-      const taxRate = 0.15;
-      const nopat = fy2023.revenue * operatingMargin * (1 - taxRate);
-      
-      if (!isNaN(nopat) && isFinite(nopat)) {
-        nopats.push(Math.abs(nopat));
-        dataPoints.push("FY2023");
-      }
-    }
-  }
+  // Calculate average operating income
+  const avgOperatingIncome = operatingIncomes.length > 0 
+    ? operatingIncomes.reduce((a, b) => a + b, 0) / operatingIncomes.length 
+    : 0;
 
-  // FY 2022 NOPAT
-  if (financialData.financials && financialData.financials.length > 2) {
-    const fy2022 = financialData.financials[2];
-    if (fy2022.revenue > 0 && fy2022.operatingIncome !== undefined) {
-      const operatingMargin = fy2022.operatingIncome / fy2022.revenue;
-      const taxRate = 0.15;
-      const nopat = fy2022.revenue * operatingMargin * (1 - taxRate);
-      
-      if (!isNaN(nopat) && isFinite(nopat)) {
-        nopats.push(Math.abs(nopat));
-        dataPoints.push("FY2022");
-      }
-    }
-  }
-
-  // Calculate average NOPAT
-  const normalizedNopat = nopats.length > 0 ? nopats.reduce((a, b) => a + b, 0) / nopats.length : 0;
-  const dataAvailability = `${nopats.length} years (${dataPoints.join(", ")})`;
+  // Calculate NOPAT: Operating Income × (1 - Tax Rate)
+  const normalizedNopat = avgOperatingIncome * (1 - TAX_RATE);
+  const dataAvailability = `${operatingIncomes.length} years (${dataPoints.join(", ")})`;
 
   return {
     nopat: normalizedNopat,
-    dataPoints: nopats.length,
+    dataPoints: operatingIncomes.length,
     dataAvailability,
   };
 }
@@ -208,7 +150,6 @@ function calculateEPVScenario(
 function calculateConfidence(
   dataPoints: number,
   normalizedNopat: number,
-  nopats: number[],
   llmConfidence?: "high" | "medium" | "low"
 ): number {
   let confidence = 0.6; // Base confidence
@@ -220,22 +161,6 @@ function calculateConfidence(
     confidence += 0.1;
   } else if (dataPoints < 2) {
     confidence -= 0.1;
-  }
-
-  // NOPAT stability factor
-  if (nopats.length > 1 && normalizedNopat > 0) {
-    const stdDev = Math.sqrt(
-      nopats.reduce((sum, val) => sum + Math.pow(val - normalizedNopat, 2), 0) / nopats.length
-    );
-    const coefficientOfVariation = stdDev / normalizedNopat;
-
-    if (coefficientOfVariation < 0.1) {
-      confidence += 0.2;
-    } else if (coefficientOfVariation < 0.2) {
-      confidence += 0.1;
-    } else if (coefficientOfVariation > 0.3) {
-      confidence -= 0.1;
-    }
   }
 
   // LLM confidence factor
@@ -327,8 +252,7 @@ export function calculateEPV(
     : 0;
 
   // Calculate confidence
-  const nopats = [normalizedNopat]; // Simplified - would need individual NOPAT values
-  const confidence = calculateConfidence(dataPoints, normalizedNopat, nopats, llmGrowthRateInfo?.confidence);
+  const confidence = calculateConfidence(dataPoints, normalizedNopat, llmGrowthRateInfo?.confidence);
 
   // Generate narrative
   const narrative = `EPV analysis suggests company is ${baseScenario.assessment.toLowerCase()}. ` +

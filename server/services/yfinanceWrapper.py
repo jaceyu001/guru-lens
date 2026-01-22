@@ -128,6 +128,46 @@ def get_stock_data(symbol):
                     except (ValueError, KeyError, TypeError):
                         pass
             
+            # First, calculate TTM from quarterly data
+            ttm_data = {"revenue": 0, "net_income": 0, "operating_income": 0, "fcf": 0}
+            quarterly_fin = ticker.quarterly_financials
+            quarterly_cf = ticker.quarterly_cashflow
+            quarterly_fcf_data = {}
+            
+            if quarterly_cf is not None and not quarterly_cf.empty and 'Free Cash Flow' in quarterly_cf.index:
+                for col in quarterly_cf.columns[:4]:  # Last 4 quarters
+                    try:
+                        fcf = float(quarterly_cf.loc['Free Cash Flow', col])
+                        if not math.isnan(fcf):
+                            quarterly_fcf_data[str(col)[:10]] = fcf
+                            ttm_data["fcf"] += fcf
+                    except (ValueError, KeyError, TypeError):
+                        pass
+            
+            if quarterly_fin is not None and not quarterly_fin.empty:
+                for col in quarterly_fin.columns[:4]:  # Last 4 quarters
+                    try:
+                        revenue = float(quarterly_fin.loc['Total Revenue', col]) if 'Total Revenue' in quarterly_fin.index else 0
+                        net_income = float(quarterly_fin.loc['Net Income', col]) if 'Net Income' in quarterly_fin.index else 0
+                        operating_income = float(quarterly_fin.loc['Operating Income', col]) if 'Operating Income' in quarterly_fin.index else 0
+                        ttm_data["revenue"] += revenue
+                        ttm_data["net_income"] += net_income
+                        ttm_data["operating_income"] += operating_income
+                    except (ValueError, KeyError, TypeError):
+                        pass
+            
+            # Add TTM as the first entry
+            if ttm_data["revenue"] > 0 or ttm_data["operating_income"] > 0:
+                result["financials"].append({
+                    "period": "TTM",
+                    "fiscalYear": datetime.now().year,
+                    "revenue": ttm_data["revenue"] / 1e9,  # Convert to billions
+                    "netIncome": ttm_data["net_income"] / 1e9,  # Convert to billions
+                    "eps": float(info.get('trailingEps', 0)) or 0,
+                    "operatingIncome": ttm_data["operating_income"] / 1e9,  # Convert to billions
+                    "freeCashFlow": ttm_data["fcf"] / 1e9  # Convert to billions
+                })
+            
             # Use income_stmt which provides annual data
             income_stmt = ticker.income_stmt
             if income_stmt is not None and not income_stmt.empty:
