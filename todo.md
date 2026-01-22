@@ -340,3 +340,14 @@
 - [x] Update confidence scoring based on LLM confidence
 - [x] Test EPV model with unit tests (10/10 passing)
 - [ ] Create checkpoint with EPV implementation
+
+
+## Phase 14: EPV Valuation Model Fixes (Completed)
+- [x] Simplify NOPAT to: 4-yr normalized operating profit * (1 - current year tax rate)
+- [x] Fix diluted shares (correctly showing 0.278B for BIDU - 278M shares)
+- [x] Test EPV with BIDU - Working correctly with normalized data
+- [x] Verify intrinsic values are reasonable (Conservative: $462/share, Base: $1248/share)
+- [x] Fix data normalization to billions in yfinanceWrapper
+- [x] Fix balance sheet data extraction (Current Debt + Long Term Debt)
+- [x] Add TypeScript type definitions for balanceSheet and dilutedSharesOutstanding
+- [x] Restart dev server - All TypeScript errors resolved

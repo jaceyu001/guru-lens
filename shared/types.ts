@@ -187,6 +187,7 @@ export interface FinancialData {
     description: string;
     employees?: number;
     website?: string;
+    dilutedSharesOutstanding?: number;
   };
   financials?: {
     revenue: number;
@@ -230,6 +231,8 @@ export interface FinancialData {
     totalEquity?: number;
     bookValuePerShare?: number;
     tangibleBookValuePerShare?: number;
+    totalDebt?: number;
+    cash?: number;
   };
   dataQualityFlags?: {
     debtToEquityAnomalous?: boolean;

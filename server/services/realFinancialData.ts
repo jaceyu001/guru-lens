@@ -35,6 +35,7 @@ interface YFinanceResponse {
     employees: number;
     website: string;
     marketCap: number;
+    dilutedSharesOutstanding?: number;
   };
   ratios: {
     pe: number;
@@ -78,6 +79,15 @@ interface YFinanceResponse {
     close: number;
     volume: number;
   }>;
+  balanceSheet?: {
+    totalAssets?: number;
+    totalLiabilities?: number;
+    totalEquity?: number;
+    bookValuePerShare?: number;
+    tangibleBookValuePerShare?: number;
+    totalDebt?: number;
+    cash?: number;
+  };
   error?: string;
 }
 
@@ -136,6 +146,7 @@ export async function getStockData(symbol: string): Promise<FinancialData> {
               description: data.profile.description,
               employees: data.profile.employees,
               website: data.profile.website,
+              dilutedSharesOutstanding: data.profile.dilutedSharesOutstanding,
             },
             financials: data.financials.map((f) => ({
               period: f.period,
@@ -168,6 +179,15 @@ export async function getStockData(symbol: string): Promise<FinancialData> {
               grossMargin: data.ratios.grossMargin,
               operatingMargin: data.ratios.operatingMargin,
               netMargin: data.ratios.netMargin,
+            },
+            balanceSheet: {
+              totalAssets: data.balanceSheet?.totalAssets,
+              totalLiabilities: data.balanceSheet?.totalLiabilities,
+              totalEquity: data.balanceSheet?.totalEquity,
+              bookValuePerShare: data.balanceSheet?.bookValuePerShare,
+              tangibleBookValuePerShare: data.balanceSheet?.tangibleBookValuePerShare,
+              totalDebt: data.balanceSheet?.totalDebt,
+              cash: data.balanceSheet?.cash,
             },
           });
         } catch (parseError) {

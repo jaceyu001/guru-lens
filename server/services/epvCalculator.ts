@@ -279,12 +279,10 @@ export function calculateEPV(
   // Calculate normalized NOPAT
   const { nopat: normalizedNopat, dataPoints, dataAvailability } = calculateNormalizedNOPAT(financialData);
 
-  // Get debt and cash data from latest financial statement
-  const latestFinancial = financialData.financials?.[0] as any;
-  const totalDebt = latestFinancial?.totalDebt || 0;
-  const nonOperatingCash = latestFinancial?.cashAndEquivalents || 0;
-  const marketCapValue = (financialData.profile as any)?.marketCap || 1;
-  const dilutedShares = marketCapValue > 0 && currentPrice > 0 ? marketCapValue / currentPrice : 1;
+  // Get debt and cash data from balance sheet
+  const totalDebt = financialData.balanceSheet?.totalDebt || 0;
+  const nonOperatingCash = financialData.balanceSheet?.cash || 0;
+  const dilutedShares = financialData.profile?.dilutedSharesOutstanding || 1;
 
   // Calculate both scenarios
   const conservativeScenario = calculateEPVScenario(

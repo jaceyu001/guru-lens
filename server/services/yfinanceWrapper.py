@@ -73,7 +73,8 @@ def get_stock_data(symbol):
                 "description": info.get('longBusinessSummary', ''),
                 "employees": info.get('fullTimeEmployees', 0),
                 "website": info.get('website', ''),
-                "marketCap": float(info.get('marketCap', 0))
+                "marketCap": float(info.get('marketCap', 0)),
+                "dilutedSharesOutstanding": float(info.get('sharesOutstanding', 0)) / 1e9  # Convert to billions
             },
             "ratios": {
                 "pe": float(info.get('trailingPE', 0)) or float(info.get('forwardPE', 0)) or 0,
@@ -141,11 +142,11 @@ def get_stock_data(symbol):
                         result["financials"].append({
                             "period": str(col)[:10],
                             "fiscalYear": int(str(col)[:4]),
-                            "revenue": revenue,
-                            "netIncome": net_income,
+                            "revenue": revenue / 1e9,  # Convert to billions
+                            "netIncome": net_income / 1e9,  # Convert to billions
                             "eps": float(info.get('trailingEps', 0)) or 0,
-                            "operatingIncome": operating_income,
-                            "freeCashFlow": fcf
+                            "operatingIncome": operating_income / 1e9,  # Convert to billions
+                            "freeCashFlow": fcf / 1e9  # Convert to billions
                         })
                     except (ValueError, KeyError, TypeError):
                         pass
@@ -167,10 +168,10 @@ def get_stock_data(symbol):
                             result["financials"].append({
                                 "period": str(col)[:10],
                                 "fiscalYear": int(str(col)[:4]),
-                                "revenue": revenue,
-                                "netIncome": net_income,
+                                "revenue": revenue / 1e9,  # Convert to billions
+                                "netIncome": net_income / 1e9,  # Convert to billions
                                 "eps": float(info.get('trailingEps', 0)) or 0,
-                                "operatingIncome": operating_income,
+                                "operatingIncome": operating_income / 1e9,  # Convert to billions
                                 "freeCashFlow": 0
                             })
                         except (ValueError, KeyError, TypeError):
@@ -221,12 +222,12 @@ def get_stock_data(symbol):
                             "period": period_str,
                             "quarter": quarter_str,
                             "fiscalYear": int(str(col)[:4]),
-                            "revenue": revenue,
-                            "netIncome": net_income,
+                            "revenue": revenue / 1e9,  # Convert to billions
+                            "netIncome": net_income / 1e9,  # Convert to billions
                             "eps": float(info.get('trailingEps', 0)) or 0,
-                            "operatingIncome": operating_income,
-                            "operatingCashFlow": ocf,
-                            "freeCashFlow": fcf
+                            "operatingIncome": operating_income / 1e9,  # Convert to billions
+                            "operatingCashFlow": ocf / 1e9,  # Convert to billions
+                            "freeCashFlow": fcf / 1e9  # Convert to billions
                         })
                     except (ValueError, KeyError, TypeError):
                         pass
@@ -263,12 +264,22 @@ def get_stock_data(symbol):
                 tangible_bv = float(balance_sheet.loc['Tangible Book Value', col]) if 'Tangible Book Value' in balance_sheet.index else stockholders_equity
                 tangible_bv_per_share = tangible_bv / shares_out if shares_out > 0 else 0
                 
+                # Get total debt = Current Debt + Long Term Debt
+                current_debt = float(balance_sheet.loc['Current Debt', col]) if 'Current Debt' in balance_sheet.index else 0
+                long_term_debt = float(balance_sheet.loc['Long Term Debt', col]) if 'Long Term Debt' in balance_sheet.index else 0
+                total_debt = current_debt + long_term_debt
+                
+                # Get cash and cash equivalents (from Current Assets section)
+                cash = float(balance_sheet.loc['Cash And Cash Equivalents', col]) if 'Cash And Cash Equivalents' in balance_sheet.index else 0
+                
                 result["balanceSheet"] = {
-                    "totalAssets": total_assets,
-                    "totalLiabilities": total_liabilities,
-                    "totalEquity": stockholders_equity,
+                    "totalAssets": total_assets / 1e9,  # Convert to billions
+                    "totalLiabilities": total_liabilities / 1e9,  # Convert to billions
+                    "totalEquity": stockholders_equity / 1e9,  # Convert to billions
                     "bookValuePerShare": book_value_per_share,
-                    "tangibleBookValuePerShare": tangible_bv_per_share
+                    "tangibleBookValuePerShare": tangible_bv_per_share,
+                    "totalDebt": total_debt / 1e9,  # Convert to billions
+                    "cash": cash / 1e9  # Convert to billions
                 }
         except Exception as e:
             pass
