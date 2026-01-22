@@ -160,7 +160,7 @@ export interface KeyRatios {
   currentRatio: number;
   quickRatio: number;
   debtToEquity: number;
-  interestCoverage: number;
+  interestCoverage?: number;
   grossMargin: number;
   operatingMargin: number;
   netMargin: number;
@@ -220,6 +220,7 @@ export interface FinancialData {
     roa?: number;
     debtToEquity?: number;
     currentRatio?: number;
+    interestCoverage?: number;
     grossMargin?: number;
     operatingMargin?: number;
     netMargin?: number;

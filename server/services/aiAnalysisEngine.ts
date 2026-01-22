@@ -261,7 +261,7 @@ Free Cash Flow: $${(latestFinancials.freeCashFlow / 1e9).toFixed(2)}B`
     .replace('{operatingMargin}', input.ratios.operatingMargin.toFixed(1))
     .replace('{debtToEquity}', getSafeMetricValue(input.ratios.debtToEquity.toFixed(2), input.dataQualityFlags?.debtToEquityAnomalous, 'Debt/Equity'))
     .replace('{currentRatio}', getSafeMetricValue(input.ratios.currentRatio.toFixed(2), input.dataQualityFlags?.currentRatioAnomalous, 'Current Ratio'))
-    .replace('{interestCoverage}', getSafeMetricValue(input.ratios.interestCoverage.toFixed(1), input.dataQualityFlags?.interestCoverageZero, 'Interest Coverage'))
+    .replace('{interestCoverage}', input.ratios.interestCoverage ? getSafeMetricValue(input.ratios.interestCoverage.toFixed(1), input.dataQualityFlags?.interestCoverageZero, 'Interest Coverage') : 'N/A')
     .replace('{dividendYield}', input.ratios.dividendYield.toFixed(2))
     .replace('{financials}', financialSummary)
     .replace('{revenueGrowth}', (() => {

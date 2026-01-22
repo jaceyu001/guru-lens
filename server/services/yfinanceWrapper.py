@@ -36,6 +36,31 @@ CHINESE_COMPANY_TICKERS = {
     'KNDI', 'RBLX', 'SOHU', 'SFUN', 'NOAH', 'VNET', 'CAFD', 'QIWI', 'BKNG'
 }
 
+def calculate_interest_coverage(ticker):
+    """Calculate interest coverage ratio from EBIT / Interest Expense"""
+    try:
+        income_stmt = ticker.income_stmt
+        if income_stmt is not None and not income_stmt.empty:
+            latest_year = income_stmt.columns[0]
+            
+            # Get EBIT
+            ebit = None
+            if 'EBIT' in income_stmt.index:
+                ebit = float(income_stmt.loc['EBIT', latest_year])
+            
+            # Get Interest Expense
+            interest_expense = None
+            if 'Interest Expense' in income_stmt.index:
+                interest_expense = float(income_stmt.loc['Interest Expense', latest_year])
+            
+            # Calculate interest coverage
+            if ebit and interest_expense and interest_expense != 0 and not math.isnan(ebit) and not math.isnan(interest_expense):
+                return ebit / interest_expense
+    except Exception as e:
+        pass
+    
+    return 0
+
 def detect_currency_needs_conversion(symbol, market_cap, revenue_billions):
     """
     Detect if financial data needs RMB to USD conversion
@@ -120,7 +145,7 @@ def get_stock_data(symbol):
                 "ps": float(info.get('priceToSalesTrailing12Months', 0)) or 0,
                 "currentRatio": float(info.get('currentRatio', 0)) or 0,
                 "debtToEquity": float(info.get('debtToEquity', 0)) or 0,
-                "interestCoverage": float(info.get('interestCoverage', 0)) or 0,
+                "interestCoverage": calculate_interest_coverage(ticker),
                 "roe": (float(info.get('returnOnEquity', 0)) or 0) * 100,
                 "roic": (float(info.get('returnOnCapital', 0)) or 0) * 100,
                 "roa": (float(info.get('returnOnAssets', 0)) or 0) * 100,

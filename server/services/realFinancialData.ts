@@ -178,6 +178,7 @@ export async function getStockData(symbol: string): Promise<FinancialData> {
               roa: data.ratios.roa,
               debtToEquity: data.ratios.debtToEquity,
               currentRatio: data.ratios.currentRatio,
+              interestCoverage: data.ratios.interestCoverage,
               grossMargin: data.ratios.grossMargin,
               operatingMargin: data.ratios.operatingMargin,
               netMargin: data.ratios.netMargin,
