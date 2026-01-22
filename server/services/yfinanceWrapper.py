@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 yfinance Wrapper Service
 Provides real financial data for stocks via yfinance
@@ -26,6 +25,45 @@ except Exception:
 # Set environment variables for certificate handling
 os.environ['CURL_CA_BUNDLE'] = ''
 os.environ['REQUESTS_CA_BUNDLE'] = ''
+
+# RMB to USD conversion rate (approximate, can be updated)
+RMB_TO_USD_RATE = 1 / 7.0
+
+# List of Chinese companies that report in RMB
+CHINESE_COMPANY_TICKERS = {
+    'PDD', 'BIDU', 'NTES', 'JD', 'TCEHY', 'BABA', 'XPEV', 'NIO', 'LI', 'FUTU',
+    'DIDI', 'VIPS', 'GOTU', 'BILI', 'BZUN', 'CPNG', 'CMCSA', 'QFIN', 'JMIA',
+    'KNDI', 'RBLX', 'SOHU', 'SFUN', 'NOAH', 'VNET', 'CAFD', 'QIWI', 'BKNG'
+}
+
+def detect_currency_needs_conversion(symbol, market_cap, revenue_billions):
+    """
+    Detect if financial data needs RMB to USD conversion
+    
+    Logic:
+    1. Check if company is known Chinese company
+    2. Check Revenue/Market Cap ratio - if > 2x, likely in RMB
+    3. Return True if conversion needed
+    """
+    
+    # Check if it's a known Chinese company
+    if symbol.upper() in CHINESE_COMPANY_TICKERS:
+        return True
+    
+    # Check Revenue/Market Cap ratio
+    if market_cap > 0 and revenue_billions > 0:
+        ratio = revenue_billions / (market_cap / 1e9)
+        # If revenue is > 2x market cap, likely in RMB
+        if ratio > 2.0:
+            return True
+    
+    return False
+
+def convert_currency(value, from_currency='RMB', to_currency='USD'):
+    """Convert financial values between currencies"""
+    if from_currency.upper() == 'RMB' and to_currency.upper() == 'USD':
+        return value * RMB_TO_USD_RATE
+    return value
 
 def get_stock_data(symbol):
     """Fetch comprehensive stock data for a given symbol"""
@@ -110,7 +148,14 @@ def get_stock_data(symbol):
                 "totalLiabilities": 0,
                 "totalEquity": 0,
                 "bookValuePerShare": 0,
-                "tangibleBookValuePerShare": 0
+                "tangibleBookValuePerShare": 0,
+                "totalDebt": 0,
+                "cash": 0
+            },
+            "currencyInfo": {
+                "reportingCurrency": "USD",
+                "conversionApplied": False,
+                "conversionRate": 1.0
             }
         }
         
@@ -156,16 +201,28 @@ def get_stock_data(symbol):
                     except (ValueError, KeyError, TypeError):
                         pass
             
+            # Detect if currency conversion is needed
+            ttm_revenue_billions = ttm_data["revenue"] / 1e9
+            market_cap = float(info.get('marketCap', 0))
+            needs_conversion = detect_currency_needs_conversion(symbol, market_cap, ttm_revenue_billions)
+            
+            # Apply conversion if needed
+            conversion_rate = RMB_TO_USD_RATE if needs_conversion else 1.0
+            result["currencyInfo"]["conversionApplied"] = needs_conversion
+            result["currencyInfo"]["conversionRate"] = conversion_rate
+            if needs_conversion:
+                result["currencyInfo"]["reportingCurrency"] = "RMB (converted to USD)"
+            
             # Add TTM as the first entry
             if ttm_data["revenue"] > 0 or ttm_data["operating_income"] > 0:
                 result["financials"].append({
                     "period": "TTM",
                     "fiscalYear": datetime.now().year,
-                    "revenue": ttm_data["revenue"] / 1e9,  # Convert to billions
-                    "netIncome": ttm_data["net_income"] / 1e9,  # Convert to billions
+                    "revenue": (ttm_data["revenue"] / 1e9) * conversion_rate,  # Convert to billions and apply currency conversion
+                    "netIncome": (ttm_data["net_income"] / 1e9) * conversion_rate,  # Convert to billions and apply currency conversion
                     "eps": float(info.get('trailingEps', 0)) or 0,
-                    "operatingIncome": ttm_data["operating_income"] / 1e9,  # Convert to billions
-                    "freeCashFlow": ttm_data["fcf"] / 1e9  # Convert to billions
+                    "operatingIncome": (ttm_data["operating_income"] / 1e9) * conversion_rate,  # Convert to billions and apply currency conversion
+                    "freeCashFlow": (ttm_data["fcf"] / 1e9) * conversion_rate  # Convert to billions and apply currency conversion
                 })
             
             # Use income_stmt which provides annual data
@@ -182,11 +239,11 @@ def get_stock_data(symbol):
                         result["financials"].append({
                             "period": str(col)[:10],
                             "fiscalYear": int(str(col)[:4]),
-                            "revenue": revenue / 1e9,  # Convert to billions
-                            "netIncome": net_income / 1e9,  # Convert to billions
+                            "revenue": (revenue / 1e9) * conversion_rate,  # Convert to billions and apply currency conversion
+                            "netIncome": (net_income / 1e9) * conversion_rate,  # Convert to billions and apply currency conversion
                             "eps": float(info.get('trailingEps', 0)) or 0,
-                            "operatingIncome": operating_income / 1e9,  # Convert to billions
-                            "freeCashFlow": fcf / 1e9  # Convert to billions
+                            "operatingIncome": (operating_income / 1e9) * conversion_rate,  # Convert to billions and apply currency conversion
+                            "freeCashFlow": (fcf / 1e9) * conversion_rate  # Convert to billions and apply currency conversion
                         })
                     except (ValueError, KeyError, TypeError):
                         pass
@@ -198,20 +255,20 @@ def get_stock_data(symbol):
             try:
                 quarterly_fin = ticker.quarterly_financials
                 if quarterly_fin is not None and not quarterly_fin.empty:
-                    # Get the most recent quarters (up to 4)
-                    for idx, col in enumerate(quarterly_fin.columns[:4]):
+                    for idx, col in enumerate(quarterly_fin.columns[:8]):  # Last 8 quarters
                         try:
                             revenue = float(quarterly_fin.loc['Total Revenue', col]) if 'Total Revenue' in quarterly_fin.index else 0
                             net_income = float(quarterly_fin.loc['Net Income', col]) if 'Net Income' in quarterly_fin.index else 0
                             operating_income = float(quarterly_fin.loc['Operating Income', col]) if 'Operating Income' in quarterly_fin.index else 0
                             
-                            result["financials"].append({
+                            result["quarterlyFinancials"].append({
                                 "period": str(col)[:10],
+                                "quarter": f"Q{(int(str(col)[5:7]) - 1) // 3 + 1}",
                                 "fiscalYear": int(str(col)[:4]),
-                                "revenue": revenue / 1e9,  # Convert to billions
-                                "netIncome": net_income / 1e9,  # Convert to billions
-                                "eps": float(info.get('trailingEps', 0)) or 0,
-                                "operatingIncome": operating_income / 1e9,  # Convert to billions
+                                "revenue": (revenue / 1e9) * conversion_rate,
+                                "netIncome": (net_income / 1e9) * conversion_rate,
+                                "eps": 0,
+                                "operatingIncome": (operating_income / 1e9) * conversion_rate,
                                 "freeCashFlow": 0
                             })
                         except (ValueError, KeyError, TypeError):
@@ -219,160 +276,123 @@ def get_stock_data(symbol):
             except Exception as e:
                 pass
         
-        # Get quarterly financials with OCF data (for TTM calculations)
-        try:
-            # Get quarterly cash flow statement for OCF and FCF data
-            quarterly_cf = ticker.quarterly_cashflow
-            quarterly_fcf_data = {}
-            quarterly_ocf_data = {}
-            if quarterly_cf is not None and not quarterly_cf.empty:
-                for col in quarterly_cf.columns:
-                    try:
-                        # Get Operating Cash Flow
-                        if 'Operating Cash Flow' in quarterly_cf.index:
-                            ocf = float(quarterly_cf.loc['Operating Cash Flow', col])
-                            if not math.isnan(ocf):
-                                quarterly_ocf_data[str(col)[:10]] = ocf
-                        # Get Free Cash Flow as fallback
-                        if 'Free Cash Flow' in quarterly_cf.index:
-                            fcf = float(quarterly_cf.loc['Free Cash Flow', col])
-                            if not math.isnan(fcf):
-                                quarterly_fcf_data[str(col)[:10]] = fcf
-                    except (ValueError, KeyError, TypeError):
-                        pass
-            
-            quarterly_fin = ticker.quarterly_financials
-            if quarterly_fin is not None and not quarterly_fin.empty:
-                # Get the most recent quarters (up to 8 for 2 years of data)
-                for idx, col in enumerate(quarterly_fin.columns[:8]):
-                    try:
-                        revenue = float(quarterly_fin.loc['Total Revenue', col]) if 'Total Revenue' in quarterly_fin.index else 0
-                        net_income = float(quarterly_fin.loc['Net Income', col]) if 'Net Income' in quarterly_fin.index else 0
-                        operating_income = float(quarterly_fin.loc['Operating Income', col]) if 'Operating Income' in quarterly_fin.index else 0
-                        ocf = quarterly_ocf_data.get(str(col)[:10], 0)
-                        fcf = quarterly_fcf_data.get(str(col)[:10], 0)
-                        
-                        # Parse quarter from date
-                        period_str = str(col)[:10]
-                        period_date = datetime.strptime(period_str, "%Y-%m-%d")
-                        quarter_num = (period_date.month - 1) // 3 + 1
-                        quarter_str = f"{period_date.year}-Q{quarter_num}"
-                        
-                        result["quarterlyFinancials"].append({
-                            "period": period_str,
-                            "quarter": quarter_str,
-                            "fiscalYear": int(str(col)[:4]),
-                            "revenue": revenue / 1e9,  # Convert to billions
-                            "netIncome": net_income / 1e9,  # Convert to billions
-                            "eps": float(info.get('trailingEps', 0)) or 0,
-                            "operatingIncome": operating_income / 1e9,  # Convert to billions
-                            "operatingCashFlow": ocf / 1e9,  # Convert to billions
-                            "freeCashFlow": fcf / 1e9  # Convert to billions
-                        })
-                    except (ValueError, KeyError, TypeError):
-                        pass
-        except Exception as e:
-            pass
-        
-        # If still no financials, add a placeholder
-        if len(result["financials"]) == 0:
-            result["financials"].append({
-                "period": datetime.now().strftime("%Y-%m-%d"),
-                "fiscalYear": datetime.now().year,
-                "revenue": 0,
-                "netIncome": 0,
-                "eps": float(info.get('trailingEps', 0)) or 0,
-                "operatingIncome": 0,
-                "freeCashFlow": 0
-            })
-        
-        # Extract balance sheet data
+        # Get balance sheet data
         try:
             balance_sheet = ticker.balance_sheet
             if balance_sheet is not None and not balance_sheet.empty:
-                # Get the most recent balance sheet
+                # Get most recent balance sheet
                 col = balance_sheet.columns[0]
-                total_assets = float(balance_sheet.loc['Total Assets', col]) if 'Total Assets' in balance_sheet.index else 0
-                stockholders_equity = float(balance_sheet.loc['Stockholders Equity', col]) if 'Stockholders Equity' in balance_sheet.index else 0
-                total_liabilities = total_assets - stockholders_equity if total_assets > 0 else 0
                 
-                # Calculate book value per share
-                shares_out = result.get('sharesOutstanding', 0) or 1
-                book_value_per_share = stockholders_equity / shares_out if shares_out > 0 else 0
+                # Try multiple possible names for each field
+                total_assets = 0
+                for name in ['Total Assets', 'Assets']:
+                    if name in balance_sheet.index:
+                        try:
+                            total_assets = float(balance_sheet.loc[name, col])
+                            break
+                        except:
+                            pass
                 
-                # Get tangible book value (if available)
-                tangible_bv = float(balance_sheet.loc['Tangible Book Value', col]) if 'Tangible Book Value' in balance_sheet.index else stockholders_equity
-                tangible_bv_per_share = tangible_bv / shares_out if shares_out > 0 else 0
+                total_liabilities = 0
+                for name in ['Total Liabilities Net Minority Interest', 'Total Liabilities']:
+                    if name in balance_sheet.index:
+                        try:
+                            total_liabilities = float(balance_sheet.loc[name, col])
+                            break
+                        except:
+                            pass
                 
-                # Get total debt = Current Debt + Long Term Debt
-                current_debt = float(balance_sheet.loc['Current Debt', col]) if 'Current Debt' in balance_sheet.index else 0
-                long_term_debt = float(balance_sheet.loc['Long Term Debt', col]) if 'Long Term Debt' in balance_sheet.index else 0
-                total_debt = current_debt + long_term_debt
+                total_equity = 0
+                for name in ['Stockholders Equity', 'Total Equity Gross Minority Interest', 'Total Equity']:
+                    if name in balance_sheet.index:
+                        try:
+                            total_equity = float(balance_sheet.loc[name, col])
+                            break
+                        except:
+                            pass
                 
-                # Get cash and cash equivalents (from Current Assets section)
-                cash = float(balance_sheet.loc['Cash And Cash Equivalents', col]) if 'Cash And Cash Equivalents' in balance_sheet.index else 0
+                book_value_per_share = 0
+                for name in ['Tangible Book Value', 'Book Value Per Share']:
+                    if name in balance_sheet.index:
+                        try:
+                            book_value_per_share = float(balance_sheet.loc[name, col])
+                            break
+                        except:
+                            pass
+                
+                # Get debt data - try Total Debt first, then sum current + long term
+                total_debt = 0
+                if 'Total Debt' in balance_sheet.index:
+                    try:
+                        total_debt = float(balance_sheet.loc['Total Debt', col])
+                    except:
+                        pass
+                
+                if total_debt == 0:
+                    current_debt = 0
+                    long_term_debt = 0
+                    for name in ['Current Debt', 'Current Debt And Capital Lease Obligation']:
+                        if name in balance_sheet.index:
+                            try:
+                                current_debt = float(balance_sheet.loc[name, col])
+                                break
+                            except:
+                                pass
+                    for name in ['Long Term Debt', 'Long Term Debt And Capital Lease Obligation']:
+                        if name in balance_sheet.index:
+                            try:
+                                long_term_debt = float(balance_sheet.loc[name, col])
+                                break
+                            except:
+                                pass
+                    total_debt = current_debt + long_term_debt
+                
+                # Get cash data
+                cash = 0
+                for name in ['Cash And Cash Equivalents', 'Cash', 'Cash And Short Term Investments']:
+                    if name in balance_sheet.index:
+                        try:
+                            cash = float(balance_sheet.loc[name, col])
+                            break
+                        except:
+                            pass
+                
+                # Handle NaN values
+                if math.isnan(total_debt):
+                    total_debt = 0
+                if math.isnan(cash):
+                    cash = 0
+                if math.isnan(total_equity):
+                    total_equity = 0
+                if math.isnan(total_liabilities):
+                    total_liabilities = 0
+                if math.isnan(total_assets):
+                    total_assets = 0
                 
                 result["balanceSheet"] = {
-                    "totalAssets": total_assets / 1e9,  # Convert to billions
-                    "totalLiabilities": total_liabilities / 1e9,  # Convert to billions
-                    "totalEquity": stockholders_equity / 1e9,  # Convert to billions
+                    "totalAssets": (total_assets / 1e9) * conversion_rate,
+                    "totalLiabilities": (total_liabilities / 1e9) * conversion_rate,
+                    "totalEquity": (total_equity / 1e9) * conversion_rate,
                     "bookValuePerShare": book_value_per_share,
-                    "tangibleBookValuePerShare": tangible_bv_per_share,
-                    "totalDebt": total_debt / 1e9,  # Convert to billions
-                    "cash": cash / 1e9  # Convert to billions
+                    "tangibleBookValuePerShare": book_value_per_share,
+                    "totalDebt": (total_debt / 1e9) * conversion_rate,
+                    "cash": (cash / 1e9) * conversion_rate
                 }
         except Exception as e:
             pass
         
-        # Add historical bars (last 30 days)
-        result["historicalBars"] = []
-        for date, row in hist.tail(30).iterrows():
-            result["historicalBars"].append({
-                "date": date.strftime("%Y-%m-%d"),
-                "open": float(row['Open']),
-                "high": float(row['High']),
-                "low": float(row['Low']),
-                "close": float(row['Close']),
-                "volume": int(row['Volume'])
-            })
-        
-        # Sort quarterly financials by date (most recent first)
-        result["quarterlyFinancials"] = sorted(
-            result["quarterlyFinancials"],
-            key=lambda x: x["period"],
-            reverse=True
-        )
-        
         return result
-        
+    
     except Exception as e:
         return {
             "error": str(e),
             "symbol": symbol
         }
 
-def convert_nan_to_none(obj):
-    """Recursively convert NaN and Inf values to None for JSON serialization"""
-    if isinstance(obj, dict):
-        return {k: convert_nan_to_none(v) for k, v in obj.items()}
-    elif isinstance(obj, list):
-        return [convert_nan_to_none(item) for item in obj]
-    elif isinstance(obj, float):
-        if math.isnan(obj) or math.isinf(obj):
-            return None
-        return obj
-    return obj
-
-def main():
-    if len(sys.argv) < 2:
-        print(json.dumps({"error": "Symbol required"}))
-        sys.exit(1)
-    
-    symbol = sys.argv[1].upper()
-    data = get_stock_data(symbol)
-    # Convert NaN and Inf to None before JSON serialization
-    data = convert_nan_to_none(data)
-    print(json.dumps(data))
-
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) > 1:
+        symbol = sys.argv[1]
+        data = get_stock_data(symbol)
+        print(json.dumps(data, indent=2))
+    else:
+        print(json.dumps({"error": "Symbol required"}, indent=2))
