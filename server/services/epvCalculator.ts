@@ -35,7 +35,6 @@ export interface EPVValuation {
     normalizedNopat: number;
     wacc: number;
     marketGrowthRate: number;
-    zeroGrowthRate: number;
     taxRate: number;
     totalDebt: number;
     nonOperatingCash: number;
@@ -320,10 +319,9 @@ export function calculateEPV(
     confidence,
     llmGrowthRateInfo,
     assumptions: {
-      normalizedNopat,
+      normalizedNopat: normalizedNopat * 1000, // Convert to millions for UI display
       wacc: WACC * 100,
       marketGrowthRate: validatedGrowthRate * 100,
-      zeroGrowthRate: zeroGrowthRate * 100,
       taxRate: 15,
       totalDebt,
       nonOperatingCash,

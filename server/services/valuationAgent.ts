@@ -145,10 +145,9 @@ export async function analyzeValuation(input: ValuationInput): Promise<Valuation
       confidence: adjustedConfidence,
       narrative: epvValuation.narrative,
       assumptions: {
-        normalizedNopat: `$${(epvValuation.assumptions.normalizedNopat / 1000).toFixed(1)}B`,
+        normalizedNopat: `$${epvValuation.assumptions.normalizedNopat.toFixed(1)}M`,
         wacc: `${epvValuation.assumptions.wacc.toFixed(1)}%`,
         marketGrowthRate: `${epvValuation.assumptions.marketGrowthRate.toFixed(1)}%`,
-        zeroGrowthRate: `${epvValuation.assumptions.zeroGrowthRate.toFixed(1)}%`,
         taxRate: `${epvValuation.assumptions.taxRate}%`,
         dataAvailability: epvValuation.assumptions.dataAvailability,
         llmConfidence: growthRateInfo.confidence,
