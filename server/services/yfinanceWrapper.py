@@ -13,6 +13,22 @@ import yfinance as yf
 from datetime import datetime
 import math
 
+# Import currency detection utility
+try:
+    from currencyDetector import (
+        detect_financial_currency,
+        get_currency_info_dict,
+        convert_to_usd
+    )
+except ImportError:
+    # Fallback if module not found
+    def detect_financial_currency(info):
+        return info.get('financialCurrency', 'USD')
+    def get_currency_info_dict(currency):
+        return {'reportingCurrency': currency, 'conversionApplied': False, 'conversionRate': 1.0}
+    def convert_to_usd(value, currency):
+        return value
+
 # Disable SSL verification warnings
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -26,15 +42,8 @@ except Exception:
 os.environ['CURL_CA_BUNDLE'] = ''
 os.environ['REQUESTS_CA_BUNDLE'] = ''
 
-# RMB to USD conversion rate (approximate, can be updated)
-RMB_TO_USD_RATE = 1 / 7.0
-
-# List of Chinese companies that report in RMB
-CHINESE_COMPANY_TICKERS = {
-    'PDD', 'BIDU', 'NTES', 'JD', 'TCEHY', 'BABA', 'XPEV', 'NIO', 'LI', 'FUTU',
-    'DIDI', 'VIPS', 'GOTU', 'BILI', 'BZUN', 'CPNG', 'CMCSA', 'QFIN', 'JMIA',
-    'KNDI', 'RBLX', 'SOHU', 'SFUN', 'NOAH', 'VNET', 'CAFD', 'QIWI', 'BKNG'
-}
+# Note: Currency detection now uses yfinance's financialCurrency field via currencyDetector utility
+# This ensures consistent currency handling across all yfinance data fetching in the application
 
 def calculate_interest_coverage(ticker):
     """Calculate interest coverage ratio from EBIT / Interest Expense"""
@@ -61,34 +70,8 @@ def calculate_interest_coverage(ticker):
     
     return 0
 
-def detect_currency_needs_conversion(symbol, market_cap, revenue_billions):
-    """
-    Detect if financial data needs RMB to USD conversion
-    
-    Logic:
-    1. Check if company is known Chinese company
-    2. Check Revenue/Market Cap ratio - if > 2x, likely in RMB
-    3. Return True if conversion needed
-    """
-    
-    # Check if it's a known Chinese company
-    if symbol.upper() in CHINESE_COMPANY_TICKERS:
-        return True
-    
-    # Check Revenue/Market Cap ratio
-    if market_cap > 0 and revenue_billions > 0:
-        ratio = revenue_billions / (market_cap / 1e9)
-        # If revenue is > 2x market cap, likely in RMB
-        if ratio > 2.0:
-            return True
-    
-    return False
-
-def convert_currency(value, from_currency='RMB', to_currency='USD'):
-    """Convert financial values between currencies"""
-    if from_currency.upper() == 'RMB' and to_currency.upper() == 'USD':
-        return value * RMB_TO_USD_RATE
-    return value
+# Currency detection and conversion functions are now in currencyDetector.py
+# Use detect_financial_currency() and convert_to_usd() from that module
 
 def get_stock_data(symbol):
     """Fetch comprehensive stock data for a given symbol"""
@@ -227,17 +210,11 @@ def get_stock_data(symbol):
                     except (ValueError, KeyError, TypeError):
                         pass
             
-            # Detect if currency conversion is needed
-            ttm_revenue_billions = ttm_data["revenue"] / 1e9
-            market_cap = float(info.get('marketCap', 0))
-            needs_conversion = detect_currency_needs_conversion(symbol, market_cap, ttm_revenue_billions)
-            
-            # Apply conversion if needed
-            conversion_rate = RMB_TO_USD_RATE if needs_conversion else 1.0
-            result["currencyInfo"]["conversionApplied"] = needs_conversion
-            result["currencyInfo"]["conversionRate"] = conversion_rate
-            if needs_conversion:
-                result["currencyInfo"]["reportingCurrency"] = "RMB (converted to USD)"
+            # Detect currency and get conversion info
+            financial_currency = detect_financial_currency(info)
+            currency_info = get_currency_info_dict(financial_currency)
+            result["currencyInfo"] = currency_info
+            conversion_rate = currency_info["conversionRate"]
             
             # Add TTM as the first entry
             if ttm_data["revenue"] > 0 or ttm_data["operating_income"] > 0:

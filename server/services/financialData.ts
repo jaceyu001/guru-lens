@@ -19,6 +19,15 @@ import json
 import sys
 import pandas as pd
 
+# Import currency detection utility
+try:
+    from currencyDetector import detect_financial_currency, get_currency_info_dict
+except ImportError:
+    def detect_financial_currency(info):
+        return info.get('financialCurrency', 'USD')
+    def get_currency_info_dict(currency):
+        return {'reportingCurrency': currency, 'conversionApplied': False, 'conversionRate': 1.0}
+
 try:
     ticker = yf.Ticker("${symbol}")
     
@@ -28,7 +37,12 @@ try:
     # Get info
     info = ticker.info
     
-    # Get balance sheet data
+    # Detect financial currency and get conversion info
+    financial_currency = detect_financial_currency(info)
+    currency_info = get_currency_info_dict(financial_currency)
+    conversion_rate = currency_info['conversionRate']
+    
+    # Get balance sheet data (apply currency conversion if needed)
     total_assets = 0
     total_liabilities = 0
     total_equity = 0
@@ -38,24 +52,24 @@ try:
         bs = ticker.balance_sheet
         if bs is not None and not bs.empty:
             latest_bs = bs.iloc[:, 0]  # Most recent column
-            total_assets = float(latest_bs.get('Total Assets', 0)) or 0
+            total_assets = (float(latest_bs.get('Total Assets', 0)) or 0) / 1e9 * conversion_rate
             # Get total equity - try multiple field names
-            total_equity = float(latest_bs.get('Stockholders Equity', 0)) or float(latest_bs.get('Total Stockholder Equity', 0)) or float(latest_bs.get('Common Stock Equity', 0)) or 0
+            total_equity = (float(latest_bs.get('Stockholders Equity', 0)) or float(latest_bs.get('Total Stockholder Equity', 0)) or float(latest_bs.get('Common Stock Equity', 0)) or 0) / 1e9 * conversion_rate
             # Get total liabilities
-            total_liabilities = float(latest_bs.get('Total Liabilities Net Minority Interest', 0)) or 0
+            total_liabilities = (float(latest_bs.get('Total Liabilities Net Minority Interest', 0)) or 0) / 1e9 * conversion_rate
             # If we don't have liabilities, calculate from assets - equity
             if total_liabilities == 0 and total_assets > 0 and total_equity > 0:
                 total_liabilities = total_assets - total_equity
     except Exception as e:
         pass
     
-    # Calculate earnings growth from income statement
+    # Calculate earnings growth from income statement (apply currency conversion if needed)
     earnings_growth = 0
     revenue_growth = info.get("revenueGrowth", 0)
     try:
         income_stmt = ticker.income_stmt
         if income_stmt is not None and not income_stmt.empty and len(income_stmt.columns) >= 2:
-            # Get net income for current and previous year
+            # Get net income for current and previous year (already in same currency, so ratio is unaffected)
             current_ni = float(income_stmt.iloc[:, 0].get('Net Income', 0)) or 0
             previous_ni = float(income_stmt.iloc[:, 1].get('Net Income', 0)) or 0
             if previous_ni != 0:
@@ -67,14 +81,14 @@ try:
         if current_eps > 0:
             earnings_growth = (forward_eps - current_eps) / current_eps
     
-    # Extract key data
+    # Extract key data (apply currency conversion if needed)
     data = {
         "symbol": "${symbol}",
         "current_price": info.get("currentPrice", info.get("regularMarketPrice", 0)),
         "shares_outstanding": info.get("sharesOutstanding", 0),
-        "market_cap": info.get("marketCap", 0),
-        "revenue": info.get("totalRevenue", 0),
-        "net_income": info.get("netIncome", 0),
+        "market_cap": info.get("marketCap", 0) * conversion_rate,
+        "revenue": (info.get("totalRevenue", 0) / 1e9) * conversion_rate,
+        "net_income": (info.get("netIncome", 0) / 1e9) * conversion_rate,
         "eps": info.get("trailingEps", 0),
         "pe_ratio": info.get("trailingPE", 0),
         "pb_ratio": info.get("priceToBook", 0),
