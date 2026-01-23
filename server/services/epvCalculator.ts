@@ -50,41 +50,57 @@ export interface EPVValuation {
  * Calculate 4-year normalized NOPAT
  * Uses: TTM, FY2024, FY2023, FY2022
  * Formula: Average Operating Income × (1 - 15% Tax Rate)
+ * 
+ * Handles mixed profitability:
+ * - Includes ALL years (positive and negative) for accurate normalization
+ * - If average is negative, returns 0 (company is destroying value)
+ * - Flags data quality issues for unprofitable periods
  */
 export function calculateNormalizedNOPAT(financialData: FinancialData): {
   nopat: number;
   dataPoints: number;
   dataAvailability: string;
+  hasNegativePeriods: boolean;
 } {
   const operatingIncomes: number[] = [];
   const dataPoints: string[] = [];
   const TAX_RATE = 0.15; // Fixed 15% tax rate
+  let hasNegativePeriods = false;
 
   // Extract operating income from financials array
   // Expected order: [TTM, FY2024, FY2023, FY2022]
+  // IMPORTANT: Include ALL years (positive and negative) for accurate normalization
   if (financialData.financials && financialData.financials.length > 0) {
     for (let i = 0; i < Math.min(4, financialData.financials.length); i++) {
       const fin = financialData.financials[i];
-      if (fin.operatingIncome !== undefined && fin.operatingIncome > 0) {
+      if (fin.operatingIncome !== undefined) {
         operatingIncomes.push(fin.operatingIncome);
         dataPoints.push(fin.period);
+        if (fin.operatingIncome < 0) {
+          hasNegativePeriods = true;
+        }
       }
     }
   }
 
-  // Calculate average operating income
+  // Calculate average operating income (including negative values)
   const avgOperatingIncome = operatingIncomes.length > 0 
     ? operatingIncomes.reduce((a, b) => a + b, 0) / operatingIncomes.length 
     : 0;
 
-  // Calculate NOPAT: Operating Income × (1 - Tax Rate)
-  const normalizedNopat = avgOperatingIncome * (1 - TAX_RATE);
+  // If average is negative or zero, the company is not generating sustainable earnings
+  // Set NOPAT to 0 to indicate inability to value using EPV
+  const normalizedNopat = avgOperatingIncome > 0 
+    ? avgOperatingIncome * (1 - TAX_RATE)
+    : 0;
+
   const dataAvailability = `${operatingIncomes.length} years (${dataPoints.join(", ")})`;
 
   return {
     nopat: normalizedNopat,
     dataPoints: operatingIncomes.length,
     dataAvailability,
+    hasNegativePeriods,
   };
 }
 
@@ -206,7 +222,7 @@ export function calculateEPV(
   }
 
   // Calculate normalized NOPAT
-  const { nopat: normalizedNopat, dataPoints, dataAvailability } = calculateNormalizedNOPAT(financialData);
+  const { nopat: normalizedNopat, dataPoints, dataAvailability, hasNegativePeriods } = calculateNormalizedNOPAT(financialData);
 
   // Get debt and cash data from balance sheet
   const totalDebt = financialData.balanceSheet?.totalDebt || 0;
@@ -282,6 +298,10 @@ export function calculateEPV(
 
   if (normalizedNopat <= 0) {
     limitations.push("Negative or zero NOPAT - valuation may not be reliable");
+  }
+
+  if (hasNegativePeriods) {
+    limitations.push("Company has unprofitable periods - suggests financial distress or turnaround situation");
   }
 
   return {

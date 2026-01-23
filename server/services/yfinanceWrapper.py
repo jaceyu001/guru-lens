@@ -382,11 +382,13 @@ def get_stock_data(symbol):
                             break
                         except:
                             pass
-                    total_debt = current_debt + long_term_debt
                 
-                # Get cash data
+                total_debt = current_debt + long_term_debt
+                
+                # Get cash data (including short-term investments)
+                # Priority: Cash Cash Equivalents And Short Term Investments > Cash And Cash Equivalents
                 cash = 0
-                for name in ['Cash And Cash Equivalents', 'Cash', 'Cash And Short Term Investments']:
+                for name in ['Cash Cash Equivalents And Short Term Investments', 'Cash And Cash Equivalents', 'Cash', 'Cash And Short Term Investments']:
                     if name in balance_sheet.index:
                         try:
                             cash = float(balance_sheet.loc[name, col])
