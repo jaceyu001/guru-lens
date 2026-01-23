@@ -279,7 +279,7 @@ export default function Ticker() {
                   {isMetricAnomalous("Debt/Equity") && <Badge variant="destructive" className="text-xs">TBC</Badge>}
                 </div>
                 <div className={`font-semibold font-mono-numbers ${isMetricAnomalous("Debt/Equity") ? "text-yellow-600" : ""}`}>
-                  {ratios.debtToEquity.toFixed(2)}%
+                  {(ratios.debtToEquity * 100).toFixed(2)}%
                 </div>
               </div>
             )}

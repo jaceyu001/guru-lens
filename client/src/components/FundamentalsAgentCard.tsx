@@ -301,7 +301,7 @@ export function FundamentalsAgentCard({ findings, isLoading }: FundamentalsAgent
                 <div>
                   <p className="text-sm text-slate-600">Debt/Equity</p>
                   <p className="text-lg font-semibold text-slate-900">
-                    {findings.financialHealth.debtToEquity !== null ? `${findings.financialHealth.debtToEquity.toFixed(1)}%` : "N/A"}
+                    {findings.financialHealth.debtToEquity !== null ? `${(findings.financialHealth.debtToEquity * 100).toFixed(1)}%` : "N/A"}
                   </p>
                 </div>
                 <div>
