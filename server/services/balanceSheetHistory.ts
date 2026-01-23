@@ -18,8 +18,23 @@ import yfinance as yf
 import json
 import pandas as pd
 
+# Import currency detection utility
+try:
+    from currencyDetector import detect_financial_currency, get_currency_info_dict
+except ImportError:
+    def detect_financial_currency(info):
+        return info.get('financialCurrency', 'USD')
+    def get_currency_info_dict(currency):
+        return {'reportingCurrency': currency, 'conversionApplied': False, 'conversionRate': 1.0}
+
 try:
     ticker = yf.Ticker("${symbol}")
+    info = ticker.info
+    
+    # Detect financial currency and get conversion rate
+    financial_currency = detect_financial_currency(info)
+    currency_info = get_currency_info_dict(financial_currency)
+    conversion_rate = currency_info['conversionRate']
     
     # Get annual balance sheets (last 4 years)
     bs_annual = ticker.balance_sheet
@@ -32,17 +47,18 @@ try:
             try:
                 bs_data = bs_annual[date_col]
                 
-                total_assets = float(bs_data.get('Total Assets', 0)) or 0
-                total_equity = float(bs_data.get('Stockholders Equity', 0)) or float(bs_data.get('Common Stock Equity', 0)) or 0
-                total_liabilities = float(bs_data.get('Total Liabilities Net Minority Interest', 0)) or 0
+                # Apply currency conversion to all balance sheet items
+                total_assets = (float(bs_data.get('Total Assets', 0)) or 0) / 1e9 * conversion_rate
+                total_equity = (float(bs_data.get('Stockholders Equity', 0)) or float(bs_data.get('Common Stock Equity', 0)) or 0) / 1e9 * conversion_rate
+                total_liabilities = (float(bs_data.get('Total Liabilities Net Minority Interest', 0)) or 0) / 1e9 * conversion_rate
                 
                 # Calculate if not available
                 if total_liabilities == 0 and total_assets > 0 and total_equity > 0:
                     total_liabilities = total_assets - total_equity
                 
-                total_debt = float(bs_data.get('Total Debt', 0)) or 0
-                current_assets = float(bs_data.get('Current Assets', 0)) or 0
-                current_liabilities = float(bs_data.get('Current Liabilities', 0)) or 0
+                total_debt = (float(bs_data.get('Total Debt', 0)) or 0) / 1e9 * conversion_rate
+                current_assets = (float(bs_data.get('Current Assets', 0)) or 0) / 1e9 * conversion_rate
+                current_liabilities = (float(bs_data.get('Current Liabilities', 0)) or 0) / 1e9 * conversion_rate
                 
                 # Calculate ratios
                 de_ratio = (total_debt / total_equity) if total_equity > 0 else 0
@@ -61,11 +77,17 @@ try:
                     "debt_to_equity": de_ratio,
                     "current_ratio": current_ratio,
                     "timestamp": date_col.isoformat(),
+                    "currency_info": currency_info,
                 })
             except Exception as e:
                 continue
     
-    print(json.dumps(results))
+    # Include currency info in response
+    response = {
+        "data": results,
+        "currency_info": currency_info
+    }
+    print(json.dumps(response))
 except Exception as e:
     print(json.dumps({"error": str(e)}))
 `;
@@ -81,7 +103,10 @@ except Exception as e:
       return [];
     }
 
-    return data.map((item: any) => ({
+    // Handle new response structure with currency_info
+    const balanceSheets = Array.isArray(data) ? data : data.data || [];
+
+    return balanceSheets.map((item: any) => ({
       symbol: item.symbol,
       period: item.period,
       year: item.year,
