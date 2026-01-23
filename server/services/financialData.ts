@@ -181,17 +181,14 @@ export async function getFinancialData(symbol: string): Promise<FinancialData | 
   // Convert shares outstanding from individual shares to millions
   const sharesOutstandingInMillions = data.shares_outstanding ? data.shares_outstanding / 1000000 : 0;
 
-  // Calculate proper debt-to-equity using balance sheet data
-  // IMPORTANT: Always use balance sheet calculation (total_debt / total_equity) as it's more accurate
-  // yfinance's debtToEquity field is often incorrect for international companies
-  let debtToEquity = 0;
+  // Use yfinance's debtToEquity field directly
+  // yfinance returns this as a percentage (e.g., 2.727 for 2.727%)
+  // Convert to decimal by dividing by 100
+  let debtToEquity = Number((data.debt_to_equity / 100)?.toFixed(4) || 0);
   
-  // Prefer balance sheet calculation if available
-  if (data.total_equity > 0 && data.total_debt > 0) {
+  // If debtToEquity is not available or is 0, try to calculate from balance sheet
+  if (!debtToEquity && data.total_equity > 0 && data.total_debt > 0) {
     debtToEquity = Number((data.total_debt / data.total_equity)?.toFixed(4) || 0);
-  } else if (data.debt_to_equity > 0) {
-    // Fallback to yfinance value if balance sheet data unavailable
-    debtToEquity = Number((data.debt_to_equity)?.toFixed(4) || 0);
   }
 
   return {
