@@ -127,7 +127,7 @@ def get_stock_data(symbol):
                 "pb": float(info.get('priceToBook', 0)) or 0,
                 "ps": float(info.get('priceToSalesTrailing12Months', 0)) or 0,
                 "currentRatio": float(info.get('currentRatio', 0)) or 0,
-                "debtToEquity": float(info.get('debtToEquity', 0)) or 0,
+                "debtToEquity": (float(info.get('debtToEquity', 0)) or 0) / 100,  # Convert from percentage to decimal
                 "interestCoverage": calculate_interest_coverage(ticker),
                 "roe": (float(info.get('returnOnEquity', 0)) or 0) * 100,
                 "roic": (float(info.get('returnOnCapital', 0)) or 0) * 100,
