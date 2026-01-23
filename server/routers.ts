@@ -189,190 +189,209 @@ export const appRouter = router({
           } as any),
         ]).catch(() => [undefined, undefined]);
         
-        // Run analysis for each persona
-        const analyses: AnalysisOutput[] = [];
-        for (const persona of validPersonas) {
+        // PHASE 1 OPTIMIZATION: Pre-compute shared data (computed once, not per persona)
+        const price = financialData.price!;
+        const stockPrice = {
+          symbol: input.symbol,
+          current: price.current,
+          open: price.open,
+          high: price.high,
+          low: price.low,
+          close: price.current,
+          volume: price.volume,
+          previousClose: price.current - price.change,
+          change: price.change,
+          changePercent: price.changePercent,
+          timestamp: price.timestamp,
+        };
+        
+        const profile = financialData.profile!;
+        const companyProfile = {
+          symbol: input.symbol,
+          companyName: ticker.companyName || input.symbol,
+          sector: profile.sector,
+          industry: profile.industry,
+          description: profile.description,
+          employees: profile.employees,
+          website: profile.website,
+          marketCap: parseFloat(ticker.marketCap || "0"),
+        };
+        
+        const ratios = financialData.ratios!;
+        const roePercent = (ratios.roe || 0);
+        const roaPercent = ((ratios.roe || 0) * 0.5);
+        const roicPercent = (ratios.roic || 0);
+        const netMarginPercent = (ratios.netMargin || 0);
+        const operatingMarginPercent = (ratios.operatingMargin || 0);
+        const grossMarginPercent = (ratios.grossMargin || 0);
+        
+        let pegRatio = 0;
+        const peRatio = ratios.pe || 0;
+        const earningsGrowth = ratios.earningsGrowth || 0;
+        
+        if (peRatio > 0 && earningsGrowth > 0) {
+          pegRatio = peRatio / (earningsGrowth * 100);
+        }
+        
+        const dataQualityFlags = {
+          peNegative: peRatio < 0,
+          pegUndefined: pegRatio === 0,
+          earningsCollapse: earningsGrowth < -0.10,
+          revenueDecline: (ratios.revenueGrowth || 0) < 0,
+        };
+        
+        const keyRatios = {
+          symbol: input.symbol,
+          peRatio: peRatio,
+          pbRatio: ratios.pb || 0,
+          psRatio: ratios.ps || 0,
+          pegRatio: pegRatio,
+          dividendYield: 0,
+          payoutRatio: 0,
+          roe: roePercent,
+          roa: roaPercent,
+          roic: roicPercent,
+          currentRatio: ratios.currentRatio || 0,
+          quickRatio: (ratios.currentRatio || 0) * 0.8,
+          debtToEquity: ratios.debtToEquity || 0,
+          interestCoverage: 10,
+          grossMargin: grossMarginPercent,
+          operatingMargin: operatingMarginPercent,
+          netMargin: netMarginPercent,
+          assetTurnover: 1.0,
+          inventoryTurnover: 8.0,
+        };
+        
+        const financials = (financialData.financials || []).map(f => ({
+          period: f.period,
+          periodType: "quarterly" as const,
+          fiscalYear: f.fiscalYear,
+          revenue: f.revenue,
+          costOfRevenue: f.revenue * 0.6,
+          grossProfit: f.revenue * 0.4,
+          operatingExpenses: f.revenue * 0.2,
+          operatingIncome: f.revenue * 0.2,
+          netIncome: f.netIncome,
+          eps: f.eps,
+          ebitda: f.revenue * 0.25,
+          freeCashFlow: f.netIncome * 0.8,
+          totalAssets: f.revenue * 3,
+          totalLiabilities: f.revenue * 1.5,
+          shareholderEquity: f.revenue * 1.5,
+          cashAndEquivalents: f.revenue * 0.5,
+          totalDebt: f.revenue * 0.8,
+        }));
+        
+        // PHASE 1 OPTIMIZATION: Parallelize persona analysis with Promise.allSettled()
+        const analysisPromises = validPersonas.map(async (persona) => {
           try {
-          // Prepare input for AI analysis
-          const price = financialData.price!;
-          const stockPrice = {
-            symbol: input.symbol,
-            current: price.current,
-            open: price.open,
-            high: price.high,
-            low: price.low,
-            close: price.current,
-            volume: price.volume,
-            previousClose: price.current - price.change,
-            change: price.change,
-            changePercent: price.changePercent,
-            timestamp: price.timestamp,
-          };
-          
-          const profile = financialData.profile!;
-          const companyProfile = {
-            symbol: input.symbol,
-            companyName: ticker.companyName || input.symbol,
-            sector: profile.sector,
-            industry: profile.industry,
-            description: profile.description,
-            employees: profile.employees,
-            website: profile.website,
-            marketCap: parseFloat(ticker.marketCap || "0"),
-          };
-          
-          const ratios = financialData.ratios!;
-          // NOTE: yfinanceWrapper.py already converts to percentages (multiplies by 100)
-          // So ratios.roe is already in percentage format (e.g., -7.4 for -7.4%)
-          // Do NOT multiply by 100 again
-          const roePercent = (ratios.roe || 0);
-          const roaPercent = ((ratios.roe || 0) * 0.5);
-          const roicPercent = (ratios.roic || 0);
-          const netMarginPercent = (ratios.netMargin || 0);
-          const operatingMarginPercent = (ratios.operatingMargin || 0);
-          const grossMarginPercent = (ratios.grossMargin || 0);
-          
-          // Calculate PEG correctly: only valid for profitable, growing companies
-          let pegRatio = 0;
-          const peRatio = ratios.pe || 0;
-          const earningsGrowth = ratios.earningsGrowth || 0;
-          
-          // PEG is undefined if:
-          // 1. Company is unprofitable (negative P/E)
-          // 2. Earnings are not growing positively
-          if (peRatio > 0 && earningsGrowth > 0) {
-            // Standard PEG formula: P/E / Earnings Growth Rate (%)
-            // earningsGrowth is in decimal form (e.g., 0.15 for 15%)
-            pegRatio = peRatio / (earningsGrowth * 100);
-          }
-          // Otherwise pegRatio stays 0 (representing undefined/N/A)
-          
-          // Build data quality flags
-          const dataQualityFlags = {
-            peNegative: peRatio < 0,
-            pegUndefined: pegRatio === 0,
-            earningsCollapse: earningsGrowth < -0.10,
-            revenueDecline: (ratios.revenueGrowth || 0) < 0,
-          };
-          
-          const keyRatios = {
-            symbol: input.symbol,
-            peRatio: peRatio,
-            pbRatio: ratios.pb || 0,
-            psRatio: ratios.ps || 0,
-            pegRatio: pegRatio,
-            dividendYield: 0,
-            payoutRatio: 0,
-            roe: roePercent,
-            roa: roaPercent,
-            roic: roicPercent,
-            currentRatio: ratios.currentRatio || 0,
-            quickRatio: (ratios.currentRatio || 0) * 0.8,
-            debtToEquity: ratios.debtToEquity || 0,
-            interestCoverage: 10,
-            grossMargin: grossMarginPercent,
-            operatingMargin: operatingMarginPercent,
-            netMargin: netMarginPercent,
-            assetTurnover: 1.0,
-            inventoryTurnover: 8.0,
-          };
-          
-          const financials = (financialData.financials || []).map(f => ({
-            period: f.period,
-            periodType: "quarterly" as const,
-            fiscalYear: f.fiscalYear,
-            revenue: f.revenue,
-            costOfRevenue: f.revenue * 0.6,
-            grossProfit: f.revenue * 0.4,
-            operatingExpenses: f.revenue * 0.2,
-            operatingIncome: f.revenue * 0.2,
-            netIncome: f.netIncome,
-            eps: f.eps,
-            ebitda: f.revenue * 0.25,
-            freeCashFlow: f.netIncome * 0.8,
-            totalAssets: f.revenue * 3,
-            totalLiabilities: f.revenue * 1.5,
-            shareholderEquity: f.revenue * 1.5,
-            cashAndEquivalents: f.revenue * 0.5,
-            totalDebt: f.revenue * 0.8,
-          }));
-          
-          const analysisInput = {
-            symbol: input.symbol,
-            personaId: persona.personaId,
-            personaName: persona.name,
-            price: stockPrice,
-            profile: companyProfile,
-            financials,
-            ratios: keyRatios,
-            dataQualityFlags: financialData.dataQualityFlags,
-            fundamentalsFindings,
-            valuationFindings,
-          };
-          
-          const result = await aiAnalysisEngine.analyzeStock(analysisInput);
-          
-          const runId = nanoid(16);
-          
-          // Map AI verdict to database verdict format
-          const dbVerdict = result.verdict === "strong_fit" ? "Strong Fit" :
-                           result.verdict === "moderate_fit" ? "Fit" :
-                           result.verdict === "weak_fit" ? "Borderline" :
-                           result.verdict === "poor_fit" ? "Not a Fit" : "Insufficient Data";
-          
-          // Create run metadata
-          const runMetadata = {
-            model: "manus-llm",
-            version: "1.0",
-            runTime: 0,
-            inputsHash: nanoid(8),
-            mode: input.mode,
-          };
-          
-          // Convert dataUsed to DataSource array
-          const dataUsed = [{
-            source: result.dataUsed.sources[0] || "Financial Data API",
-            endpoint: "/api/financial-data",
-            timestamp: result.dataUsed.priceAsOf.getTime(),
-          }];
-          
-          const analysisId = await db.createAnalysis({
-            tickerId: ticker.id,
-            personaId: persona.id,
-            runId,
-            score: result.score,
-            verdict: dbVerdict,
-            confidence: result.confidence.toString(),
-            summaryBullets: result.summaryBullets,
-            criteria: result.criteria,
-            keyRisks: result.keyRisks,
-            whatWouldChangeMind: result.whatWouldChangeMind,
-            dataUsed,
-            citations: [],
-            runMetadata,
-            runTimestamp: new Date(),
-          });
-          
-          analyses.push({
-            id: analysisId,
-            runId,
-            ticker: input.symbol,
-            personaId: persona.personaId,
-            personaName: persona.name,
-            score: result.score,
-            verdict: dbVerdict,
-            confidence: result.confidence,
-            summaryBullets: result.summaryBullets,
-            criteria: result.criteria,
-            keyRisks: result.keyRisks,
-            whatWouldChangeMind: result.whatWouldChangeMind,
-            dataUsed,
-            citations: [],
-            runMetadata,
-            runTimestamp: new Date(),
-          });
+            const analysisInput = {
+              symbol: input.symbol,
+              personaId: persona.personaId,
+              personaName: persona.name,
+              price: stockPrice,
+              profile: companyProfile,
+              financials,
+              ratios: keyRatios,
+              dataQualityFlags: financialData.dataQualityFlags,
+              fundamentalsFindings,
+              valuationFindings,
+            };
+            
+            const result = await aiAnalysisEngine.analyzeStock(analysisInput);
+            
+            const runId = nanoid(16);
+            
+            // Map AI verdict to database verdict format
+            const dbVerdict = result.verdict === "strong_fit" ? "Strong Fit" :
+                             result.verdict === "moderate_fit" ? "Fit" :
+                             result.verdict === "weak_fit" ? "Borderline" :
+                             result.verdict === "poor_fit" ? "Not a Fit" : "Insufficient Data";
+            
+            // Create run metadata
+            const runMetadata = {
+              model: "manus-llm",
+              version: "1.0",
+              runTime: 0,
+              inputsHash: nanoid(8),
+              mode: input.mode,
+            };
+            
+            // Convert dataUsed to DataSource array
+            const dataUsed = [{
+              source: result.dataUsed.sources[0] || "Financial Data API",
+              endpoint: "/api/financial-data",
+              timestamp: result.dataUsed.priceAsOf.getTime(),
+            }];
+            
+            return {
+              persona,
+              result,
+              dbVerdict,
+              runMetadata,
+              dataUsed,
+              runId,
+            };
           } catch (error) {
             console.error(`[runAnalysis] Error analyzing ${input.symbol} for persona ${persona.name}:`, error);
+            return null;
+          }
+        });
+        
+        // Wait for all personas to complete analysis in parallel
+        const analysisResults = await Promise.allSettled(analysisPromises);
+        
+        // Process results and prepare for batch database write
+        const analysesToCreate = [];
+        const analyses: AnalysisOutput[] = [];
+        
+        for (const result of analysisResults) {
+          if (result.status === 'fulfilled' && result.value) {
+            const { persona, result: aiResult, dbVerdict, runMetadata, dataUsed, runId } = result.value;
+            
+            analysesToCreate.push({
+              tickerId: ticker.id,
+              personaId: persona.id,
+              runId,
+              score: aiResult.score,
+              verdict: dbVerdict as "Strong Fit" | "Fit" | "Borderline" | "Not a Fit" | "Insufficient Data",
+              confidence: aiResult.confidence.toString(),
+              summaryBullets: aiResult.summaryBullets,
+              criteria: aiResult.criteria,
+              keyRisks: aiResult.keyRisks,
+              whatWouldChangeMind: aiResult.whatWouldChangeMind,
+              dataUsed,
+              citations: [],
+              runMetadata,
+              runTimestamp: new Date(),
+            });
+            
+            analyses.push({
+              id: 0,
+              runId,
+              ticker: input.symbol,
+              personaId: persona.personaId,
+              personaName: persona.name,
+              score: aiResult.score,
+              verdict: dbVerdict as "Strong Fit" | "Fit" | "Borderline" | "Not a Fit" | "Insufficient Data",
+              confidence: aiResult.confidence,
+              summaryBullets: aiResult.summaryBullets,
+              criteria: aiResult.criteria,
+              keyRisks: aiResult.keyRisks,
+              whatWouldChangeMind: aiResult.whatWouldChangeMind,
+              dataUsed,
+              citations: [],
+              runMetadata,
+              runTimestamp: new Date(),
+            });
+          }
+        }
+        
+        // PHASE 1 OPTIMIZATION: Batch insert all analyses at once
+        if (analysesToCreate.length > 0) {
+          const analysisIds = await db.createAnalysisMany(analysesToCreate);
+          for (let i = 0; i < analyses.length; i++) {
+            analyses[i].id = analysisIds[i];
           }
         }
         

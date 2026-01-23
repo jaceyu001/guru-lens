@@ -200,6 +200,18 @@ export async function createAnalysis(analysis: InsertAnalysis): Promise<number> 
   return Number(result.insertId);
 }
 
+export async function createAnalysisMany(analysisArray: InsertAnalysis[]): Promise<number[]> {
+  if (!analysisArray || analysisArray.length === 0) return [];
+  
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const result = await db.insert(analyses).values(analysisArray) as any;
+  const startId = Number(result.insertId);
+  
+  return Array.from({ length: analysisArray.length }, (_, i) => startId + i);
+}
+
 export async function getLatestAnalysis(tickerId: number, personaId: number): Promise<Analysis | undefined> {
   const db = await getDb();
   if (!db) return undefined;
