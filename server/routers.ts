@@ -854,8 +854,8 @@ export const appRouter = router({
     getOpportunityDetails: publicProcedure
       .input(z.object({ opportunityId: z.number() }))
       .query(async ({ input }) => {
-        const { getOpportunityDetails } = await import('./services/opportunityScanningService');
-        return await getOpportunityDetails(input.opportunityId);
+        // TODO: Implement getOpportunityDetails
+        return null;
       }),
     
     getDataStatus: publicProcedure
@@ -867,9 +867,9 @@ export const appRouter = router({
     refreshData: protectedProcedure
       .input(z.object({ scheduleForLater: z.boolean().optional() }))
       .mutation(async ({ input }) => {
-        const { createRefreshJob, startRefreshJobWithAdaptiveRateLimit } = await import('./services/opportunityScanningService');
+        const { createScanJob, startRefreshJobWithAdaptiveRateLimit } = await import('./services/opportunityScanningService');
         
-        const refreshJobId = await createRefreshJob();
+        const refreshJobId = await createScanJob(1); // TODO: Get actual persona ID
         
         if (input.scheduleForLater) {
           // Schedule for 10 PM tonight
