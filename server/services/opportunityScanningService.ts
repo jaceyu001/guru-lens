@@ -9,6 +9,7 @@ import { getDb } from "../db";
 import { scanJobs, scanOpportunities, scanOpportunityAnalyses, tickers } from "../../drizzle/schema";
 import { calculatePersonaScore, getPersonaMinThreshold } from "./personaScoringEngine";
 import { invokeLLM } from "../_core/llm";
+import { PERSONA_PROMPTS } from "./personaPrompts";
 import type { KeyRatios } from "../../shared/types";
 import { eq, desc } from "drizzle-orm";
 
@@ -640,6 +641,70 @@ export async function startRefreshJobWithAdaptiveRateLimit(
       }
     }
 
+    // Phase 2: LLM Analysis for top 50 opportunities (if this is a scan job)
+    if (refreshJobId > 0) {
+      console.log(`[RefreshJob] 🤖 Starting Phase 2: LLM Analysis for top opportunities`);
+      
+      await database
+        .update(scanJobs)
+        .set({
+          phase: "llm_analysis",
+        })
+        .where(eq(scanJobs.id, refreshJobId));
+
+      // Get top 50 opportunities for this scan
+      const topOpportunities = await database
+        .select({
+          id: scanOpportunities.id,
+          tickerId: scanOpportunities.tickerId,
+          personaId: scanOpportunities.personaId,
+          metricsJson: scanOpportunities.metricsJson,
+        })
+        .from(scanOpportunities)
+        .where(eq(scanOpportunities.scanJobId, refreshJobId))
+        .orderBy(desc(scanOpportunities.score))
+        .limit(50);
+
+      // Generate LLM analysis for each opportunity
+      let llmAnalysesCompleted = 0;
+      for (const opp of topOpportunities) {
+        try {
+          // Get ticker symbol from tickerId
+          const ticker = await database
+            .select({ symbol: tickers.symbol, name: tickers.companyName })
+            .from(tickers)
+            .where(eq(tickers.id, opp.tickerId))
+            .limit(1);
+
+          if (ticker && ticker[0]) {
+            // Generate LLM analysis
+            await generateLLMAnalysisForOpportunity(
+              opp.id,
+              opp.personaId,
+              ticker[0].symbol,
+              ticker[0].name || '',
+              opp.metricsJson as Record<string, any>
+            );
+
+            llmAnalysesCompleted++;
+
+            // Update progress
+            await database
+              .update(scanJobs)
+              .set({
+                llmAnalysesCompleted,
+              })
+              .where(eq(scanJobs.id, refreshJobId));
+          }
+        } catch (error) {
+          console.error(`[RefreshJob] Error generating LLM analysis for opportunity ${opp.id}:`, error);
+          // Continue with next opportunity
+        }
+      }
+
+      console.log(`[RefreshJob] ✅ Completed LLM analysis for ${llmAnalysesCompleted} opportunities`);
+    }
+
     // Mark as completed
     const endTime = new Date();
     const durationMinutes = Math.round(
@@ -833,4 +898,121 @@ export async function createRefreshJob(): Promise<number> {
   });
 
   return (result as any).insertId as number;
+}
+
+
+/**
+ * Generate LLM analysis for a qualified opportunity
+ * Uses existing persona prompts to generate investment thesis
+ */
+export async function generateLLMAnalysisForOpportunity(
+  opportunityId: number,
+  personaId: number,
+  ticker: string,
+  companyName: string,
+  financialData: Record<string, any>
+): Promise<void> {
+  const database = await ensureDb();
+
+  try {
+    // Get persona prompt
+    const { PERSONA_PROMPTS } = await import('./personaPrompts');
+    const personaKey = Object.keys(PERSONA_PROMPTS)[personaId - 1]; // Assuming personaId 1-6 maps to prompts
+    
+    if (!personaKey || !PERSONA_PROMPTS[personaKey]) {
+      console.warn(`[LLM Analysis] No prompt found for persona ${personaId}`);
+      return;
+    }
+
+    const personaPrompt = PERSONA_PROMPTS[personaKey];
+
+    // Build LLM prompt with financial data
+    const userPrompt = `
+Analyze ${ticker} (${companyName}) for opportunity investment.
+
+Financial Metrics:
+- Current Price: $${financialData.price?.current || 'N/A'}
+- P/E Ratio: ${financialData.ratios?.pe || 'N/A'}
+- ROE: ${financialData.ratios?.roe || 'N/A'}%
+- Profit Margin: ${financialData.ratios?.netMargin || 'N/A'}%
+- Debt/Equity: ${financialData.ratios?.debtToEquity || 'N/A'}
+- Current Ratio: ${financialData.ratios?.currentRatio || 'N/A'}
+- Market Cap: ${financialData.profile?.marketCap || 'N/A'}
+- Sector: ${financialData.profile?.sector || 'N/A'}
+
+Provide a JSON response with:
+{
+  "investmentThesis": "2-3 paragraph analysis of why this stock fits the persona's criteria",
+  "keyStrengths": ["strength 1", "strength 2", "strength 3"],
+  "keyRisks": ["risk 1", "risk 2"],
+  "catalystAnalysis": ["catalyst 1", "catalyst 2"],
+  "confidenceLevel": "low|medium|high",
+  "recommendedAction": "buy|hold|watch"
+}
+
+Be concise and specific. Reference the financial metrics provided.`;
+
+    // Call LLM
+    const { invokeLLM } = await import('../_core/llm');
+    const response = await invokeLLM({
+      messages: [
+        { role: "system", content: personaPrompt.systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "opportunity_analysis",
+          strict: true,
+          schema: {
+            type: "object",
+            properties: {
+              investmentThesis: { type: "string" },
+              keyStrengths: { type: "array", items: { type: "string" } },
+              keyRisks: { type: "array", items: { type: "string" } },
+              catalystAnalysis: { type: "array", items: { type: "string" } },
+              confidenceLevel: { type: "string", enum: ["low", "medium", "high"] },
+              recommendedAction: { type: "string", enum: ["buy", "hold", "watch"] },
+            },
+            required: [
+              "investmentThesis",
+              "keyStrengths",
+              "keyRisks",
+              "catalystAnalysis",
+              "confidenceLevel",
+              "recommendedAction",
+            ],
+            additionalProperties: false,
+          },
+        },
+      },
+    });
+
+    // Parse response
+    const content = response.choices[0]?.message?.content;
+    if (!content) {
+      console.warn(`[LLM Analysis] No content in LLM response for ${ticker}`);
+      return;
+    }
+
+    const analysis = typeof content === "string" ? JSON.parse(content) : content;
+
+    // Store analysis in database
+    await database.insert(scanOpportunityAnalyses).values({
+      opportunityId,
+      personaId,
+      investmentThesis: analysis.investmentThesis,
+      keyStrengths: analysis.keyStrengths,
+      keyRisks: analysis.keyRisks,
+      catalystAnalysis: analysis.catalystAnalysis,
+      confidenceLevel: analysis.confidenceLevel as "low" | "medium" | "high",
+      recommendedAction: analysis.recommendedAction,
+      analysisDate: new Date(),
+    });
+
+    console.log(`[LLM Analysis] ✅ Generated analysis for ${ticker}`);
+  } catch (error) {
+    console.error(`[LLM Analysis] Error for ${ticker}:`, error);
+    // Don't throw - continue processing other opportunities
+  }
 }
