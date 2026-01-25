@@ -470,3 +470,95 @@
 - ✓ Shared infrastructure: Both individual analysis and scanning use same scoring
 - ✓ Parallel processing: Fast scanning of 5,500 stocks
 - ✓ LLM-powered insights: Narrative thesis for qualified opportunities
+
+
+## OPPORTUNITY SCANNING - BATCH IMPLEMENTATION (CURRENT PHASE)
+
+### Phase 2: Batch Fetching & Adaptive Rate Limiting (COMPLETE)
+- [x] Implement batch fetching in yfinanceWrapper.py
+  - [x] Create get_stock_data_batch() function
+  - [x] Support fetching 50 tickers in one call
+  - [x] Return dict of {ticker: financial_data}
+  - [x] Updated main section for batch mode
+- [x] Implement batch fetching in realFinancialData.ts
+  - [x] Create getStockDataBatch() method
+  - [x] Handle batch responses
+  - [x] Error handling for failed tickers
+- [x] Implement adaptive rate limiting
+  - [x] Start at 500/hr
+  - [x] Increase by 250/hr every hour (750, 1000, 1250, 1500)
+  - [x] Detect rate limit errors
+  - [x] Revert to previous rate on error
+  - [x] Stop increasing when error detected
+- [x] Implement refresh job executor
+  - [x] Load 5,500 stock tickers
+  - [x] Process in batches of 50
+  - [x] Apply adaptive rate limiting
+  - [x] Track progress and errors
+  - [x] Calculate optimal delay between batches
+
+### Phase 3: Database Schema for Caching
+- [ ] Update financialDataCache table schema
+  - [ ] Add all financial metrics columns
+  - [ ] Add cachedAt timestamp
+  - [ ] Remove expiration (manual refresh only)
+- [ ] Create cacheRefreshHistory table
+  - [ ] Track refresh operations
+  - [ ] Store rate limit progression
+  - [ ] Track success/failure counts
+- [ ] Create phase1_screening_results table
+  - [ ] Store Phase 1 screening results
+  - [ ] Link to cached financial data
+  - [ ] Store Phase 1.5 ranking info
+
+### Phase 4: tRPC Procedures
+- [ ] Create getDataStatus() procedure
+  - [ ] Return current cache status
+  - [ ] Show collection date
+  - [ ] Show stocks count
+- [ ] Create refreshFinancialData() procedure
+  - [ ] Start refresh immediately or schedule
+  - [ ] Return refresh job ID
+- [ ] Create getRefreshProgress() procedure
+  - [ ] Real-time progress updates
+  - [ ] Show current rate
+  - [ ] Show success/failure counts
+- [ ] Create generateScan() procedure
+  - [ ] Validate cache exists
+  - [ ] Run three-phase screening
+  - [ ] Return opportunities
+
+### Phase 5: UI Components
+- [ ] Build OpportunityScannerHeader component
+  - [ ] Show data status
+  - [ ] Show collection date
+  - [ ] Refresh button
+- [ ] Build RefreshDataModal component
+  - [ ] Show current data age
+  - [ ] Options: Refresh Now, Schedule for Tonight
+- [ ] Build RefreshProgressModal component
+  - [ ] Show real-time progress
+  - [ ] Show rate progression
+  - [ ] Show batch progress
+- [ ] Update ScanResults component
+  - [ ] Display data collection date
+  - [ ] Show opportunities table
+
+### Phase 6: LLM Analysis Integration
+- [ ] Implement LLM analysis for qualified opportunities
+  - [ ] Use existing persona prompts
+  - [ ] Generate investment thesis
+  - [ ] Extract strengths, risks, catalysts
+  - [ ] Calculate confidence level
+- [ ] Store LLM analyses in database
+  - [ ] Link to opportunities
+  - [ ] Store full analysis
+
+### Phase 7: Testing & Deployment
+- [ ] Test batch fetching with 50 tickers
+- [ ] Test adaptive rate limiting
+- [ ] Test error detection and backoff
+- [ ] Test end-to-end refresh flow
+- [ ] Test three-phase screening
+- [ ] Test LLM analysis
+- [ ] Deploy opportunity scanning

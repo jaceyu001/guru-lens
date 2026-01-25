@@ -243,3 +243,145 @@ export async function searchTickers(query: string): Promise<
       t.name.toLowerCase().includes(lowerQuery)
   );
 }
+
+
+/**
+ * Fetch financial data for multiple stocks in a single batch
+ * 
+ * @param symbols - Array of ticker symbols (e.g., ["AAPL", "MSFT", "GOOGL"])
+ * @returns Record of {symbol: FinancialData} for all symbols
+ */
+export async function getStockDataBatch(
+  symbols: string[]
+): Promise<Record<string, FinancialData | { error: string }>> {
+  return new Promise((resolve, reject) => {
+    try {
+      const scriptPath = path.join(__dirname, "yfinanceWrapper.py");
+      // Pass symbols as comma-separated string for batch mode
+      const symbolsArg = symbols.join(",");
+
+      const python = spawn("/usr/bin/python3", [scriptPath, symbolsArg], {
+        env: {
+          ...process.env,
+          PYTHONPATH: undefined,
+          PYTHONHOME: undefined,
+        },
+        timeout: 60000, // 60 seconds for batch (longer than single ticker)
+      });
+
+      let output = "";
+      let errorOutput = "";
+
+      python.stdout.on("data", (data) => {
+        output += data.toString();
+      });
+
+      python.stderr.on("data", (data) => {
+        errorOutput += data.toString();
+      });
+
+      python.on("close", (code) => {
+        if (code !== 0) {
+          reject(
+            new Error(
+              `Python process exited with code ${code}: ${errorOutput}`
+            )
+          );
+          return;
+        }
+
+        try {
+          const data: Record<string, YFinanceResponse> = JSON.parse(output);
+
+          // Convert each response to FinancialData format
+          const results: Record<string, FinancialData | { error: string }> = {};
+
+          for (const symbol in data) {
+            const response = data[symbol];
+
+            if (response.error) {
+              results[symbol] = { error: response.error };
+              continue;
+            }
+
+            results[symbol] = {
+              price: {
+                current: response.price.current,
+                change: response.price.change,
+                changePercent: response.price.changePercent,
+                open: response.price.open,
+                high: response.price.high,
+                low: response.price.low,
+                volume: response.price.volume,
+                timestamp: new Date(response.price.timestamp),
+              },
+              profile: {
+                sector: response.profile.sector,
+                industry: response.profile.industry,
+                description: response.profile.description,
+                employees: response.profile.employees,
+                website: response.profile.website,
+                dilutedSharesOutstanding:
+                  response.profile.dilutedSharesOutstanding,
+              },
+              financials: response.financials.map((f) => ({
+                period: f.period,
+                fiscalYear: f.fiscalYear,
+                revenue: f.revenue,
+                netIncome: f.netIncome,
+                eps: f.eps,
+                operatingIncome: f.operatingIncome,
+                freeCashFlow: f.freeCashFlow,
+              })),
+              quarterlyFinancials: response.quarterlyFinancials?.map((q) => ({
+                period: q.period,
+                quarter: q.quarter,
+                fiscalYear: q.fiscalYear,
+                revenue: q.revenue,
+                netIncome: q.netIncome,
+                eps: q.eps,
+                operatingIncome: q.operatingIncome,
+                freeCashFlow: q.freeCashFlow,
+                operatingCashFlow: q.operatingCashFlow,
+              })),
+              ratios: {
+                pe: response.ratios.pe,
+                pb: response.ratios.pb,
+                ps: response.ratios.ps,
+                roe: response.ratios.roe,
+                roic: response.ratios.roic,
+                roa: response.ratios.roa,
+                debtToEquity: response.ratios.debtToEquity,
+                currentRatio: response.ratios.currentRatio,
+                interestCoverage: response.ratios.interestCoverage,
+                grossMargin: response.ratios.grossMargin,
+                operatingMargin: response.ratios.operatingMargin,
+                netMargin: response.ratios.netMargin,
+              },
+              balanceSheet: {
+                totalAssets: response.balanceSheet?.totalAssets,
+                totalLiabilities: response.balanceSheet?.totalLiabilities,
+                totalEquity: response.balanceSheet?.totalEquity,
+                bookValuePerShare: response.balanceSheet?.bookValuePerShare,
+                tangibleBookValuePerShare:
+                  response.balanceSheet?.tangibleBookValuePerShare,
+                totalDebt: response.balanceSheet?.totalDebt,
+                cash: response.balanceSheet?.cash,
+              },
+            };
+          }
+
+          resolve(results);
+        } catch (parseError) {
+          reject(new Error(`Failed to parse yfinance batch output: ${parseError}`));
+        }
+      });
+
+      python.on("error", (error) => {
+        reject(error);
+      });
+    } catch (error) {
+      reject(error);
+    }
+  });
+}

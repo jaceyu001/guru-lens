@@ -435,3 +435,239 @@ export function isQualifiedOpportunity(ratios: Partial<KeyRatios>, personaId: st
 export function calculateScore(ratios: Partial<KeyRatios>, personaId: string): number | null {
   return calculatePersonaScore(ratios, personaId);
 }
+
+
+/**
+ * Adaptive Rate Limiting Configuration
+ */
+interface RateLimitConfig {
+  currentRate: number;        // Current requests/hour (500, 750, 1000, 1250, 1500)
+  targetRate: number;         // Target for next hour
+  minRate: number;            // Minimum rate (500)
+  maxRate: number;            // Maximum rate (1500)
+  rateIncrement: number;      // Increment per hour (250)
+  batchSize: number;          // Tickers per batch (50)
+  hoursSinceStart: number;    // Hours elapsed
+  errorDetected: boolean;     // Whether rate limit error found
+  lastStableRate: number;     // Rate before error
+}
+
+/**
+ * Check if error is a rate limit error
+ */
+function isRateLimitError(error: string): boolean {
+  const rateLimitPatterns = [
+    /too many requests/i,
+    /rate limit/i,
+    /429/,
+    /403/,
+    /999/,
+    /throttle/i,
+    /exceeded/i,
+  ];
+
+  return rateLimitPatterns.some((pattern) => pattern.test(error));
+}
+
+/**
+ * Delay utility function
+ */
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Get all US stock tickers
+ */
+async function getAllUSStockTickers(): Promise<string[]> {
+  const database = await ensureDb();
+  const allTickers = await database.select({ symbol: tickers.symbol }).from(tickers);
+  return allTickers.map((t) => t.symbol);
+}
+
+/**
+ * Start refresh job with adaptive rate limiting and batch fetching
+ */
+export async function startRefreshJobWithAdaptiveRateLimit(
+  refreshJobId: number
+): Promise<void> {
+  const database = await ensureDb();
+
+  try {
+    // Update job status
+    await database
+      .update(scanJobs)
+      .set({
+        status: "running",
+        phase: "data_collection",
+        startedAt: new Date(),
+      })
+      .where(eq(scanJobs.id, refreshJobId));
+
+    // Get all US stock tickers
+    const allTickers = await getAllUSStockTickers();
+    console.log(`[RefreshJob] Starting refresh for ${allTickers.length} stocks`);
+
+    let successCount = 0;
+    let failureCount = 0;
+    let rateLimitErrorCount = 0;
+
+    // Initialize rate limiting config
+    const rateLimitConfig: RateLimitConfig = {
+      currentRate: 500,        // Start at 500/hr
+      targetRate: 500,
+      minRate: 500,
+      maxRate: 1500,
+      rateIncrement: 250,
+      batchSize: 50,
+      hoursSinceStart: 0,
+      errorDetected: false,
+      lastStableRate: 500,
+    };
+
+    const BATCH_SIZE = rateLimitConfig.batchSize;
+    const refreshStartTime = new Date();
+    let lastRateIncreaseTime = new Date();
+
+    // Import batch fetching function
+    const { getStockDataBatch } = await import("./realFinancialData");
+
+    // Process in batches
+    for (let i = 0; i < allTickers.length; i += BATCH_SIZE) {
+      // Check if we should increase rate (every hour)
+      const currentTime = new Date();
+      const hoursSinceStart =
+        (currentTime.getTime() - refreshStartTime.getTime()) / (1000 * 60 * 60);
+      const hoursSinceLastIncrease =
+        (currentTime.getTime() - lastRateIncreaseTime.getTime()) / (1000 * 60 * 60);
+
+      if (
+        hoursSinceLastIncrease >= 1 &&
+        !rateLimitConfig.errorDetected &&
+        rateLimitConfig.currentRate < rateLimitConfig.maxRate
+      ) {
+        // Increase rate
+        rateLimitConfig.lastStableRate = rateLimitConfig.currentRate;
+        rateLimitConfig.currentRate = Math.min(
+          rateLimitConfig.currentRate + rateLimitConfig.rateIncrement,
+          rateLimitConfig.maxRate
+        );
+        lastRateIncreaseTime = new Date();
+
+        console.log(
+          `[RefreshJob] 📈 Rate increased to ${rateLimitConfig.currentRate}/hr`
+        );
+
+        // Rate limit tracking would be in separate table
+        console.log(`Rate: ${rateLimitConfig.currentRate}/hr`);
+      }
+
+      const batch = allTickers.slice(i, i + BATCH_SIZE);
+
+      try {
+        // Calculate delay based on current rate
+        const delayBetweenBatches = (3600 * 1000) / (rateLimitConfig.currentRate / BATCH_SIZE);
+
+        // Fetch batch from yfinance
+        const batchData = await getStockDataBatch(batch);
+
+        // Process each stock in batch
+        for (const ticker in batchData) {
+          const data = batchData[ticker];
+
+          if ("error" in data) {
+            // Check if it's a rate limit error
+            if (isRateLimitError(data.error)) {
+              rateLimitErrorCount++;
+              failureCount++;
+
+              // Detect rate limit error
+              if (!rateLimitConfig.errorDetected) {
+                console.warn(
+                  `⚠️ [RefreshJob] Rate limit error detected at ${rateLimitConfig.currentRate}/hr`
+                );
+
+                rateLimitConfig.errorDetected = true;
+                rateLimitConfig.currentRate = rateLimitConfig.lastStableRate;
+
+                // Update database with error
+                await database
+                  .update(scanJobs)
+                  .set({
+                    errorMessage: `Rate limit error detected, reverted to ${rateLimitConfig.currentRate}/hr`,
+                  })
+                  .where(eq(scanJobs.id, refreshJobId));
+              }
+            } else {
+              failureCount++;
+            }
+            continue;
+          }
+
+          // Store in cache (simplified - would store all fields in real implementation)
+          // This is a placeholder - actual implementation would store all financial metrics
+          successCount++;
+        }
+
+        // Update progress
+        await database
+          .update(scanJobs)
+          .set({
+            processedStocks: i + batch.length,
+            opportunitiesFound: successCount,
+          })
+          .where(eq(scanJobs.id, refreshJobId));
+
+        // Rate limiting: wait before next batch
+        if (i + BATCH_SIZE < allTickers.length) {
+          console.log(
+            `[RefreshJob] Waiting ${(delayBetweenBatches / 1000).toFixed(1)}s before next batch (Rate: ${rateLimitConfig.currentRate}/hr)`
+          );
+          await delay(delayBetweenBatches);
+        }
+      } catch (error) {
+        failureCount += batch.length;
+        console.error(`[RefreshJob] Failed to fetch batch ${i / BATCH_SIZE + 1}:`, error);
+
+        // Update progress
+        await database
+          .update(scanJobs)
+          .set({
+            processedStocks: i + batch.length,
+            opportunitiesFound: successCount,
+          })
+          .where(eq(scanJobs.id, refreshJobId));
+      }
+    }
+
+    // Mark as completed
+    const endTime = new Date();
+    const durationMinutes = Math.round(
+      (endTime.getTime() - refreshStartTime.getTime()) / (1000 * 60)
+    );
+
+    console.log(
+      `[RefreshJob] ✅ Completed in ${durationMinutes} minutes. Success: ${successCount}, Failures: ${failureCount}, Rate Limit Errors: ${rateLimitErrorCount}`
+    );
+
+    await database
+      .update(scanJobs)
+      .set({
+        status: "completed",
+        phase: "aggregation",
+        completedAt: endTime,
+      })
+      .where(eq(scanJobs.id, refreshJobId));
+  } catch (error) {
+    console.error("[RefreshJob] Error:", error);
+
+    await database
+      .update(scanJobs)
+      .set({
+        status: "failed",
+        errorMessage: error instanceof Error ? error.message : String(error),
+        completedAt: new Date(),
+      })
+      .where(eq(scanJobs.id, refreshJobId));
+  }
+}
