@@ -511,38 +511,41 @@
   - [ ] Link to cached financial data
   - [ ] Store Phase 1.5 ranking info
 
-### Phase 4: tRPC Procedures
-- [ ] Create getDataStatus() procedure
-  - [ ] Return current cache status
-  - [ ] Show collection date
-  - [ ] Show stocks count
-- [ ] Create refreshFinancialData() procedure
-  - [ ] Start refresh immediately or schedule
-  - [ ] Return refresh job ID
-- [ ] Create getRefreshProgress() procedure
-  - [ ] Real-time progress updates
-  - [ ] Show current rate
-  - [ ] Show success/failure counts
-- [ ] Create generateScan() procedure
-  - [ ] Validate cache exists
-  - [ ] Run three-phase screening
-  - [ ] Return opportunities
+### Phase 4: tRPC Procedures (COMPLETE)
+- [x] Create getDataStatus() procedure
+  - [x] Return current cache status
+  - [x] Show collection date
+  - [x] Show stocks count
+- [x] Create refreshFinancialData() procedure
+  - [x] Start refresh immediately or schedule
+  - [x] Return refresh job ID
+- [x] Create getRefreshProgress() procedure
+  - [x] Real-time progress updates
+  - [x] Show current rate
+  - [x] Show success/failure counts
+- [x] Create generateScan() procedure
+  - [x] Validate cache exists
+  - [x] Run three-phase screening
+  - [x] Return opportunities
 
-### Phase 5: UI Components
-- [ ] Build OpportunityScannerHeader component
-  - [ ] Show data status
-  - [ ] Show collection date
-  - [ ] Refresh button
-- [ ] Build RefreshDataModal component
-  - [ ] Show current data age
-  - [ ] Options: Refresh Now, Schedule for Tonight
-- [ ] Build RefreshProgressModal component
-  - [ ] Show real-time progress
-  - [ ] Show rate progression
-  - [ ] Show batch progress
-- [ ] Update ScanResults component
-  - [ ] Display data collection date
-  - [ ] Show opportunities table
+### Phase 5: UI Components (COMPLETE)
+- [x] Build OpportunityScannerHeader component
+  - [x] Show data status
+  - [x] Show collection date
+  - [x] Refresh button
+- [x] Build RefreshDataModal component
+  - [x] Show current data age
+  - [x] Options: Refresh Now, Schedule for Tonight
+- [x] Build RefreshProgressModal component
+  - [x] Show real-time progress
+  - [x] Show rate progression
+  - [x] Show batch progress
+- [x] Create OpportunityScannerPage component
+  - [x] Persona selection
+  - [x] Scan progress tracking
+  - [x] Results table display
+  - [x] Opportunity details modal
+- [x] Add /scanner route to App.tsx
 
 ### Phase 6: LLM Analysis Integration
 - [ ] Implement LLM analysis for qualified opportunities

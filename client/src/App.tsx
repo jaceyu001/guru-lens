@@ -9,6 +9,7 @@ import Ticker from "./pages/Ticker";
 import TickerTest from "./pages/TickerTest";
 import Opportunities from "./pages/Opportunities";
 import Watchlist from "./pages/Watchlist";
+import { OpportunityScannerPage } from "./pages/OpportunityScannerPage";
 
 function Router() {
   return (
@@ -18,6 +19,7 @@ function Router() {
       <Route path={"/ticker-test/:symbol"} component={TickerTest} />
       <Route path={"/opportunities"} component={Opportunities} />
       <Route path={"/opportunities/:personaId"} component={Opportunities} />
+      <Route path={"/scanner"} component={OpportunityScannerPage} />
       <Route path={"/watchlist"} component={Watchlist} />
       <Route path={"/404"} component={NotFound} />
       <Route component={NotFound} />

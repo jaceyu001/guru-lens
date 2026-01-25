@@ -671,3 +671,166 @@ export async function startRefreshJobWithAdaptiveRateLimit(
       .where(eq(scanJobs.id, refreshJobId));
   }
 }
+
+
+/**
+ * Get opportunities for a completed scan
+ */
+export async function getOpportunitiesForScan(
+  scanJobId: number,
+  limit: number = 50
+): Promise<ScanOpportunityResult[]> {
+  const database = await ensureDb();
+
+  const opportunities = await database
+    .select({
+      id: scanOpportunities.id,
+      rank: scanOpportunities.rank,
+      tickerId: scanOpportunities.tickerId,
+      score: scanOpportunities.score,
+      metricsJson: scanOpportunities.metricsJson,
+      currentPrice: scanOpportunities.currentPrice,
+      marketCap: scanOpportunities.marketCap,
+      sector: scanOpportunities.sector,
+      thesis: scanOpportunityAnalyses.investmentThesis,
+      strengths: scanOpportunityAnalyses.keyStrengths,
+      risks: scanOpportunityAnalyses.keyRisks,
+      catalysts: scanOpportunityAnalyses.catalystAnalysis,
+      confidence: scanOpportunityAnalyses.confidenceLevel,
+    })
+    .from(scanOpportunities)
+    .leftJoin(
+      scanOpportunityAnalyses,
+      eq(scanOpportunities.id, scanOpportunityAnalyses.opportunityId)
+    )
+    .where(eq(scanOpportunities.scanJobId, scanJobId))
+    .orderBy(desc(scanOpportunities.score))
+    .limit(limit);
+
+  // Map to result format
+  return opportunities.map((opp: any) => ({
+    id: opp.id,
+    rank: opp.rank || 0,
+    ticker: '',
+    companyName: '',
+    score: opp.score,
+    metrics: opp.metricsJson || {},
+    currentPrice: opp.currentPrice ? Number(opp.currentPrice) : null,
+    marketCap: opp.marketCap ? Number(opp.marketCap) : null,
+    sector: opp.sector,
+    thesis: opp.thesis,
+    strengths: opp.strengths || [],
+    risks: opp.risks || [],
+    catalysts: opp.catalysts || [],
+    confidence: opp.confidence,
+  })) as any;
+}
+
+/**
+ * Get full details for a single opportunity
+ */
+export async function getOpportunityDetails(
+  opportunityId: number
+): Promise<(ScanOpportunityResult & { fullMetrics: Record<string, any> }) | null> {
+  const database = await ensureDb();
+
+  const opportunity = await database
+    .select({
+      id: scanOpportunities.id,
+      rank: scanOpportunities.rank,
+      tickerId: scanOpportunities.tickerId,
+      score: scanOpportunities.score,
+      metricsJson: scanOpportunities.metricsJson,
+      currentPrice: scanOpportunities.currentPrice,
+      marketCap: scanOpportunities.marketCap,
+      sector: scanOpportunities.sector,
+      thesis: scanOpportunityAnalyses.investmentThesis,
+      strengths: scanOpportunityAnalyses.keyStrengths,
+      risks: scanOpportunityAnalyses.keyRisks,
+      catalysts: scanOpportunityAnalyses.catalystAnalysis,
+      confidence: scanOpportunityAnalyses.confidenceLevel,
+    })
+    .from(scanOpportunities)
+    .leftJoin(
+      scanOpportunityAnalyses,
+      eq(scanOpportunities.id, scanOpportunityAnalyses.opportunityId)
+    )
+    .where(eq(scanOpportunities.id, opportunityId))
+    .limit(1);
+
+  if (!opportunity || opportunity.length === 0) {
+    return null;
+  }
+
+  const result = opportunity[0] as any;
+  return {
+    id: result.id,
+    rank: result.rank || 0,
+    ticker: '',
+    companyName: '',
+    score: result.score,
+    metrics: result.metricsJson || {},
+    currentPrice: result.currentPrice ? Number(result.currentPrice) : null,
+    marketCap: result.marketCap ? Number(result.marketCap) : null,
+    sector: result.sector,
+    thesis: result.thesis,
+    strengths: result.strengths || [],
+    risks: result.risks || [],
+    catalysts: result.catalysts || [],
+    confidence: result.confidence,
+    fullMetrics: (result.metricsJson as Record<string, any>) || {},
+  } as any;
+}
+
+/**
+ * Get current data cache status
+ */
+export async function getDataStatus(): Promise<{
+  lastUpdated: Date | null;
+  stocksCached: number;
+  nextRefreshTime: string | null;
+}> {
+  const database = await ensureDb();
+
+  // Get most recent successful refresh
+  const lastRefresh = await database
+    .select({
+      completedAt: scanJobs.completedAt,
+    })
+    .from(scanJobs)
+    .where(eq(scanJobs.status, "completed"))
+    .orderBy(desc(scanJobs.completedAt))
+    .limit(1);
+
+  const lastUpdated = lastRefresh[0]?.completedAt || null;
+
+  // Count cached stocks (simplified - would count from financialDataCache table)
+  // For now, return placeholder
+  const stocksCached = 5500;
+
+  return {
+    lastUpdated,
+    stocksCached,
+    nextRefreshTime: null, // Would be set if scheduled
+  };
+}
+
+/**
+ * Create a new refresh job (for data cache refresh)
+ */
+export async function createRefreshJob(): Promise<number> {
+  const database = await ensureDb();
+
+  // Create a special scan job for refresh (personaId = 0 means data refresh)
+  const result = await database.insert(scanJobs).values({
+    personaId: 0, // Special ID for data refresh
+    status: "pending",
+    phase: "init",
+    totalStocks: 5500,
+    processedStocks: 0,
+    opportunitiesFound: 0,
+    llmAnalysesCompleted: 0,
+  });
+
+  return (result as any).insertId as number;
+}

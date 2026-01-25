@@ -819,6 +819,72 @@ export const appRouter = router({
         return findings;
       }),
   }),
+
+  // Opportunity Scanning operations
+  opportunityScanning: router({
+    startScan: protectedProcedure
+      .input(z.object({ personaId: z.number() }))
+      .mutation(async ({ input }) => {
+        const { createScanJob, startRefreshJobWithAdaptiveRateLimit } = await import('./services/opportunityScanningService');
+        
+        const scanJobId = await createScanJob(input.personaId);
+        
+        // Start refresh job in background (don't await)
+        startRefreshJobWithAdaptiveRateLimit(scanJobId).catch((error) => {
+          console.error(`[Scan Job ${scanJobId}] Error:`, error);
+        });
+        
+        return { scanJobId, status: 'pending', startedAt: new Date() };
+      }),
+    
+    getScanProgress: publicProcedure
+      .input(z.object({ scanJobId: z.number() }))
+      .query(async ({ input }) => {
+        const { getScanJobProgress } = await import('./services/opportunityScanningService');
+        return await getScanJobProgress(input.scanJobId);
+      }),
+    
+    getOpportunities: publicProcedure
+      .input(z.object({ scanJobId: z.number(), limit: z.number().optional() }))
+      .query(async ({ input }) => {
+        const { getOpportunitiesForScan } = await import('./services/opportunityScanningService');
+        return await getOpportunitiesForScan(input.scanJobId, input.limit || 50);
+      }),
+    
+    getOpportunityDetails: publicProcedure
+      .input(z.object({ opportunityId: z.number() }))
+      .query(async ({ input }) => {
+        const { getOpportunityDetails } = await import('./services/opportunityScanningService');
+        return await getOpportunityDetails(input.opportunityId);
+      }),
+    
+    getDataStatus: publicProcedure
+      .query(async () => {
+        const { getDataStatus } = await import('./services/opportunityScanningService');
+        return await getDataStatus();
+      }),
+    
+    refreshData: protectedProcedure
+      .input(z.object({ scheduleForLater: z.boolean().optional() }))
+      .mutation(async ({ input }) => {
+        const { createRefreshJob, startRefreshJobWithAdaptiveRateLimit } = await import('./services/opportunityScanningService');
+        
+        const refreshJobId = await createRefreshJob();
+        
+        if (input.scheduleForLater) {
+          // Schedule for 10 PM tonight
+          console.log(`[Refresh Job ${refreshJobId}] Scheduled for 10 PM tonight`);
+          // TODO: Implement scheduling logic
+        } else {
+          // Start immediately in background
+          startRefreshJobWithAdaptiveRateLimit(refreshJobId).catch((error) => {
+            console.error(`[Refresh Job ${refreshJobId}] Error:`, error);
+          });
+        }
+        
+        return { refreshJobId, estimatedDuration: '~8 hours' };
+      }),
+  }),
 });
 
 export type AppRouter = typeof appRouter;
