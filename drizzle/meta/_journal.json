@@ -15,6 +15,13 @@
       "when": 1767893976264,
       "tag": "0001_neat_prima",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1769313263230,
+      "tag": "0002_normal_the_initiative",
+      "breakpoints": true
     }
   ]
 }

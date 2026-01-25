@@ -354,3 +354,119 @@
 
 ## Current Fixes In Progress
 - [x] Fix consensus valuation aggregation - Low/High/Midpoint now reflect min/max/average across all valuation points including EPV scenarios
+
+
+---
+
+## OPPORTUNITY SCANNING FEATURE (NEW)
+
+### Phase 1: Shared Scoring Engine (COMPLETE)
+- [x] Create shared persona scoring engine (`personaScoringEngine.ts`)
+  - [x] Warren Buffett scoring configuration
+  - [x] Peter Lynch scoring configuration
+  - [x] Benjamin Graham scoring configuration
+  - [x] Core scoring functions: `calculatePersonaScore()`, `isOpportunity()`, `getDetailedScoreBreakdown()`
+  - [x] Metric mapping and threshold evaluation
+- [x] Create database schema for opportunity scanning
+  - [x] `scanJobs` table (track scan progress)
+  - [x] `scanOpportunities` table (store qualified opportunities)
+  - [x] `scanOpportunityAnalyses` table (store LLM-generated thesis)
+  - [x] Database migrations applied successfully
+- [x] Create opportunity scanning service (`opportunityScanningService.ts`)
+  - [x] Scan job management functions
+  - [x] Opportunity storage and retrieval
+  - [x] LLM analysis generation
+  - [x] Shared scoring engine integration
+- [ ] Integrate scoring engine into individual stock analysis
+  - [ ] Update `aiAnalysisEngine.ts` to use shared scoring
+  - [ ] Verify individual analysis still works correctly
+  - [ ] Test that scores match expected values
+- [ ] Create unit tests for scoring engine
+  - [ ] Test Warren Buffett scoring
+  - [ ] Test Peter Lynch scoring
+  - [ ] Test Benjamin Graham scoring
+  - [ ] Test edge cases (missing data, invalid metrics)
+
+### Phase 2: Batch Processor & Stock Scanning (NEXT)
+- [ ] Implement batch processor for stock scanning
+  - [ ] Load stock universe (~5,500 stocks)
+  - [ ] Fetch financial data in parallel batches
+  - [ ] Calculate metrics for each stock
+  - [ ] Apply persona scoring
+  - [ ] Filter by minimum threshold
+  - [ ] Store qualified opportunities
+- [ ] Implement progress tracking
+  - [ ] Update scan job status in real-time
+  - [ ] Track processed stocks count
+  - [ ] Track opportunities found count
+  - [ ] Handle errors gracefully
+- [ ] Create background job executor
+  - [ ] Execute scans asynchronously
+  - [ ] Implement job queue
+
+### Phase 3: LLM Analysis Integration (READY)
+- [x] LLM analysis function created in opportunityScanningService
+- [ ] Generate investment thesis for qualified opportunities
+  - [ ] Create LLM prompting for opportunity thesis
+  - [ ] Parse LLM responses (thesis, strengths, risks, catalysts)
+  - [ ] Store analyses in database
+  - [ ] Add confidence level assessment
+- [ ] Implement rate limiting for LLM calls
+- [ ] Add caching for LLM responses
+
+### Phase 4: tRPC API Procedures
+- [ ] Create opportunity scanning router
+  - [ ] `generateScan(personaId)` - Start new scan
+  - [ ] `getScanProgress(scanJobId)` - Get real-time progress
+  - [ ] `getOpportunities(scanJobId, limit)` - Retrieve results
+  - [ ] `getFullAnalysis(opportunityId)` - Get detailed analysis
+  - [ ] `dismiss(opportunityId)` - Mark as dismissed
+  - [ ] `addToWatchlist(opportunityId)` - Add to watchlist
+- [ ] Add error handling and validation
+- [ ] Write vitest tests for all procedures
+
+### Phase 5: Frontend UI Components
+- [ ] Create OpportunitiesPage component
+  - [ ] Display scan progress with real-time updates
+  - [ ] Show "No Opportunities" state when appropriate
+  - [ ] Display results table with thesis preview
+  - [ ] Add filtering options (sector, market cap, min score)
+  - [ ] Add sorting options (score, ticker, sector)
+- [ ] Create OpportunityAnalysisModal component
+  - [ ] Display full investment thesis
+  - [ ] Show key strengths and risks
+  - [ ] Display catalyst analysis
+  - [ ] Show confidence level
+  - [ ] Add action buttons (watchlist, dismiss)
+- [ ] Integrate with existing navigation
+  - [ ] Add "Opportunities" link to main navigation
+  - [ ] Add persona selector for scans
+
+### Phase 6: Testing & Optimization
+- [ ] End-to-end testing
+  - [ ] Test full scan workflow
+  - [ ] Test with different personas
+  - [ ] Test error scenarios
+- [ ] Performance optimization
+  - [ ] Optimize batch sizes for data fetching
+  - [ ] Add caching for frequently accessed data
+  - [ ] Monitor scan duration
+- [ ] Add analytics tracking
+  - [ ] Track scan frequency by persona
+  - [ ] Track opportunities found
+  - [ ] Track user actions (watchlist, dismiss)
+
+### Phase 7: Documentation & Deployment
+- [ ] Update README with opportunity scanning feature
+- [ ] Create user guide for opportunity scanning
+- [ ] Document API procedures
+- [ ] Deploy to production
+- [ ] Monitor for issues
+
+### Key Design Principles
+- ✓ Single source of truth: Persona scoring logic in `personaScoringEngine.ts`
+- ✓ Absolute scoring: Stock either fits criteria or it doesn't
+- ✓ Normal to have no opportunities: Market doesn't always have good deals
+- ✓ Shared infrastructure: Both individual analysis and scanning use same scoring
+- ✓ Parallel processing: Fast scanning of 5,500 stocks
+- ✓ LLM-powered insights: Narrative thesis for qualified opportunities

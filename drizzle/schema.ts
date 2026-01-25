@@ -285,3 +285,96 @@ export const jobs = mysqlTable("jobs", {
 
 export type Job = typeof jobs.$inferSelect;
 export type InsertJob = typeof jobs.$inferInsert;
+
+
+/**
+ * On-demand opportunity scans
+ * Tracks scan jobs for finding opportunities across all US stocks
+ */
+export const scanJobs = mysqlTable("scanJobs", {
+  id: int("id").autoincrement().primaryKey(),
+  personaId: int("personaId").notNull().references(() => personas.id),
+  
+  status: mysqlEnum("status", ["pending", "running", "completed", "failed"]).default("pending").notNull(),
+  phase: mysqlEnum("phase", ["init", "data_collection", "llm_analysis", "aggregation"]).default("init").notNull(),
+  
+  totalStocks: int("totalStocks").default(5500).notNull(),
+  processedStocks: int("processedStocks").default(0).notNull(),
+  opportunitiesFound: int("opportunitiesFound").default(0).notNull(),
+  llmAnalysesCompleted: int("llmAnalysesCompleted").default(0).notNull(),
+  
+  startedAt: timestamp("startedAt"),
+  completedAt: timestamp("completedAt"),
+  errorMessage: text("errorMessage"),
+  
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  personaStatusIdx: index("persona_status_idx").on(table.personaId, table.status),
+  createdAtIdx: index("created_at_idx").on(table.createdAt),
+}));
+
+export type ScanJob = typeof scanJobs.$inferSelect;
+export type InsertScanJob = typeof scanJobs.$inferInsert;
+
+/**
+ * Qualified opportunities from scans
+ * Stores stocks that meet persona criteria (score >= minimum threshold)
+ */
+export const scanOpportunities = mysqlTable("scanOpportunities", {
+  id: int("id").autoincrement().primaryKey(),
+  scanJobId: int("scanJobId").notNull().references(() => scanJobs.id, { onDelete: "cascade" }),
+  personaId: int("personaId").notNull().references(() => personas.id),
+  tickerId: int("tickerId").notNull().references(() => tickers.id),
+  
+  score: int("score").notNull(), // 0-100, absolute score
+  rank: int("rank"), // Ranking within this scan (1, 2, 3, etc.)
+  
+  // Metrics snapshot at time of scan
+  metricsJson: json("metricsJson").$type<Record<string, number | string | null>>().notNull(),
+  currentPrice: decimal("currentPrice", { precision: 10, scale: 2 }),
+  marketCap: decimal("marketCap", { precision: 20, scale: 0 }),
+  sector: varchar("sector", { length: 100 }),
+  
+  status: mysqlEnum("status", ["new", "watched", "purchased", "dismissed"]).default("new").notNull(),
+  llmAnalysisGenerated: boolean("llmAnalysisGenerated").default(false).notNull(),
+  
+  dismissedAt: timestamp("dismissedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  scanJobIdIdx: index("scan_job_id_idx").on(table.scanJobId),
+  personaScoreIdx: index("persona_score_idx").on(table.personaId, table.score),
+  scanRankIdx: index("scan_rank_idx").on(table.scanJobId, table.rank),
+  uniqueScanTicker: unique("unique_scan_ticker").on(table.scanJobId, table.tickerId),
+}));
+
+export type ScanOpportunity = typeof scanOpportunities.$inferSelect;
+export type InsertScanOpportunity = typeof scanOpportunities.$inferInsert;
+
+/**
+ * LLM-generated analysis for opportunities
+ * Stores investment thesis, strengths, risks, catalysts for each opportunity
+ */
+export const scanOpportunityAnalyses = mysqlTable("scanOpportunityAnalyses", {
+  id: int("id").autoincrement().primaryKey(),
+  opportunityId: int("opportunityId").notNull().references(() => scanOpportunities.id, { onDelete: "cascade" }),
+  personaId: int("personaId").notNull().references(() => personas.id),
+  
+  investmentThesis: text("investmentThesis").notNull(),
+  keyStrengths: json("keyStrengths").$type<string[]>().notNull(),
+  keyRisks: json("keyRisks").$type<string[]>().notNull(),
+  catalystAnalysis: json("catalystAnalysis").$type<string[]>().notNull(),
+  
+  confidenceLevel: mysqlEnum("confidenceLevel", ["low", "medium", "high"]).default("medium").notNull(),
+  recommendedAction: varchar("recommendedAction", { length: 255 }),
+  
+  analysisDate: timestamp("analysisDate").defaultNow().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  opportunityIdIdx: index("opportunity_id_idx").on(table.opportunityId),
+  personaIdIdx: index("persona_id_idx").on(table.personaId),
+}));
+
+export type ScanOpportunityAnalysis = typeof scanOpportunityAnalyses.$inferSelect;
+export type InsertScanOpportunityAnalysis = typeof scanOpportunityAnalyses.$inferInsert;
