@@ -217,26 +217,30 @@ export default function OpportunityScannerPage() {
       {/* Persona Selection */}
       {!isScanning && opportunities.length === 0 && (
         <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-bold">Select an Investor Persona</h2>
-            <Button
-              onClick={() => handleStartScan(1)}
-              variant="outline"
-              className="border-green-600 text-green-600 hover:bg-green-50"
-            >
-              Test Scan (10 stocks)
-            </Button>
-          </div>
+          <h2 className="text-2xl font-bold mb-4">Select an Investor Persona</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {personas.data?.map((persona) => (
               <Card
                 key={persona.id}
-                className="p-6 cursor-pointer hover:shadow-lg transition-shadow"
-                onClick={() => handleStartScan(persona.id)}
+                className="p-6 hover:shadow-lg transition-shadow"
               >
                 <h3 className="font-bold text-lg mb-2">{persona.name}</h3>
                 <p className="text-sm text-gray-600 mb-4">{persona.description}</p>
-                <Button className="w-full">Start Scan</Button>
+                <div className="space-y-2">
+                  <Button 
+                    className="w-full" 
+                    onClick={() => handleStartScan(persona.id)}
+                  >
+                    Start Scan (5,500 stocks)
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="w-full border-green-600 text-green-600 hover:bg-green-50"
+                    onClick={() => handleStartScan(persona.id)}
+                  >
+                    Test Scan (10 stocks)
+                  </Button>
+                </div>
               </Card>
             ))}
           </div>
