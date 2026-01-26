@@ -11,6 +11,7 @@ import { calculatePersonaScore, getPersonaMinThreshold, calculateDetailedScoring
 import { invokeLLM } from "../_core/llm";
 import { PERSONA_PROMPTS } from "./personaPrompts";
 import { fetchRealKeyRatios } from "./realFinancialDataFetcher";
+import { createScanJob as createCacheJob, updateScanProgress, addScanResult, completeScan, failScan, getScanProgress, getScanResults } from "./scanResultsCache";
 import type { KeyRatios } from "../../shared/types";
 import { eq, desc } from "drizzle-orm";
 
@@ -101,29 +102,19 @@ export async function createScanJob(personaId: number): Promise<number> {
  * Get scan job progress
  */
 export async function getScanJobProgress(scanJobId: number): Promise<ScanJobProgress> {
-  const database = (await ensureDb())!;
-
-  const job = await database
-    .select()
-    .from(scanJobs)
-    .where(eq(scanJobs.id, scanJobId))
-    .limit(1);
-
-  if (!job || !job[0]) {
-    throw new Error(`Scan job not found: ${scanJobId}`);
-  }
-
+  const progress = getScanProgress(scanJobId);
+  
   return {
-    id: job[0].id,
-    status: job[0].status as "pending" | "running" | "completed" | "failed",
-    phase: job[0].phase as "data_collection" | "ranking" | "llm_analysis" | "aggregation",
-    startedAt: job[0].startedAt,
-    completedAt: job[0].completedAt,
-    totalStocks: job[0].totalStocks,
-    processedStocks: job[0].processedStocks,
-    opportunitiesFound: job[0].opportunitiesFound,
-    llmAnalysesCompleted: job[0].llmAnalysesCompleted,
-    errorMessage: job[0].errorMessage,
+    id: scanJobId,
+    status: progress.status as "pending" | "running" | "completed" | "failed",
+    phase: progress.phase as "data_collection" | "ranking" | "llm_analysis" | "aggregation",
+    startedAt: new Date(),
+    completedAt: null,
+    totalStocks: 10,
+    processedStocks: progress.processedStocks,
+    opportunitiesFound: progress.opportunitiesFound,
+    llmAnalysesCompleted: 0,
+    errorMessage: null,
   };
 }
 
@@ -134,49 +125,21 @@ export async function getOpportunitiesForScan(
   scanJobId: number,
   limit: number = 50
 ): Promise<ScanOpportunityResult[]> {
-  const database = (await ensureDb())!;
-
-  const opportunities = await database
-    .select()
-    .from(scanOpportunities)
-    .where(eq(scanOpportunities.scanJobId, scanJobId))
-    .orderBy(desc(scanOpportunities.score))
-    .limit(limit);
-
-  const results: ScanOpportunityResult[] = [];
-
-  for (const opp of opportunities) {
-    const tickerRecord = await database
-      .select({ symbol: tickers.symbol, companyName: tickers.companyName })
-      .from(tickers)
-      .where(eq(tickers.id, opp.tickerId))
-      .limit(1);
-
-    if (!tickerRecord || !tickerRecord[0]) continue;
-
-    const analysis = await database
-      .select()
-      .from(scanOpportunityAnalyses)
-      .where(eq(scanOpportunityAnalyses.opportunityId, opp.id))
-      .limit(1);
-
-    results.push({
-      id: opp.id,
-      rank: opp.rank || 0,
-      ticker: tickerRecord[0].symbol,
-      companyName: tickerRecord[0].companyName || "",
-      score: opp.score,
-      metrics: (opp.metricsJson as Record<string, number | string | null>) || {},
-      currentPrice: opp.currentPrice ? Number(opp.currentPrice) : null,
-      marketCap: opp.marketCap ? Number(opp.marketCap) : null,
-      sector: opp.sector,
-      thesis: analysis?.[0]?.investmentThesis || undefined,
-      confidence: analysis?.[0]?.confidenceLevel || undefined,
-      scoringDetails: analysis?.[0]?.scoringDetails ? (typeof analysis[0].scoringDetails === 'string' ? JSON.parse(analysis[0].scoringDetails) : analysis[0].scoringDetails) : undefined,
-    });
-  }
-
-  return results;
+  const results = getScanResults(scanJobId, limit);
+  return results.map(r => ({
+    id: r.id,
+    rank: r.rank,
+    ticker: r.ticker,
+    companyName: r.companyName,
+    score: r.score,
+    metrics: {},
+    currentPrice: r.currentPrice,
+    marketCap: r.marketCap,
+    sector: r.sector,
+    thesis: r.thesis,
+    confidence: r.confidence,
+    scoringDetails: r.scoringDetails,
+  }));
 }
 
 /**
