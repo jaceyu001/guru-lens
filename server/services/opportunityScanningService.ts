@@ -10,6 +10,7 @@ import { scanJobs, scanOpportunities, scanOpportunityAnalyses, tickers } from ".
 import { calculatePersonaScore, getPersonaMinThreshold, calculateDetailedScoringBreakdown } from "./personaScoringEngine";
 import { invokeLLM } from "../_core/llm";
 import { PERSONA_PROMPTS } from "./personaPrompts";
+import { fetchRealKeyRatios } from "./realFinancialDataFetcher";
 import type { KeyRatios } from "../../shared/types";
 import { eq, desc } from "drizzle-orm";
 
@@ -357,28 +358,13 @@ export async function startTestScan(scanJobId: number, personaId: number): Promi
 
         const tickerId = tickerRecord[0].id;
 
-        // Get financial data (mock - using realistic values that pass thresholds)
-        const financialData: KeyRatios = {
-          symbol: ticker,
-          peRatio: 15 + Math.random() * 10,
-          pbRatio: 1.5 + Math.random() * 2,
-          psRatio: 0.8 + Math.random() * 1.2,
-          pegRatio: 0.5 + Math.random() * 0.8,
-          dividendYield: 0.01 + Math.random() * 0.04,
-          payoutRatio: 0.2 + Math.random() * 0.3,
-          roe: 0.12 + Math.random() * 0.15,
-          roa: 0.06 + Math.random() * 0.08,
-          roic: 0.10 + Math.random() * 0.12,
-          currentRatio: 1.2 + Math.random() * 1,
-          quickRatio: 0.8 + Math.random() * 0.8,
-          debtToEquity: 0.2 + Math.random() * 0.3,
-          interestCoverage: 5 + Math.random() * 10,
-          grossMargin: 0.3 + Math.random() * 0.25,
-          operatingMargin: 0.1 + Math.random() * 0.15,
-          netMargin: 0.05 + Math.random() * 0.1,
-          assetTurnover: 0.8 + Math.random() * 1,
-          inventoryTurnover: 2 + Math.random() * 3,
-        };
+        // Fetch real financial data from yfinance
+        const financialData = await fetchRealKeyRatios(ticker);
+        
+        if (!financialData) {
+          console.warn(`[TestScan ${scanJobId}] Failed to fetch real data for ${ticker}`);
+          continue;
+        }
 
         // Score against persona
         const scoreResult = calculatePersonaScore(financialData as any, personaIdStr);
