@@ -9,7 +9,7 @@ import Ticker from "./pages/Ticker";
 import TickerTest from "./pages/TickerTest";
 import Opportunities from "./pages/Opportunities";
 import Watchlist from "./pages/Watchlist";
-import { OpportunityScannerPage } from "./pages/OpportunityScannerPage";
+import OpportunityScannerPage from "./pages/OpportunityScannerPage";
 
 function Router() {
   return (

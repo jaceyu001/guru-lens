@@ -221,3 +221,64 @@
   - [x] Show filtered opportunities count
   - [x] Update table with filtered data
   - [x] Maintain sorting and ranking
+
+
+## UI ENHANCEMENTS FOR OPPORTUNITY SCANNER
+
+### Phase 7: Enhanced UI Components
+- [ ] Data Status Header
+  - [ ] Show last cache update date/time
+  - [ ] Display "Refresh Data" button
+  - [ ] Show cache status (empty/populated)
+  - [ ] Add loading state during refresh
+- [ ] Scan Progress Modal
+  - [ ] Real-time progress bar (0-100%)
+  - [ ] Show current phase (Phase 1, 1.5, 2)
+  - [ ] Display processed stocks count
+  - [ ] Show opportunities found count
+  - [ ] Display elapsed time
+  - [ ] Auto-close when scan completes
+- [ ] Results Table
+  - [ ] Columns: Rank, Ticker, Company, Score, Price, Market Cap, Sector
+  - [ ] Sortable by any column
+  - [ ] Clickable rows to show details
+  - [ ] Color-coded scores (green >70, yellow 50-70, red <50)
+  - [ ] Empty state message
+  - [ ] Pagination (10/30/50 per page)
+- [ ] Filter Panel
+  - [ ] Sector multi-select checkboxes
+  - [ ] Market cap range slider (billions)
+  - [ ] Price range inputs (min/max)
+  - [ ] Minimum score slider (0-100)
+  - [ ] Apply/Clear buttons
+  - [ ] Filter count badge
+  - [ ] Show "X of Y opportunities" when filtered
+- [ ] Opportunity Details Modal
+  - [ ] Investment thesis (full text)
+  - [ ] Key strengths (bullet list)
+  - [ ] Key risks (bullet list)
+  - [ ] Catalyst analysis (bullet list)
+  - [ ] Confidence level (low/medium/high)
+  - [ ] Recommended action (buy/hold/watch)
+  - [ ] Full financial metrics table
+  - [ ] Close button
+
+### Phase 8: Test Mode
+- [ ] Add "Test Scan (10 stocks)" button
+  - [ ] Uses test tickers: AAPL, MSFT, GOOGL, AMZN, TSLA, JNJ, V, WMT, KO, PG
+  - [ ] Lowers score threshold to 40 (vs 60+)
+  - [ ] Filters to top 5 opportunities
+  - [ ] Shows same UI flow as production scan
+  - [ ] Completes in 2-3 minutes vs 8-17 minutes
+- [ ] Create testScan tRPC procedure
+  - [ ] Calls startTestScan from testScanService
+  - [ ] Returns scan job ID
+  - [ ] Tracks progress same as production scan
+
+### Phase 9: End-to-End Testing
+- [ ] Test data refresh flow
+- [ ] Test scan progress tracking
+- [ ] Test results table display
+- [ ] Test filtering functionality
+- [ ] Test opportunity details modal
+- [ ] Verify all 3 phases complete successfully

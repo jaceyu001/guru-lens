@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
-import { Search, TrendingUp, Users, BarChart3, Shield } from "lucide-react";
+import { Search, TrendingUp, Users, BarChart3, Shield, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -157,6 +157,29 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Opportunity Scanner Section */}
+      <section className="py-20 bg-gradient-to-br from-primary/10 via-background to-accent/10">
+        <div className="container">
+          <div className="max-w-3xl mx-auto text-center">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/20 mb-6">
+              <Zap className="h-8 w-8 text-primary" />
+            </div>
+            <h2 className="text-3xl font-bold text-foreground mb-4">Opportunity Scanner</h2>
+            <p className="text-lg text-muted-foreground mb-8">
+              Scan all 5,500 US stocks to find opportunities matching your investment style. 
+              Our AI analyzes each stock through the lens of legendary investors and ranks the best matches.
+            </p>
+            <Button 
+              size="lg" 
+              className="px-8 h-12 text-base"
+              onClick={() => setLocation("/scanner")}
+            >
+              Start Scanning Now
+            </Button>
+          </div>
+        </div>
+      </section>
+
       {/* Personas Section */}
       <section className="py-20">
         <div className="container">
@@ -183,7 +206,7 @@ export default function Home() {
                 <Card
                   key={persona.id}
                   className="p-6 hover:shadow-lg transition-all cursor-pointer"
-                  onClick={() => setLocation(`/opportunities/${persona.personaId}`)}
+                  onClick={() => setLocation(`/scanner`)}
                 >
                   <h3 className="text-xl font-bold text-foreground mb-2">{persona.name}</h3>
                   <p className="text-sm text-muted-foreground mb-4">{persona.description}</p>

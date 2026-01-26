@@ -1,10 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { trpc } from "@/lib/trpc";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Loader2 } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Slider } from "@/components/ui/slider";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import { trpc } from "@/lib/trpc";
+import { AlertCircle, RefreshCw, Play, Loader2, ChevronDown, ChevronUp } from "lucide-react";
 
 interface Opportunity {
   id: number;
@@ -28,7 +34,7 @@ interface FilterState {
   minScore: number;
 }
 
-export function OpportunityScannerPage() {
+export default function OpportunityScannerPage() {
   const [selectedPersona, setSelectedPersona] = useState<number | null>(null);
   const [scanJobId, setScanJobId] = useState<number | null>(null);
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
