@@ -217,7 +217,16 @@ export default function OpportunityScannerPage() {
       {/* Persona Selection */}
       {!isScanning && opportunities.length === 0 && (
         <div className="mb-8">
-          <h2 className="text-2xl font-bold mb-4">Select an Investor Persona</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-2xl font-bold">Select an Investor Persona</h2>
+            <Button
+              onClick={() => handleStartScan(1)}
+              variant="outline"
+              className="border-green-600 text-green-600 hover:bg-green-50"
+            >
+              Test Scan (10 stocks)
+            </Button>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {personas.data?.map((persona) => (
               <Card
