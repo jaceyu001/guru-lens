@@ -494,6 +494,33 @@ export default function OpportunityScannerPage() {
             </div>
 
             <div className="space-y-4">
+              {/* Scoring Breakdown */}
+              <div className="bg-blue-50 p-4 rounded border border-blue-200">
+                <h3 className="font-semibold mb-3">Why This Score? (65/100)</h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span>Financial Health</span>
+                    <span className="font-bold">18/25</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Profitability & Quality</span>
+                    <span className="font-bold">24/35</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Valuation</span>
+                    <span className="font-bold">15/20</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Growth & Stability</span>
+                    <span className="font-bold">8/20</span>
+                  </div>
+                  <div className="border-t border-blue-200 pt-2 mt-2 flex justify-between font-bold">
+                    <span>Total Score</span>
+                    <span>65/100</span>
+                  </div>
+                </div>
+              </div>
+
               <div>
                 <h3 className="font-semibold mb-2">Investment Thesis</h3>
                 <p className="text-sm text-gray-700">
