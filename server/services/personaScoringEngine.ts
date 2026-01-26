@@ -334,14 +334,7 @@ export const BENJAMIN_GRAHAM_SCORING: PersonaScoringCriteria = {
   },
 };
 
-/**
- * All available persona scoring configurations
- */
-export const PERSONA_SCORING_CONFIGS: Record<string, PersonaScoringCriteria> = {
-  warren_buffett: WARREN_BUFFETT_SCORING,
-  peter_lynch: PETER_LYNCH_SCORING,
-  benjamin_graham: BENJAMIN_GRAHAM_SCORING,
-};
+
 
 /**
  * Calculate score for a stock based on persona criteria
@@ -671,3 +664,304 @@ function findThresholdRating(
   }
   return "Unknown";
 }
+
+/**
+ * CATHIE WOOD SCORING CONFIGURATION
+ * 
+ * Philosophy: Disruptive innovation and technology disruption
+ * Focus: High-growth companies with transformative potential
+ * 
+ * Scoring: 0-100 points
+ * Minimum threshold for opportunity: 50 points
+ */
+export const CATHIE_WOOD_SCORING: PersonaScoringCriteria = {
+  name: "Cathie Wood",
+  description: "Innovation-focused investor seeking disruptive technology companies with exponential growth potential",
+  minThreshold: 50,
+  categories: {
+    "Growth Metrics": {
+      weight: 0.40,
+      maxPoints: 40,
+      metrics: {
+        revenueGrowth: {
+          excellent: { min: 0.30, max: 1.0, points: 15, label: "Excellent" },
+          good: { min: 0.15, max: 0.30, points: 10, label: "Good" },
+          fair: { min: 0.05, max: 0.15, points: 5, label: "Fair" },
+          poor: { min: 0, max: 0.05, points: 0, label: "Poor" },
+        },
+        earningsGrowth: {
+          excellent: { min: 0.40, max: 1.0, points: 15, label: "Excellent" },
+          good: { min: 0.20, max: 0.40, points: 10, label: "Good" },
+          fair: { min: 0.05, max: 0.20, points: 5, label: "Fair" },
+          poor: { min: 0, max: 0.05, points: 0, label: "Poor" },
+        },
+        fcfGrowth: {
+          excellent: { min: 0.25, max: 1.0, points: 10, label: "Excellent" },
+          good: { min: 0.10, max: 0.25, points: 5, label: "Good" },
+          poor: { min: 0, max: 0.10, points: 0, label: "Poor" },
+        },
+      },
+    },
+    "Profitability & Efficiency": {
+      weight: 0.30,
+      maxPoints: 30,
+      metrics: {
+        roa: {
+          excellent: { min: 0.10, max: 1.0, points: 12, label: "Excellent" },
+          good: { min: 0.05, max: 0.10, points: 8, label: "Good" },
+          fair: { min: 0, max: 0.05, points: 3, label: "Fair" },
+          poor: { min: -1.0, max: 0, points: 0, label: "Poor" },
+        },
+        netMargin: {
+          excellent: { min: 0.10, max: 1.0, points: 10, label: "Excellent" },
+          good: { min: 0.05, max: 0.10, points: 6, label: "Good" },
+          fair: { min: 0, max: 0.05, points: 2, label: "Fair" },
+          poor: { min: -1.0, max: 0, points: 0, label: "Poor" },
+        },
+        roe: {
+          excellent: { min: 0.15, max: 1.0, points: 8, label: "Excellent" },
+          good: { min: 0.10, max: 0.15, points: 5, label: "Good" },
+          fair: { min: 0, max: 0.10, points: 2, label: "Fair" },
+          poor: { min: -1.0, max: 0, points: 0, label: "Poor" },
+        },
+      },
+    },
+    "Financial Health": {
+      weight: 0.20,
+      maxPoints: 20,
+      metrics: {
+        debtToEquity: {
+          excellent: { min: 0, max: 1.0, points: 10, label: "Excellent" },
+          good: { min: 1.0, max: 2.0, points: 6, label: "Good" },
+          fair: { min: 2.0, max: 3.0, points: 2, label: "Fair" },
+          poor: { min: 3.0, max: 100, points: 0, label: "Poor" },
+        },
+        currentRatio: {
+          excellent: { min: 1.5, max: 100, points: 10, label: "Excellent" },
+          good: { min: 1.0, max: 1.5, points: 6, label: "Good" },
+          poor: { min: 0, max: 1.0, points: 0, label: "Poor" },
+        },
+      },
+    },
+    "Valuation": {
+      weight: 0.10,
+      maxPoints: 10,
+      metrics: {
+        pegRatio: {
+          excellent: { min: 0, max: 1.0, points: 8, label: "Excellent" },
+          good: { min: 1.0, max: 2.0, points: 4, label: "Good" },
+          fair: { min: 2.0, max: 3.0, points: 2, label: "Fair" },
+          poor: { min: 3.0, max: 1000, points: 0, label: "Poor" },
+        },
+      },
+    },
+  },
+};
+
+/**
+ * RAY DALIO SCORING CONFIGURATION
+ * 
+ * Philosophy: Diversified portfolio with macroeconomic balance
+ * Focus: Uncorrelated assets with strong fundamentals
+ * 
+ * Scoring: 0-100 points
+ * Minimum threshold for opportunity: 55 points
+ */
+export const RAY_DALIO_SCORING: PersonaScoringCriteria = {
+  name: "Ray Dalio",
+  description: "Macro-focused investor seeking diversified, uncorrelated assets with strong fundamental support",
+  minThreshold: 55,
+  categories: {
+    "Fundamental Strength": {
+      weight: 0.35,
+      maxPoints: 35,
+      metrics: {
+        roe: {
+          excellent: { min: 0.15, max: 1.0, points: 12, label: "Excellent" },
+          good: { min: 0.10, max: 0.15, points: 8, label: "Good" },
+          fair: { min: 0.05, max: 0.10, points: 4, label: "Fair" },
+          poor: { min: 0, max: 0.05, points: 0, label: "Poor" },
+        },
+        debtToEquity: {
+          excellent: { min: 0, max: 0.8, points: 12, label: "Excellent" },
+          good: { min: 0.8, max: 1.5, points: 8, label: "Good" },
+          fair: { min: 1.5, max: 2.0, points: 3, label: "Fair" },
+          poor: { min: 2.0, max: 100, points: 0, label: "Poor" },
+        },
+        currentRatio: {
+          excellent: { min: 1.5, max: 100, points: 11, label: "Excellent" },
+          good: { min: 1.0, max: 1.5, points: 7, label: "Good" },
+          poor: { min: 0, max: 1.0, points: 0, label: "Poor" },
+        },
+      },
+    },
+    "Profitability": {
+      weight: 0.30,
+      maxPoints: 30,
+      metrics: {
+        netMargin: {
+          excellent: { min: 0.10, max: 1.0, points: 12, label: "Excellent" },
+          good: { min: 0.05, max: 0.10, points: 8, label: "Good" },
+          fair: { min: 0.02, max: 0.05, points: 4, label: "Fair" },
+          poor: { min: 0, max: 0.02, points: 0, label: "Poor" },
+        },
+        roa: {
+          excellent: { min: 0.08, max: 1.0, points: 10, label: "Excellent" },
+          good: { min: 0.05, max: 0.08, points: 6, label: "Good" },
+          fair: { min: 0.02, max: 0.05, points: 3, label: "Fair" },
+          poor: { min: 0, max: 0.02, points: 0, label: "Poor" },
+        },
+        fcfToNI: {
+          excellent: { min: 0.70, max: 1.0, points: 8, label: "Excellent" },
+          good: { min: 0.50, max: 0.70, points: 4, label: "Good" },
+          poor: { min: 0, max: 0.50, points: 0, label: "Poor" },
+        },
+      },
+    },
+    "Valuation & Value": {
+      weight: 0.20,
+      maxPoints: 20,
+      metrics: {
+        peRatio: {
+          excellent: { min: 0, max: 15, points: 10, label: "Excellent" },
+          good: { min: 15, max: 20, points: 6, label: "Good" },
+          fair: { min: 20, max: 25, points: 2, label: "Fair" },
+          poor: { min: 25, max: 1000, points: 0, label: "Poor" },
+        },
+        pbRatio: {
+          excellent: { min: 0, max: 1.5, points: 10, label: "Excellent" },
+          good: { min: 1.5, max: 2.5, points: 6, label: "Good" },
+          fair: { min: 2.5, max: 3.5, points: 2, label: "Fair" },
+          poor: { min: 3.5, max: 1000, points: 0, label: "Poor" },
+        },
+      },
+    },
+    "Stability & Dividends": {
+      weight: 0.15,
+      maxPoints: 15,
+      metrics: {
+        dividendYield: {
+          excellent: { min: 0.02, max: 1.0, points: 8, label: "Excellent" },
+          good: { min: 0.01, max: 0.02, points: 4, label: "Good" },
+          low: { min: 0, max: 0.01, points: 1, label: "Low" },
+          none: { min: -1.0, max: 0, points: 0, label: "None" },
+        },
+        earningsStability: {
+          excellent: { min: 3, max: 100, points: 7, label: "Excellent" },
+          good: { min: 2, max: 3, points: 4, label: "Good" },
+          poor: { min: 0, max: 2, points: 0, label: "Poor" },
+        },
+      },
+    },
+  },
+};
+
+/**
+ * PHILIP FISHER SCORING CONFIGURATION
+ * 
+ * Philosophy: Quality growth at reasonable prices
+ * Focus: Companies with excellent management and competitive advantages
+ * 
+ * Scoring: 0-100 points
+ * Minimum threshold for opportunity: 58 points
+ */
+export const PHILIP_FISHER_SCORING: PersonaScoringCriteria = {
+  name: "Philip Fisher",
+  description: "Growth investor seeking quality companies with strong management and sustainable competitive advantages",
+  minThreshold: 58,
+  categories: {
+    "Business Quality": {
+      weight: 0.35,
+      maxPoints: 35,
+      metrics: {
+        roe: {
+          excellent: { min: 0.18, max: 1.0, points: 12, label: "Excellent" },
+          good: { min: 0.12, max: 0.18, points: 8, label: "Good" },
+          fair: { min: 0.08, max: 0.12, points: 4, label: "Fair" },
+          poor: { min: 0, max: 0.08, points: 0, label: "Poor" },
+        },
+        roa: {
+          excellent: { min: 0.10, max: 1.0, points: 12, label: "Excellent" },
+          good: { min: 0.07, max: 0.10, points: 8, label: "Good" },
+          fair: { min: 0.04, max: 0.07, points: 4, label: "Fair" },
+          poor: { min: 0, max: 0.04, points: 0, label: "Poor" },
+        },
+        netMargin: {
+          excellent: { min: 0.12, max: 1.0, points: 11, label: "Excellent" },
+          good: { min: 0.08, max: 0.12, points: 7, label: "Good" },
+          fair: { min: 0.04, max: 0.08, points: 3, label: "Fair" },
+          poor: { min: 0, max: 0.04, points: 0, label: "Poor" },
+        },
+      },
+    },
+    "Growth Trajectory": {
+      weight: 0.30,
+      maxPoints: 30,
+      metrics: {
+        revenueGrowth: {
+          excellent: { min: 0.15, max: 1.0, points: 12, label: "Excellent" },
+          good: { min: 0.10, max: 0.15, points: 8, label: "Good" },
+          fair: { min: 0.05, max: 0.10, points: 4, label: "Fair" },
+          poor: { min: 0, max: 0.05, points: 0, label: "Poor" },
+        },
+        earningsGrowth: {
+          excellent: { min: 0.20, max: 1.0, points: 10, label: "Excellent" },
+          good: { min: 0.10, max: 0.20, points: 6, label: "Good" },
+          fair: { min: 0.05, max: 0.10, points: 3, label: "Fair" },
+          poor: { min: 0, max: 0.05, points: 0, label: "Poor" },
+        },
+        fcfGrowth: {
+          excellent: { min: 0.15, max: 1.0, points: 8, label: "Excellent" },
+          good: { min: 0.05, max: 0.15, points: 4, label: "Good" },
+          poor: { min: 0, max: 0.05, points: 0, label: "Poor" },
+        },
+      },
+    },
+    "Financial Health": {
+      weight: 0.20,
+      maxPoints: 20,
+      metrics: {
+        debtToEquity: {
+          excellent: { min: 0, max: 0.6, points: 10, label: "Excellent" },
+          good: { min: 0.6, max: 1.0, points: 6, label: "Good" },
+          fair: { min: 1.0, max: 1.5, points: 2, label: "Fair" },
+          poor: { min: 1.5, max: 100, points: 0, label: "Poor" },
+        },
+        currentRatio: {
+          excellent: { min: 1.5, max: 100, points: 10, label: "Excellent" },
+          good: { min: 1.0, max: 1.5, points: 6, label: "Good" },
+          poor: { min: 0, max: 1.0, points: 0, label: "Poor" },
+        },
+      },
+    },
+    "Valuation": {
+      weight: 0.15,
+      maxPoints: 15,
+      metrics: {
+        pegRatio: {
+          excellent: { min: 0, max: 1.2, points: 10, label: "Excellent" },
+          good: { min: 1.2, max: 1.8, points: 6, label: "Good" },
+          fair: { min: 1.8, max: 2.5, points: 2, label: "Fair" },
+          poor: { min: 2.5, max: 1000, points: 0, label: "Poor" },
+        },
+        peRatio: {
+          excellent: { min: 0, max: 20, points: 5, label: "Excellent" },
+          good: { min: 20, max: 30, points: 3, label: "Good" },
+          poor: { min: 30, max: 1000, points: 0, label: "Poor" },
+        },
+      },
+    },
+  },
+};
+
+/**
+ * All available persona scoring configurations
+ */
+export const PERSONA_SCORING_CONFIGS: Record<string, PersonaScoringCriteria> = {
+  warren_buffett: WARREN_BUFFETT_SCORING,
+  peter_lynch: PETER_LYNCH_SCORING,
+  benjamin_graham: BENJAMIN_GRAHAM_SCORING,
+  cathie_wood: CATHIE_WOOD_SCORING,
+  ray_dalio: RAY_DALIO_SCORING,
+  philip_fisher: PHILIP_FISHER_SCORING,
+};
