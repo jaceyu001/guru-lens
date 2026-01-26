@@ -90,14 +90,14 @@ export default function OpportunityScannerPage() {
     }
   }, [getDataStatusQuery.data]);
 
-  const handleStartScan = async (personaId: number) => {
+  const handleStartScan = async (personaId: number, testMode: boolean = false) => {
     setSelectedPersona(personaId);
     setIsScanning(true);
     setOpportunities([]);
     setScanProgress(null);
 
     try {
-      const result = await startScan.mutateAsync({ personaId });
+      const result = await startScan.mutateAsync({ personaId, testMode });
       setScanJobId(result.scanJobId);
     } catch (error) {
       console.error("Failed to start scan:", error);
@@ -236,7 +236,7 @@ export default function OpportunityScannerPage() {
                   <Button 
                     variant="outline" 
                     className="w-full border-green-600 text-green-600 hover:bg-green-50"
-                    onClick={() => handleStartScan(persona.id)}
+                    onClick={() => handleStartScan(persona.id, true)}
                   >
                     Test Scan (10 stocks)
                   </Button>

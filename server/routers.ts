@@ -823,16 +823,22 @@ export const appRouter = router({
   // Opportunity Scanning operations
   opportunityScanning: router({
     startScan: publicProcedure
-      .input(z.object({ personaId: z.number() }))
+      .input(z.object({ personaId: z.number(), testMode: z.boolean().optional() }))
       .mutation(async ({ input }) => {
-        const { createScanJob, startRefreshJobWithAdaptiveRateLimit } = await import('./services/opportunityScanningService');
+        const { createScanJob, startRefreshJobWithAdaptiveRateLimit, startTestScan } = await import('./services/opportunityScanningService');
         
         const scanJobId = await createScanJob(input.personaId);
         
-        // Start refresh job in background (don't await)
-        startRefreshJobWithAdaptiveRateLimit(scanJobId).catch((error) => {
-          console.error(`[Scan Job ${scanJobId}] Error:`, error);
-        });
+        // Start scan in background
+        if (input.testMode) {
+          startTestScan(scanJobId, input.personaId).catch((error) => {
+            console.error(`[Test Scan Job ${scanJobId}] Error:`, error);
+          });
+        } else {
+          startRefreshJobWithAdaptiveRateLimit(scanJobId).catch((error) => {
+            console.error(`[Scan Job ${scanJobId}] Error:`, error);
+          });
+        }
         
         return { scanJobId, status: 'pending', startedAt: new Date() };
       }),

@@ -336,3 +336,195 @@ Provide a JSON response with:
     // Don't throw - continue processing other opportunities
   }
 }
+
+
+/**
+ * Test scan with 10 stocks
+ * Used to validate the scanning pipeline before running full 5,500-stock scan
+ */
+export async function startTestScan(scanJobId: number, personaId: number): Promise<void> {
+  const database = await ensureDb();
+  const testTickers = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "JNJ", "V", "WMT", "KO", "PG"];
+
+  try {
+    // Update job status
+    await database
+      .update(scanJobs)
+      .set({
+        status: "running",
+        phase: "data_collection",
+        startedAt: new Date(),
+        totalStocks: testTickers.length,
+      })
+      .where(eq(scanJobs.id, scanJobId));
+
+    console.log(`[TestScan ${scanJobId}] Starting test scan with ${testTickers.length} stocks`);
+
+    // Get persona threshold
+    const personaIdMap: Record<number, string> = {
+      1: "warren_buffett",
+      2: "peter_lynch",
+      3: "benjamin_graham",
+      4: "cathie_wood",
+      5: "ray_dalio",
+      6: "philip_fisher",
+    };
+    const personaIdStr = personaIdMap[personaId] || "warren_buffett";
+    const minThreshold = getPersonaMinThreshold(personaIdStr);
+    console.log(`[TestScan ${scanJobId}] Persona ${personaIdStr} min threshold: ${minThreshold}`);
+
+    // Phase 1: Screen all test stocks
+    let opportunitiesCount = 0;
+    const scoredStocks: Array<{ ticker: string; score: number; data: any; tickerId: number }> = [];
+
+    for (let i = 0; i < testTickers.length; i++) {
+      const ticker = testTickers[i];
+      
+      try {
+        // Get ticker record
+        const tickerRecord = await database
+          .select()
+          .from(tickers)
+          .where(eq(tickers.symbol, ticker))
+          .limit(1);
+
+        if (!tickerRecord || !tickerRecord[0]) {
+          console.warn(`[TestScan ${scanJobId}] Ticker not found: ${ticker}`);
+          continue;
+        }
+
+        const tickerId = tickerRecord[0].id;
+
+        // Get financial data (mock for now - in production would fetch from yfinance)
+        const financialData: KeyRatios = {
+          symbol: ticker,
+          peRatio: Math.random() * 30,
+          pbRatio: Math.random() * 5,
+          psRatio: Math.random() * 5,
+          pegRatio: Math.random() * 2,
+          dividendYield: Math.random() * 0.05,
+          payoutRatio: Math.random() * 0.5,
+          roe: Math.random() * 0.3,
+          roa: Math.random() * 0.15,
+          roic: Math.random() * 0.25,
+          currentRatio: Math.random() * 2 + 0.5,
+          quickRatio: Math.random() * 1.5 + 0.5,
+          debtToEquity: Math.random() * 0.5,
+          interestCoverage: Math.random() * 10,
+          grossMargin: Math.random() * 0.5,
+          operatingMargin: Math.random() * 0.3,
+          netMargin: Math.random() * 0.15,
+          assetTurnover: Math.random() * 2,
+          inventoryTurnover: Math.random() * 5,
+        };
+
+        // Score against persona
+        const scoreResult = calculatePersonaScore(financialData as any, personaIdStr);
+        const score = typeof scoreResult === 'number' ? scoreResult : 0;
+        
+        if (score >= minThreshold) {
+          scoredStocks.push({
+            ticker,
+            score,
+            data: financialData,
+            tickerId,
+          });
+          opportunitiesCount++;
+        }
+
+        // Update progress
+        await database
+          .update(scanJobs)
+          .set({
+            processedStocks: i + 1,
+            opportunitiesFound: opportunitiesCount,
+          })
+          .where(eq(scanJobs.id, scanJobId));
+
+        console.log(`[TestScan ${scanJobId}] Processed ${ticker}: score=${score.toFixed(1)}`);
+      } catch (error) {
+        console.error(`[TestScan ${scanJobId}] Error processing ${ticker}:`, error);
+      }
+    }
+
+    // Phase 1.5: Rank and filter to top opportunities
+    const topOpportunities = scoredStocks
+      .sort((a, b) => (b.score || 0) - (a.score || 0))
+      .slice(0, 50);
+
+    console.log(`[TestScan ${scanJobId}] Found ${topOpportunities.length} opportunities, starting LLM analysis`);
+
+    // Phase 2: Generate LLM analysis
+    await database
+      .update(scanJobs)
+      .set({
+        phase: "llm_analysis",
+      })
+      .where(eq(scanJobs.id, scanJobId));
+
+    for (let i = 0; i < topOpportunities.length; i++) {
+      const opp = topOpportunities[i];
+
+      try {
+        // Store opportunity
+        const oppResult = await database.insert(scanOpportunities).values({
+          scanJobId,
+          personaId,
+          tickerId: opp.tickerId,
+          score: Math.round(opp.score || 0),
+          rank: i + 1,
+          currentPrice: null,
+          marketCap: null,
+          sector: null,
+          metricsJson: opp.data,
+        });
+
+        const opportunityId = Number(oppResult[0]?.insertId || 0);
+
+        // Generate LLM analysis
+        if (opportunityId) {
+          await generateLLMAnalysisForOpportunity(
+            opportunityId,
+            personaId,
+            opp.ticker,
+            opp.ticker,
+            opp.data
+          );
+        }
+
+        // Update progress
+        await database
+          .update(scanJobs)
+          .set({
+            llmAnalysesCompleted: i + 1,
+          })
+          .where(eq(scanJobs.id, scanJobId));
+
+        console.log(`[TestScan ${scanJobId}] Generated analysis for ${opp.ticker}`);
+      } catch (error) {
+        console.error(`[TestScan ${scanJobId}] Error analyzing ${opp.ticker}:`, error);
+      }
+    }
+
+    // Mark as completed
+    await database
+      .update(scanJobs)
+      .set({
+        status: "completed",
+        phase: "aggregation",
+        completedAt: new Date(),
+      })
+      .where(eq(scanJobs.id, scanJobId));
+
+    console.log(`[TestScan ${scanJobId}] ✅ Test scan completed`);
+  } catch (error) {
+    console.error(`[TestScan ${scanJobId}] Error:`, error);
+    await database
+      .update(scanJobs)
+      .set({
+        status: "failed",
+        errorMessage: error instanceof Error ? error.message : "Unknown error",
+      })
+      .where(eq(scanJobs.id, scanJobId));
+  }
+}
