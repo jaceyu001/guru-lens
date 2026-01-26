@@ -11,6 +11,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
 import { AlertCircle, RefreshCw, Play, Loader2, ChevronDown, ChevronUp } from "lucide-react";
+import { useAuth } from "@/_core/hooks/useAuth";
+import { getLoginUrl } from "@/const";
 
 interface Opportunity {
   id: number;
@@ -35,6 +37,7 @@ interface FilterState {
 }
 
 export default function OpportunityScannerPage() {
+  const auth = useAuth();
   const [selectedPersona, setSelectedPersona] = useState<number | null>(null);
   const [scanJobId, setScanJobId] = useState<number | null>(null);
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
@@ -90,6 +93,11 @@ export default function OpportunityScannerPage() {
   }, [getDataStatusQuery.data]);
 
   const handleStartScan = async (personaId: number) => {
+    if (!auth.user) {
+      window.location.href = getLoginUrl();
+      return;
+    }
+
     setSelectedPersona(personaId);
     setIsScanning(true);
     setOpportunities([]);
@@ -105,6 +113,11 @@ export default function OpportunityScannerPage() {
   };
 
   const handleRefreshData = async () => {
+    if (!auth.user) {
+      window.location.href = getLoginUrl();
+      return;
+    }
+
     try {
       await refreshData.mutateAsync({ scheduleForLater: false });
       getDataStatusQuery.refetch();
@@ -112,7 +125,6 @@ export default function OpportunityScannerPage() {
       console.error("Failed to refresh data:", error);
     }
   };
-
   // Filter opportunities based on current filters
   const filteredOpportunities = opportunities.filter((opp) => {
     // Sector filter
