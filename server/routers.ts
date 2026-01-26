@@ -822,7 +822,7 @@ export const appRouter = router({
 
   // Opportunity Scanning operations
   opportunityScanning: router({
-    startScan: protectedProcedure
+    startScan: publicProcedure
       .input(z.object({ personaId: z.number() }))
       .mutation(async ({ input }) => {
         const { createScanJob, startRefreshJobWithAdaptiveRateLimit } = await import('./services/opportunityScanningService');
@@ -864,7 +864,7 @@ export const appRouter = router({
         return await getDataStatus();
       }),
     
-    refreshData: protectedProcedure
+    refreshData: publicProcedure
       .input(z.object({ scheduleForLater: z.boolean().optional() }))
       .mutation(async ({ input }) => {
         const { createScanJob, startRefreshJobWithAdaptiveRateLimit } = await import('./services/opportunityScanningService');
