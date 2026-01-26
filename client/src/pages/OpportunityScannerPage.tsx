@@ -24,6 +24,20 @@ interface Opportunity {
   sector: string | null;
   thesis?: string;
   confidence?: string;
+  scoringDetails?: {
+    categories: Array<{
+      name: string;
+      points: number;
+      maxPoints: number;
+      metrics: Array<{
+        name: string;
+        value: number;
+        rating: string;
+        points: number;
+      }>;
+    }>;
+    totalScore: number;
+  };
 }
 
 interface FilterState {
@@ -495,31 +509,40 @@ export default function OpportunityScannerPage() {
 
             <div className="space-y-4">
               {/* Scoring Breakdown */}
-              <div className="bg-blue-50 p-4 rounded border border-blue-200">
-                <h3 className="font-semibold mb-3">Why This Score? (65/100)</h3>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span>Financial Health</span>
-                    <span className="font-bold">18/25</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Profitability & Quality</span>
-                    <span className="font-bold">24/35</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Valuation</span>
-                    <span className="font-bold">15/20</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Growth & Stability</span>
-                    <span className="font-bold">8/20</span>
-                  </div>
-                  <div className="border-t border-blue-200 pt-2 mt-2 flex justify-between font-bold">
-                    <span>Total Score</span>
-                    <span>65/100</span>
+              {selectedOpportunity.scoringDetails ? (
+                <div className="bg-blue-50 p-4 rounded border border-blue-200">
+                  <h3 className="font-semibold mb-3">Why This Score? ({selectedOpportunity.scoringDetails.totalScore}/100)</h3>
+                  <div className="space-y-3 text-sm">
+                    {selectedOpportunity.scoringDetails.categories.map((cat, idx) => (
+                      <div key={idx}>
+                        <div className="flex justify-between mb-1">
+                          <span className="font-medium">{cat.name}</span>
+                          <span className="font-bold">{cat.points}/{cat.maxPoints}</span>
+                        </div>
+                        {cat.metrics.length > 0 && (
+                          <div className="ml-2 space-y-1 text-xs text-gray-600">
+                            {cat.metrics.map((m, midx) => (
+                              <div key={midx} className="flex justify-between">
+                                <span>{m.name}: {m.value} ({m.rating})</span>
+                                <span className="font-semibold">+{m.points}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    <div className="border-t border-blue-200 pt-2 mt-2 flex justify-between font-bold">
+                      <span>Total Score</span>
+                      <span>{selectedOpportunity.scoringDetails.totalScore}/100</span>
+                    </div>
                   </div>
                 </div>
-              </div>
+              ) : (
+                <div className="bg-blue-50 p-4 rounded border border-blue-200">
+                  <h3 className="font-semibold mb-3">Why This Score? ({selectedOpportunity.score.toFixed(0)}/100)</h3>
+                  <p className="text-sm text-gray-600">Scoring details not available</p>
+                </div>
+              )}
 
               <div>
                 <h3 className="font-semibold mb-2">Investment Thesis</h3>

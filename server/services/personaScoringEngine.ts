@@ -559,3 +559,115 @@ export function getDetailedScoreBreakdown(
     categories,
   };
 }
+
+
+/**
+ * Calculate detailed scoring breakdown with metric details
+ * Returns category scores and individual metric ratings
+ */
+export function calculateDetailedScoringBreakdown(
+  ratios: Partial<KeyRatios>,
+  personaId: string
+): {
+  categories: Array<{
+    name: string;
+    points: number;
+    maxPoints: number;
+    metrics: Array<{
+      name: string;
+      value: number;
+      rating: string;
+      points: number;
+    }>;
+  }>;
+  totalScore: number;
+} | null {
+  const config = PERSONA_SCORING_CONFIGS[personaId];
+  if (!config) {
+    throw new Error(`Unknown persona: ${personaId}`);
+  }
+
+  let totalScore = 0;
+  let maxPossible = 0;
+  const categories: Array<{
+    name: string;
+    points: number;
+    maxPoints: number;
+    metrics: Array<{
+      name: string;
+      value: number;
+      rating: string;
+      points: number;
+    }>;
+  }> = [];
+
+  // Iterate through each category
+  for (const [categoryName, category] of Object.entries(config.categories)) {
+    let categoryScore = 0;
+    const metrics: Array<{
+      name: string;
+      value: number;
+      rating: string;
+      points: number;
+    }> = [];
+
+    // Iterate through each metric in the category
+    for (const [metricName, thresholds] of Object.entries(category.metrics)) {
+      const metricValue = getMetricValue(ratios, metricName);
+
+      if (metricValue !== null) {
+        // Find which threshold bracket this metric falls into
+        const points = findThresholdPoints(metricValue, thresholds);
+        const rating = findThresholdRating(metricValue, thresholds);
+        
+        categoryScore += points;
+        metrics.push({
+          name: metricName,
+          value: Number(metricValue.toFixed(2)),
+          rating,
+          points,
+        });
+      }
+    }
+
+    // Add weighted category score
+    const weightedScore = categoryScore * category.weight;
+    totalScore += weightedScore;
+    maxPossible += category.maxPoints * category.weight;
+
+    categories.push({
+      name: categoryName,
+      points: Math.round(weightedScore),
+      maxPoints: Math.round(category.maxPoints * category.weight),
+      metrics,
+    });
+  }
+
+  // If we don't have enough data, return null
+  if (categories.every((c) => c.metrics.length === 0)) {
+    return null;
+  }
+
+  // Normalize to 0-100 scale
+  const finalScore = maxPossible > 0 ? (totalScore / maxPossible) * 100 : 0;
+
+  return {
+    categories,
+    totalScore: Math.round(finalScore),
+  };
+}
+
+/**
+ * Find the rating label for a metric value
+ */
+function findThresholdRating(
+  value: number,
+  thresholds: MetricScoringConfig
+): string {
+  for (const [rating, threshold] of Object.entries(thresholds)) {
+    if (value >= threshold.min && value <= threshold.max) {
+      return threshold.label;
+    }
+  }
+  return "Unknown";
+}

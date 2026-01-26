@@ -1,0 +1,1 @@
+ALTER TABLE `scanOpportunityAnalyses` ADD `scoringDetails` json;

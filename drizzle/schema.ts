@@ -366,6 +366,9 @@ export const scanOpportunityAnalyses = mysqlTable("scanOpportunityAnalyses", {
   keyRisks: json("keyRisks").$type<string[]>().notNull(),
   catalystAnalysis: json("catalystAnalysis").$type<string[]>().notNull(),
   
+  // Scoring breakdown by category with metric details
+  scoringDetails: json("scoringDetails").$type<Record<string, any>>(),
+  
   confidenceLevel: mysqlEnum("confidenceLevel", ["low", "medium", "high"]).default("medium").notNull(),
   recommendedAction: varchar("recommendedAction", { length: 255 }),
   

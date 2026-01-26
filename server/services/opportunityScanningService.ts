@@ -7,7 +7,7 @@
 
 import { getDb } from "../db";
 import { scanJobs, scanOpportunities, scanOpportunityAnalyses, tickers } from "../../drizzle/schema";
-import { calculatePersonaScore, getPersonaMinThreshold } from "./personaScoringEngine";
+import { calculatePersonaScore, getPersonaMinThreshold, calculateDetailedScoringBreakdown } from "./personaScoringEngine";
 import { invokeLLM } from "../_core/llm";
 import { PERSONA_PROMPTS } from "./personaPrompts";
 import type { KeyRatios } from "../../shared/types";
@@ -51,6 +51,20 @@ export interface ScanOpportunityResult {
   sector: string | null;
   thesis?: string;
   confidence?: string;
+  scoringDetails?: {
+    categories: Array<{
+      name: string;
+      points: number;
+      maxPoints: number;
+      metrics: Array<{
+        name: string;
+        value: number;
+        rating: string;
+        points: number;
+      }>;
+    }>;
+    totalScore: number;
+  };
 }
 
 /**
@@ -161,6 +175,7 @@ export async function getOpportunitiesForScan(
       sector: opp.sector,
       thesis: analysis?.[0]?.investmentThesis || undefined,
       confidence: analysis?.[0]?.confidenceLevel || undefined,
+      scoringDetails: analysis?.[0]?.scoringDetails ? (typeof analysis[0].scoringDetails === 'string' ? JSON.parse(analysis[0].scoringDetails) : analysis[0].scoringDetails) : undefined,
     });
   }
 
@@ -317,6 +332,9 @@ Provide a JSON response with:
       };
     }
 
+    // Calculate detailed scoring breakdown
+    const scoringDetails = calculateDetailedScoringBreakdown(financialData as any, personaIdStr);
+
     // Store analysis
     await database.insert(scanOpportunityAnalyses).values({
       opportunityId,
@@ -327,6 +345,7 @@ Provide a JSON response with:
       catalystAnalysis: analysis.catalystAnalysis,
       confidenceLevel: analysis.confidenceLevel as "low" | "medium" | "high",
       recommendedAction: analysis.recommendedAction,
+      scoringDetails: scoringDetails || undefined,
       analysisDate: new Date(),
     });
 
