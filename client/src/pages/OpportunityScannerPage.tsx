@@ -75,7 +75,7 @@ export default function OpportunityScannerPage() {
   );
   const getOpportunities = trpc.opportunityScanning.getOpportunities.useQuery(
     { scanJobId: scanJobId || 0, limit: 50 },
-    { enabled: !!scanJobId && !isScanning }
+    { enabled: !!scanJobId }
   );
   const getDataStatusQuery = trpc.opportunityScanning.getDataStatus.useQuery();
   const refreshData = trpc.opportunityScanning.refreshData.useMutation();
@@ -86,9 +86,11 @@ export default function OpportunityScannerPage() {
       setScanProgress(getScanProgress.data);
       if (getScanProgress.data.status === "completed") {
         setIsScanning(false);
+        // Refetch opportunities when scan completes
+        getOpportunities.refetch();
       }
     }
-  }, [getScanProgress.data]);
+  }, [getScanProgress.data, getOpportunities]);
 
   // Update opportunities
   useEffect(() => {
@@ -231,7 +233,7 @@ export default function OpportunityScannerPage() {
       </Card>
 
       {/* Persona Selection */}
-      {!isScanning && (
+      {!isScanning && opportunities.length === 0 && (
         <div className="mb-8">
           <h2 className="text-2xl font-bold mb-4">Select an Investor Persona</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -264,7 +266,7 @@ export default function OpportunityScannerPage() {
       )}
 
       {/* Scan Progress */}
-      {isScanning && scanProgress && (
+      {isScanning && !opportunities.length && scanProgress && (
         <Card className="mb-8 p-6 bg-yellow-50">
           <h3 className="font-semibold text-lg mb-4">Scan in Progress</h3>
           <div className="space-y-2">
@@ -284,7 +286,7 @@ export default function OpportunityScannerPage() {
       )}
 
       {/* Filters */}
-      {!isScanning && opportunities.length > 0 && (
+      {opportunities.length > 0 && (
         <div className="mb-6">
           <div className="flex items-center justify-between mb-4">
             <Button
@@ -434,7 +436,7 @@ export default function OpportunityScannerPage() {
       )}
 
       {/* Results */}
-      {!isScanning && opportunities.length > 0 && (
+      {opportunities.length > 0 && (
         <div className="mb-8">
           <h2 className="text-2xl font-bold mb-2">
             Showing {filteredOpportunities.length} of {opportunities.length} Opportunities
