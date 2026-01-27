@@ -265,10 +265,37 @@ export default function OpportunityScannerPage() {
         </div>
       )}
 
-      {/* Scan Progress */}
+      {/* Scan Progress with Persona Header */}
       {isScanning && !opportunities.length && scanProgress && (
-        <Card className="mb-8 p-6 bg-yellow-50">
-          <h3 className="font-semibold text-lg mb-4">Scan in Progress</h3>
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-4">
+              <Button
+                onClick={() => {
+                  setSelectedPersona(null);
+                  setScanJobId(null);
+                  setOpportunities([]);
+                  setIsScanning(false);
+                  setScanProgress(null);
+                }}
+                variant="outline"
+                className="flex items-center gap-2"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Back
+              </Button>
+              <div>
+                <h2 className="text-2xl font-bold">
+                  {personas.data?.find(p => p.id === selectedPersona)?.name || "Unknown Persona"}
+                </h2>
+                <p className="text-sm text-gray-600">
+                  {personas.data?.find(p => p.id === selectedPersona)?.description || ""}
+                </p>
+              </div>
+            </div>
+          </div>
+          <Card className="p-6 bg-yellow-50">
+            <h3 className="font-semibold text-lg mb-4">Scan in Progress</h3>
           <div className="space-y-2">
             <p className="text-sm">Phase: {scanProgress.phase}</p>
             <p className="text-sm">Processed: {scanProgress.processedStocks} stocks</p>
@@ -282,7 +309,8 @@ export default function OpportunityScannerPage() {
               ></div>
             </div>
           </div>
-        </Card>
+          </Card>
+        </div>
       )}
 
       {/* Filters */}
