@@ -10,7 +10,7 @@ import { Slider } from "@/components/ui/slider";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
-import { AlertCircle, RefreshCw, Play, Loader2, ChevronDown, ChevronUp } from "lucide-react";
+import { AlertCircle, RefreshCw, Play, Loader2, ChevronDown, ChevronUp, ArrowLeft } from "lucide-react";
 
 
 interface Opportunity {
@@ -435,24 +435,50 @@ export default function OpportunityScannerPage() {
         </div>
       )}
 
-      {/* Results */}
+      {/* Results Header with Back Button */}
       {opportunities.length > 0 && (
         <div className="mb-8">
-          <h2 className="text-2xl font-bold mb-2">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-4">
+              <Button
+                onClick={() => {
+                  setSelectedPersona(null);
+                  setScanJobId(null);
+                  setOpportunities([]);
+                  setIsScanning(false);
+                  setScanProgress(null);
+                }}
+                variant="outline"
+                className="flex items-center gap-2"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Back
+              </Button>
+              <div>
+                <h2 className="text-2xl font-bold">
+                  {personas.data?.find(p => p.id === selectedPersona)?.name || "Unknown Persona"}
+                </h2>
+                <p className="text-sm text-gray-600">
+                  {personas.data?.find(p => p.id === selectedPersona)?.description || ""}
+                </p>
+              </div>
+            </div>
+          </div>
+          <h3 className="text-lg font-semibold mb-4">
             Showing {filteredOpportunities.length} of {opportunities.length} Opportunities
-          </h2>
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
+          </h3>
+          <div className="overflow-x-auto border rounded-lg">
+            <table className="w-full">
               <thead>
-                <tr className="bg-gray-100 border-b">
-                  <th className="p-3 text-left">Rank</th>
-                  <th className="p-3 text-left">Ticker</th>
-                  <th className="p-3 text-left">Company</th>
-                  <th className="p-3 text-left">Sector</th>
-                  <th className="p-3 text-right">Price</th>
-                  <th className="p-3 text-right">Market Cap</th>
-                  <th className="p-3 text-right">Score</th>
-                  <th className="p-3 text-center">Action</th>
+                <tr className="bg-gray-200 border-b sticky top-0">
+                  <th className="p-3 text-left font-semibold">Rank</th>
+                  <th className="p-3 text-left font-semibold">Ticker</th>
+                  <th className="p-3 text-left font-semibold">Company</th>
+                   <th className="p-3 text-left font-semibold">Sector</th>
+                  <th className="p-3 text-left font-semibold">Price</th>
+                  <th className="p-3 text-left font-semibold">Market Cap</th>
+                  <th className="p-3 text-left font-semibold">Score</th>
+                  <th className="p-3 text-left font-semibold">Action</th>
                 </tr>
               </thead>
               <tbody>
