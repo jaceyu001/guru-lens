@@ -309,7 +309,7 @@
   - [x] Polling mechanism fetches results every 5 seconds
   - [x] Frontend displays results when available
 
-## CURRENT WORK: Add Details Button and Scorecard to Results
+## COMPLETED: Add Details Button and Scorecard to Results
 
 - [x] Create OpportunityDetailsModal component
   - [x] Display financial metrics (PE ratio, market cap, etc.)
@@ -320,4 +320,27 @@
   - [x] Button in each row
   - [x] Opens modal with full opportunity details
   - [x] Close button/modal dismiss
-- [ ] Test Details view for each opportunity (in progress - scan running)
+- [x] Test Details view for each opportunity
+
+## CURRENT WORK: Batch LLM Analysis Optimization
+
+- [x] Create batchLLMAnalysis.ts module
+  - [x] Implement analyzeBatchOptimized function
+  - [x] Single LLM call for all stocks instead of sequential calls
+  - [x] Preserve stock order in results
+  - [x] Handle errors gracefully with fallback results
+- [x] Integrate batch analysis into hybridScoringOrchestrator
+  - [x] Update applyLLMFinalScoring to use batch optimization
+  - [x] Prepare all analysis inputs in parallel
+  - [x] Call batch LLM analysis instead of sequential calls
+- [x] Write unit tests for batch LLM analysis
+  - [x] Test single stock analysis
+  - [x] Test multiple stocks analysis
+  - [x] Test stock order preservation
+  - [x] Test different personas
+  - [x] All 4 tests passing
+- [ ] Performance testing with UI
+  - [ ] Test scan with Warren Buffett persona
+  - [ ] Test scan with other personas
+  - [ ] Measure actual time reduction
+  - [ ] Verify results display correctly
