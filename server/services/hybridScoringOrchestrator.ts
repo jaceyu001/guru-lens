@@ -15,6 +15,7 @@ import type { KeyRatios, FinancialData } from "../../shared/types";
 import type { AnalysisOutput } from "./aiAnalysisEngine";
 import { nanoid } from "nanoid";
 
+
 export interface StockPreFilterResult {
   ticker: string;
   preliminaryScore: number;
@@ -250,7 +251,8 @@ export async function hybridScore(
   tickers: string[],
   personaId: number,
   personaName: string,
-  topN: number
+  topN: number,
+  scanJobId?: number
 ): Promise<HybridScoringResult[]> {
   console.log(`[HybridScore] Starting for ${tickers.length} stocks, persona: ${personaName}`);
 
@@ -263,9 +265,13 @@ export async function hybridScore(
   const topCandidates = preFiltered.slice(0, topN);
   console.log(`[HybridScore] Selected top ${topCandidates.length} for LLM analysis`);
 
+  // WebSocket broadcasting disabled - using polling instead
+
   // Stage 2: LLM final scoring
   console.log(`[HybridScore] Stage 2: Running LLM analysis on top ${topCandidates.length}...`);
   const finalResults = await applyLLMFinalScoring(topCandidates, personaId, personaName);
+
+  // WebSocket broadcasting disabled - using polling instead
 
   console.log(`[HybridScore] Completed: ${finalResults.length} results with final scores`);
   return finalResults;

@@ -835,7 +835,7 @@ export const appRouter = router({
             console.error(`[Test Scan Job ${scanJobId}] Error:`, error);
           });
         } else {
-          startRefreshJobWithAdaptiveRateLimit(scanJobId).catch((error) => {
+          startRefreshJobWithAdaptiveRateLimit(scanJobId, input.personaId).catch((error) => {
             console.error(`[Scan Job ${scanJobId}] Error:`, error);
           });
         }
@@ -874,8 +874,7 @@ export const appRouter = router({
       .input(z.object({ scheduleForLater: z.boolean().optional() }))
       .mutation(async ({ input }) => {
         const { createScanJob, startRefreshJobWithAdaptiveRateLimit } = await import('./services/opportunityScanningService');
-        
-        const refreshJobId = await createScanJob(1); // TODO: Get actual persona ID
+              const refreshJobId = await createScanJob(1); // TODO: Get actual persona ID
         
         if (input.scheduleForLater) {
           // Schedule for 10 PM tonight
@@ -883,8 +882,7 @@ export const appRouter = router({
           // TODO: Implement scheduling logic
         } else {
           // Start immediately in background
-          startRefreshJobWithAdaptiveRateLimit(refreshJobId).catch((error) => {
-            console.error(`[Refresh Job ${refreshJobId}] Error:`, error);
+          startRefreshJobWithAdaptiveRateLimit(refreshJobId, 1).catch((error: any) => {           console.error(`[Refresh Job ${refreshJobId}] Error:`, error);
           });
         }
         

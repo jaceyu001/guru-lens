@@ -89,6 +89,9 @@ export function addScanResult(scanJobId: number, result: ScanResult): void {
   if (job) {
     job.results.push(result);
     job.opportunitiesFound = job.results.length;
+    console.log(`[ScanCache] Added result for ${result.ticker} to job ${scanJobId}. Total results: ${job.results.length}`);
+  } else {
+    console.warn(`[ScanCache] Job ${scanJobId} not found when adding result for ${result.ticker}`);
   }
 }
 

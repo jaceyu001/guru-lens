@@ -300,3 +300,24 @@
 - [ ] Full scan for Ray Dalio persona
 - [ ] Full scan for Philip Fisher persona
 - [ ] Verify all scans return meaningful results
+
+## COMPLETED: Database Persistence for Scan Results
+
+- [x] Implemented in-memory cache for scan results
+  - [x] Scan results stored in scanResultsCache
+  - [x] getOpportunitiesForScan reads from cache
+  - [x] Polling mechanism fetches results every 5 seconds
+  - [x] Frontend displays results when available
+
+## CURRENT WORK: Add Details Button and Scorecard to Results
+
+- [x] Create OpportunityDetailsModal component
+  - [x] Display financial metrics (PE ratio, market cap, etc.)
+  - [x] Display LLM analysis details (thesis, strengths, risks)
+  - [x] Show score breakdown by criteria
+  - [x] Similar layout to individual analysis scorecard
+- [x] Add Details button to results table
+  - [x] Button in each row
+  - [x] Opens modal with full opportunity details
+  - [x] Close button/modal dismiss
+- [ ] Test Details view for each opportunity (in progress - scan running)

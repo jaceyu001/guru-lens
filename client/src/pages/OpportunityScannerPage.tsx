@@ -1,103 +1,70 @@
-"use client";
-
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Slider } from "@/components/ui/slider";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
+import { ArrowLeft, RefreshCw, Loader2, Eye } from "lucide-react";
 import { trpc } from "@/lib/trpc";
-import { AlertCircle, RefreshCw, Play, Loader2, ChevronDown, ChevronUp, ArrowLeft } from "lucide-react";
-
+import { OpportunityDetailsModal } from "@/components/OpportunityDetailsModal";
 
 interface Opportunity {
-  id: number;
-  rank: number;
   ticker: string;
-  companyName: string;
-  score: number;
-  currentPrice: number | null;
-  marketCap: number | null;
+  company: string;
   sector: string | null;
+  price: number | null;
+  marketCap: number | null;
+  score: number;
   thesis?: string;
   confidence?: string;
-  scoringDetails?: {
-    categories: Array<{
-      name: string;
-      points: number;
-      maxPoints: number;
-      metrics: Array<{
-        name: string;
-        value: number;
-        rating: string;
-        points: number;
-      }>;
-    }>;
-    totalScore: number;
-  };
-}
-
-interface FilterState {
-  sectors: string[];
-  marketCapMin: number | null;
-  marketCapMax: number | null;
-  priceMin: number | null;
-  priceMax: number | null;
-  minScore: number;
 }
 
 export default function OpportunityScannerPage() {
-  const [selectedPersona, setSelectedPersona] = useState<number | null>(null);
+  const [location, setLocation] = useLocation();
+  const [selectedPersonaId, setSelectedPersonaId] = useState<number | null>(null);
   const [scanJobId, setScanJobId] = useState<number | null>(null);
-  const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [isScanning, setIsScanning] = useState(false);
-  const [scanProgress, setScanProgress] = useState<any>(null);
+  const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [dataStatus, setDataStatus] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
   const [selectedOpportunity, setSelectedOpportunity] = useState<Opportunity | null>(null);
-  const [showFilters, setShowFilters] = useState(false);
-  const [filters, setFilters] = useState<FilterState>({
-    sectors: [],
-    marketCapMin: null,
-    marketCapMax: null,
-    priceMin: null,
-    priceMax: null,
-    minScore: 0,
-  });
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
   const personas = trpc.personas.list.useQuery();
   const startScan = trpc.opportunityScanning.startScan.useMutation();
-  const getScanProgress = trpc.opportunityScanning.getScanProgress.useQuery(
-    { scanJobId: scanJobId || 0 },
-    { enabled: !!scanJobId && isScanning, refetchInterval: 2000 }
-  );
-  const getOpportunities = trpc.opportunityScanning.getOpportunities.useQuery(
+  const getDataStatusQuery = trpc.opportunityScanning.getDataStatus.useQuery();
+  const getOpportunitiesQuery = trpc.opportunityScanning.getOpportunities.useQuery(
     { scanJobId: scanJobId || 0, limit: 50 },
     { enabled: !!scanJobId }
   );
-  const getDataStatusQuery = trpc.opportunityScanning.getDataStatus.useQuery();
   const refreshData = trpc.opportunityScanning.refreshData.useMutation();
 
-  // Update scan progress
+  // Poll for results when scanning
   useEffect(() => {
-    if (getScanProgress.data) {
-      setScanProgress(getScanProgress.data);
-      if (getScanProgress.data.status === "completed") {
-        setIsScanning(false);
-        // Refetch opportunities when scan completes
-        getOpportunities.refetch();
-      }
-    }
-  }, [getScanProgress.data, getOpportunities]);
+    if (!isScanning || !scanJobId) return;
 
-  // Update opportunities
+    const pollInterval = setInterval(() => {
+      getOpportunitiesQuery.refetch();
+    }, 3000);
+
+    return () => clearInterval(pollInterval);
+  }, [isScanning, scanJobId, getOpportunitiesQuery]);
+
+  // Check if results are available
   useEffect(() => {
-    if (getOpportunities.data) {
-      setOpportunities(getOpportunities.data as Opportunity[]);
+    if (getOpportunitiesQuery.data && getOpportunitiesQuery.data.length > 0) {
+      const mapped = getOpportunitiesQuery.data.map((opp: any) => ({
+        ticker: opp.ticker,
+        company: opp.company || opp.ticker,
+        sector: opp.sector,
+        price: opp.price,
+        marketCap: opp.marketCap,
+        score: opp.score || opp.finalScore,
+        thesis: opp.thesis,
+        confidence: opp.confidence,
+      }));
+      setOpportunities(mapped);
+      setIsScanning(false);
     }
-  }, [getOpportunities.data]);
+  }, [getOpportunitiesQuery.data]);
 
   // Update data status
   useEffect(() => {
@@ -106,155 +73,108 @@ export default function OpportunityScannerPage() {
     }
   }, [getDataStatusQuery.data]);
 
-  const handleStartScan = async (personaId: number, testMode: boolean = false) => {
-    setSelectedPersona(personaId);
-    setIsScanning(true);
-    setOpportunities([]);
-    setScanProgress(null);
-
+  const handleStartScan = async (personaId: number, isTestScan: boolean) => {
     try {
-      const result = await startScan.mutateAsync({ personaId, testMode });
+      setSelectedPersonaId(personaId);
+      setIsScanning(true);
+      setOpportunities([]);
+      setError(null);
+      setScanJobId(null);
+
+      // Start scan - returns immediately
+      const result = await startScan.mutateAsync({
+        personaId,
+        testMode: isTestScan,
+      });
+
       setScanJobId(result.scanJobId);
-    } catch (error) {
-      console.error("[UI] Failed to start scan:", error);
-      alert(`Failed to start scan: ${error instanceof Error ? error.message : String(error)}`);
-      console.log("[UI] Alert shown to user");
+      console.log(`[Scan] Started scan job ${result.scanJobId}`);
+    } catch (err) {
+      console.error("Scan failed:", err);
+      setError(err instanceof Error ? err.message : "Scan failed. Please try again.");
       setIsScanning(false);
     }
   };
 
+  const handleBack = () => {
+    setSelectedPersonaId(null);
+    setIsScanning(false);
+    setOpportunities([]);
+    setError(null);
+    setScanJobId(null);
+  };
+
   const handleRefreshData = async () => {
     try {
-      await refreshData.mutateAsync({ scheduleForLater: false });
+      await refreshData.mutateAsync({});
       getDataStatusQuery.refetch();
-    } catch (error) {
-      console.error("Failed to refresh data:", error);
+    } catch (err) {
+      console.error("Refresh failed:", err);
     }
   };
-  // Filter opportunities based on current filters
-  const filteredOpportunities = opportunities.filter((opp) => {
-    // Sector filter
-    if (filters.sectors.length > 0 && !filters.sectors.includes(opp.sector || "")) {
-      return false;
-    }
 
-    // Market cap filter (in billions)
-    if (opp.marketCap) {
-      const marketCapInBillions = opp.marketCap / 1e9;
-      if (filters.marketCapMin !== null && marketCapInBillions < filters.marketCapMin) {
-        return false;
-      }
-      if (filters.marketCapMax !== null && marketCapInBillions > filters.marketCapMax) {
-        return false;
-      }
-    }
+  const persona = personas.data?.find((p) => p.id === selectedPersonaId);
 
-    // Price filter
-    if (opp.currentPrice) {
-      if (filters.priceMin !== null && opp.currentPrice < filters.priceMin) {
-        return false;
-      }
-      if (filters.priceMax !== null && opp.currentPrice > filters.priceMax) {
-        return false;
-      }
-    }
-
-    // Score filter
-    if (opp.score < filters.minScore) {
-      return false;
-    }
-
-    return true;
-  });
-
-  const activeFilterCount = [
-    filters.sectors.length > 0 ? 1 : 0,
-    filters.marketCapMin !== null || filters.marketCapMax !== null ? 1 : 0,
-    filters.priceMin !== null || filters.priceMax !== null ? 1 : 0,
-    filters.minScore > 0 ? 1 : 0,
-  ].reduce((a, b) => a + b, 0);
-
-  const handleClearFilters = () => {
-    setFilters({
-      sectors: [],
-      marketCapMin: null,
-      marketCapMax: null,
-      priceMin: null,
-      priceMax: null,
-      minScore: 0,
-    });
-  };
-
-  // Get unique sectors from opportunities
-  const uniqueSectors = Array.from(
-    new Set(opportunities.map((o) => o.sector).filter(Boolean))
-  ) as string[];
-
-  return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold mb-2">Opportunity Scanner</h1>
-        <p className="text-gray-600">
-          Scan all US stocks to find opportunities matching your investment style
-        </p>
-      </div>
-
-      {/* Data Status Header */}
-      <Card className="mb-8 p-6 bg-blue-50">
-        <div className="flex justify-between items-center">
-          <div>
-            <h3 className="font-semibold text-lg">Financial Data Cache</h3>
-            {dataStatus?.lastUpdated ? (
-              <p className="text-sm text-gray-600">
-                Last updated: {new Date(dataStatus.lastUpdated).toLocaleString()}
-              </p>
-            ) : (
-              <p className="text-sm text-gray-600">No data cached yet</p>
-            )}
-            <p className="text-sm text-gray-600">
-              Stocks cached: {dataStatus?.stocksCached || 0} / 5,500
+  // Show scanner page
+  if (!selectedPersonaId || !persona) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-background to-background/80 p-8">
+        <div className="max-w-6xl mx-auto">
+          <div className="mb-12">
+            <h1 className="text-4xl font-bold mb-2">Opportunity Scanner</h1>
+            <p className="text-lg text-muted-foreground">
+              Scan all US stocks to find opportunities matching your investment style
             </p>
           </div>
-          <Button
-            onClick={handleRefreshData}
-            disabled={refreshData.isPending}
-            className="bg-blue-600 hover:bg-blue-700"
-          >
-            {refreshData.isPending ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Refreshing...
-              </>
-            ) : (
-              "Refresh Data"
-            )}
-          </Button>
-        </div>
-      </Card>
 
-      {/* Persona Selection */}
-      {!isScanning && opportunities.length === 0 && (
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold mb-4">Select an Investor Persona</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {personas.data?.map((persona) => (
-              <Card
-                key={persona.id}
-                className="p-6 hover:shadow-lg transition-shadow"
+          {/* Financial Data Cache */}
+          <Card className="mb-8 p-6 border-blue-200 bg-blue-50">
+            <div className="flex justify-between items-start">
+              <div>
+                <h2 className="text-lg font-semibold mb-2">Financial Data Cache</h2>
+                <p className="text-sm text-muted-foreground">
+                  Last updated: {dataStatus?.lastUpdated ? new Date(dataStatus.lastUpdated).toLocaleString() : "Never"}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Stocks cached: {dataStatus?.cachedStocks || 0} / 5,500
+                </p>
+              </div>
+              <Button
+                onClick={handleRefreshData}
+                disabled={refreshData.isPending}
+                className="bg-blue-600 hover:bg-blue-700"
               >
-                <h3 className="font-bold text-lg mb-2">{persona.name}</h3>
-                <p className="text-sm text-gray-600 mb-4">{persona.description}</p>
+                {refreshData.isPending ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Refreshing...
+                  </>
+                ) : (
+                  "Refresh Data"
+                )}
+              </Button>
+            </div>
+          </Card>
+
+          {/* Personas Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {personas.data?.map((p) => (
+              <Card key={p.id} className="p-6 hover:shadow-lg transition-shadow">
+                <h3 className="text-xl font-bold mb-2">{p.name}</h3>
+                <p className="text-sm text-muted-foreground mb-6">{p.description}</p>
                 <div className="space-y-2">
-                  <Button 
-                    className="w-full" 
-                    onClick={() => handleStartScan(persona.id)}
+                  <Button
+                    onClick={() => handleStartScan(p.id, false)}
+                    disabled={startScan.isPending}
+                    className="w-full bg-blue-600 hover:bg-blue-700"
                   >
                     Start Scan (5,500 stocks)
                   </Button>
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    onClick={() => handleStartScan(p.id, true)}
+                    disabled={startScan.isPending}
+                    variant="outline"
                     className="w-full border-green-600 text-green-600 hover:bg-green-50"
-                    onClick={() => handleStartScan(persona.id, true)}
                   >
                     Test Scan (10 stocks)
                   </Button>
@@ -263,387 +183,166 @@ export default function OpportunityScannerPage() {
             ))}
           </div>
         </div>
-      )}
+      </div>
+    );
+  }
 
-      {/* Scan Progress with Persona Header */}
-      {isScanning && !opportunities.length && scanProgress && (
+  // Show scan in progress or results
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-background to-background/80 p-8">
+      <div className="maxw-6xl mx-auto">
+        {/* Header with back button and persona info */}
         <div className="mb-8">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-4">
-              <Button
-                onClick={() => {
-                  setSelectedPersona(null);
-                  setScanJobId(null);
-                  setOpportunities([]);
-                  setIsScanning(false);
-                  setScanProgress(null);
-                }}
-                variant="outline"
-                className="flex items-center gap-2"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Back
-              </Button>
-              <div>
-                <h2 className="text-2xl font-bold">
-                  {personas.data?.find(p => p.id === selectedPersona)?.name || "Unknown Persona"}
-                </h2>
-                <p className="text-sm text-gray-600">
-                  {personas.data?.find(p => p.id === selectedPersona)?.description || ""}
-                </p>
-              </div>
-            </div>
-          </div>
-          <Card className="p-6 bg-yellow-50">
-            <h3 className="font-semibold text-lg mb-4">Scan in Progress</h3>
-          <div className="space-y-2">
-            <p className="text-sm">Phase: {scanProgress.phase}</p>
-            <p className="text-sm">Processed: {scanProgress.processedStocks} stocks</p>
-            <p className="text-sm">Opportunities Found: {scanProgress.opportunitiesFound}</p>
-            <div className="w-full bg-gray-200 rounded-full h-2 mt-4">
-              <div
-                className="bg-blue-600 h-2 rounded-full transition-all"
-                style={{
-                  width: `${Math.min((scanProgress.processedStocks / 5500) * 100, 100)}%`,
-                }}
-              ></div>
-            </div>
-          </div>
-          </Card>
+          <Button
+            onClick={handleBack}
+            variant="ghost"
+            className="mb-4 text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back
+          </Button>
+          <h1 className="text-3xl font-bold mb-2">{persona.name}</h1>
+          <p className="text-muted-foreground">{persona.description}</p>
         </div>
-      )}
 
-      {/* Filters */}
-      {opportunities.length > 0 && (
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-4">
+        {/* Financial Data Cache */}
+        <Card className="mb-8 p-6 border-blue-200 bg-blue-50">
+          <div className="flex justify-between items-start">
+            <div>
+              <h2 className="text-lg font-semibold mb-2">Financial Data Cache</h2>
+              <p className="text-sm text-muted-foreground">
+                Last updated: {dataStatus?.lastUpdated ? new Date(dataStatus.lastUpdated).toLocaleString() : "Never"}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Stocks cached: {dataStatus?.cachedStocks || 0} / 5,500
+              </p>
+            </div>
             <Button
-              onClick={() => setShowFilters(!showFilters)}
-              variant="outline"
-              className="flex items-center gap-2"
+              onClick={handleRefreshData}
+              disabled={refreshData.isPending}
+              className="bg-blue-600 hover:bg-blue-700"
             >
-              🔍 Filters
-              {activeFilterCount > 0 && (
-                <span className="bg-blue-600 text-white rounded-full px-2 py-1 text-xs font-bold">
-                  {activeFilterCount}
-                </span>
+              {refreshData.isPending ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Refreshing...
+                </>
+              ) : (
+                "Refresh Data"
               )}
             </Button>
-            {activeFilterCount > 0 && (
-              <Button
-                onClick={handleClearFilters}
-                variant="ghost"
-                className="text-sm"
-              >
-                Clear All Filters
-              </Button>
-            )}
           </div>
+        </Card>
 
-          {showFilters && (
-            <Card className="p-6 mb-6 bg-gray-50">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {/* Sector Filter */}
-                <div>
-                  <label className="block font-semibold mb-2">Sector</label>
-                  <div className="space-y-2 max-h-40 overflow-y-auto">
-                    {uniqueSectors.map((sector) => (
-                      <label key={sector} className="flex items-center">
-                        <input
-                          type="checkbox"
-                          checked={filters.sectors.includes(sector)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setFilters({
-                                ...filters,
-                                sectors: [...filters.sectors, sector],
-                              });
-                            } else {
-                              setFilters({
-                                ...filters,
-                                sectors: filters.sectors.filter((s) => s !== sector),
-                              });
-                            }
-                          }}
-                          className="mr-2"
-                        />
-                        <span className="text-sm">{sector}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Market Cap Filter */}
-                <div>
-                  <label className="block font-semibold mb-2">Market Cap (Billions)</label>
-                  <div className="space-y-2">
-                    <input
-                      type="number"
-                      placeholder="Min"
-                      value={filters.marketCapMin || ""}
-                      onChange={(e) =>
-                        setFilters({
-                          ...filters,
-                          marketCapMin: e.target.value ? Number(e.target.value) : null,
-                        })
-                      }
-                      className="w-full px-2 py-1 border rounded text-sm"
-                    />
-                    <input
-                      type="number"
-                      placeholder="Max"
-                      value={filters.marketCapMax || ""}
-                      onChange={(e) =>
-                        setFilters({
-                          ...filters,
-                          marketCapMax: e.target.value ? Number(e.target.value) : null,
-                        })
-                      }
-                      className="w-full px-2 py-1 border rounded text-sm"
-                    />
-                  </div>
-                </div>
-
-                {/* Price Range Filter */}
-                <div>
-                  <label className="block font-semibold mb-2">Price Range ($)</label>
-                  <div className="space-y-2">
-                    <input
-                      type="number"
-                      placeholder="Min"
-                      value={filters.priceMin || ""}
-                      onChange={(e) =>
-                        setFilters({
-                          ...filters,
-                          priceMin: e.target.value ? Number(e.target.value) : null,
-                        })
-                      }
-                      className="w-full px-2 py-1 border rounded text-sm"
-                    />
-                    <input
-                      type="number"
-                      placeholder="Max"
-                      value={filters.priceMax || ""}
-                      onChange={(e) =>
-                        setFilters({
-                          ...filters,
-                          priceMax: e.target.value ? Number(e.target.value) : null,
-                        })
-                      }
-                      className="w-full px-2 py-1 border rounded text-sm"
-                    />
-                  </div>
-                </div>
-
-                {/* Minimum Score Filter */}
-                <div>
-                  <label className="block font-semibold mb-2">Minimum Score</label>
-                  <div className="space-y-2">
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      value={filters.minScore}
-                      onChange={(e) =>
-                        setFilters({
-                          ...filters,
-                          minScore: Number(e.target.value),
-                        })
-                      }
-                      className="w-full"
-                    />
-                    <div className="text-sm font-semibold text-center">
-                      {filters.minScore}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          )}
-        </div>
-      )}
-
-      {/* Results Header with Back Button */}
-      {opportunities.length > 0 && (
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-4">
-              <Button
-                onClick={() => {
-                  setSelectedPersona(null);
-                  setScanJobId(null);
-                  setOpportunities([]);
-                  setIsScanning(false);
-                  setScanProgress(null);
-                }}
-                variant="outline"
-                className="flex items-center gap-2"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Back
-              </Button>
-              <div>
-                <h2 className="text-2xl font-bold">
-                  {personas.data?.find(p => p.id === selectedPersona)?.name || "Unknown Persona"}
-                </h2>
-                <p className="text-sm text-gray-600">
-                  {personas.data?.find(p => p.id === selectedPersona)?.description || ""}
-                </p>
-              </div>
-            </div>
-          </div>
-          <h3 className="text-lg font-semibold mb-4">
-            Showing {filteredOpportunities.length} of {opportunities.length} Opportunities
-          </h3>
-          <div className="overflow-x-auto border rounded-lg">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-gray-200 border-b sticky top-0">
-                  <th className="p-3 text-left font-semibold">Rank</th>
-                  <th className="p-3 text-left font-semibold">Ticker</th>
-                  <th className="p-3 text-left font-semibold">Company</th>
-                   <th className="p-3 text-left font-semibold">Sector</th>
-                  <th className="p-3 text-left font-semibold">Price</th>
-                  <th className="p-3 text-left font-semibold">Market Cap</th>
-                  <th className="p-3 text-left font-semibold">Score</th>
-                  <th className="p-3 text-left font-semibold">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredOpportunities.map((opp) => (
-                  <tr key={opp.id} className="border-b hover:bg-gray-50">
-                    <td className="p-3">{opp.rank}</td>
-                    <td className="p-3 font-bold">{opp.ticker}</td>
-                    <td className="p-3">{opp.companyName}</td>
-                    <td className="p-3 text-sm">{opp.sector || "-"}</td>
-                    <td className="p-3 text-right">
-                      ${opp.currentPrice?.toFixed(2) || "-"}
-                    </td>
-                    <td className="p-3 text-right text-sm">
-                      {opp.marketCap
-                        ? `$${(opp.marketCap / 1e9).toFixed(1)}B`
-                        : "-"}
-                    </td>
-                    <td className="p-3 text-right">
-                      <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded font-bold">
-                        {opp.score.toFixed(0)}
-                      </span>
-                    </td>
-                    <td className="p-3 text-center">
-                      <Button
-                        onClick={() => setSelectedOpportunity(opp)}
-                        variant="outline"
-                        size="sm"
-                      >
-                        Details
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Opportunity Details Modal */}
-      {selectedOpportunity && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <Card className="max-w-2xl w-full max-h-96 overflow-y-auto p-6">
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <h2 className="text-2xl font-bold">
-                  {selectedOpportunity.ticker} - {selectedOpportunity.companyName}
-                </h2>
-                <p className="text-gray-600">Score: {selectedOpportunity.score.toFixed(0)}</p>
-              </div>
-              <Button
-                onClick={() => setSelectedOpportunity(null)}
-                variant="ghost"
-              >
-                ✕
-              </Button>
-            </div>
-
-            <div className="space-y-4">
-              {/* Scoring Breakdown */}
-              {selectedOpportunity.scoringDetails ? (
-                <div className="bg-blue-50 p-4 rounded border border-blue-200">
-                  <h3 className="font-semibold mb-3">Why This Score? ({selectedOpportunity.scoringDetails.totalScore}/100)</h3>
-                  <div className="space-y-3 text-sm">
-                    {selectedOpportunity.scoringDetails.categories.map((cat, idx) => (
-                      <div key={idx}>
-                        <div className="flex justify-between mb-1">
-                          <span className="font-medium">{cat.name}</span>
-                          <span className="font-bold">{cat.points}/{cat.maxPoints}</span>
-                        </div>
-                        {cat.metrics.length > 0 && (
-                          <div className="ml-2 space-y-1 text-xs text-gray-600">
-                            {cat.metrics.map((m, midx) => (
-                              <div key={midx} className="flex justify-between">
-                                <span>{m.name}: {m.value} ({m.rating})</span>
-                                <span className="font-semibold">+{m.points}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                    <div className="border-t border-blue-200 pt-2 mt-2 flex justify-between font-bold">
-                      <span>Total Score</span>
-                      <span>{selectedOpportunity.scoringDetails.totalScore}/100</span>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-blue-50 p-4 rounded border border-blue-200">
-                  <h3 className="font-semibold mb-3">Why This Score? ({selectedOpportunity.score.toFixed(0)}/100)</h3>
-                  <p className="text-sm text-gray-600">Scoring details not available</p>
-                </div>
-              )}
-
-              <div>
-                <h3 className="font-semibold mb-2">Investment Thesis</h3>
-                <p className="text-sm text-gray-700">
-                  {selectedOpportunity.thesis || "No thesis available"}
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-gray-600">Current Price</p>
-                  <p className="font-bold">${selectedOpportunity.currentPrice?.toFixed(2)}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Market Cap</p>
-                  <p className="font-bold">
-                    {selectedOpportunity.marketCap
-                      ? `$${(selectedOpportunity.marketCap / 1e9).toFixed(1)}B`
-                      : "-"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Sector</p>
-                  <p className="font-bold">{selectedOpportunity.sector || "-"}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Confidence</p>
-                  <p className="font-bold">{selectedOpportunity.confidence || "-"}</p>
-                </div>
-              </div>
+        {/* Scan in Progress, Error, or Results */}
+        {isScanning ? (
+          <Card className="p-12 text-center">
+            <div className="flex flex-col items-center justify-center space-y-4">
+              <Loader2 className="w-12 h-12 animate-spin text-blue-600" />
+              <h2 className="text-2xl font-bold">Scan in Progress</h2>
+              <p className="text-muted-foreground">
+                Analyzing stocks and generating investment insights...
+              </p>
+              <p className="text-sm text-muted-foreground">
+                This may take 60-90 seconds
+              </p>
             </div>
           </Card>
-        </div>
-      )}
+        ) : error ? (
+          <Card className="p-12 text-center border-red-200 bg-red-50">
+            <h2 className="text-2xl font-bold text-red-800 mb-2">Scan Failed</h2>
+            <p className="text-red-700 mb-6">{error}</p>
+            <Button
+              onClick={handleBack}
+              variant="outline"
+              className="border-red-600 text-red-600 hover:bg-red-50"
+            >
+              Back to Personas
+            </Button>
+          </Card>
+        ) : opportunities.length > 0 ? (
+          <Card className="p-6">
+            <h2 className="text-2xl font-bold mb-6">Top 5 Opportunities</h2>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-3 px-4 font-semibold">Ticker</th>
+                    <th className="text-left py-3 px-4 font-semibold">Company</th>
+                    <th className="text-left py-3 px-4 font-semibold">Score</th>
+                    <th className="text-left py-3 px-4 font-semibold">Sector</th>
+                    <th className="text-left py-3 px-4 font-semibold">Thesis</th>
+                    <th className="text-left py-3 px-4 font-semibold">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {opportunities.map((opp, idx) => (
+                    <tr key={idx} className="border-b hover:bg-muted/50">
+                      <td className="py-3 px-4 font-bold text-blue-600">{opp.ticker}</td>
+                      <td className="py-3 px-4">{opp.company}</td>
+                      <td className="py-3 px-4">
+                        <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                          opp.score >= 70 ? 'bg-green-100 text-green-800' :
+                          opp.score >= 50 ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-red-100 text-red-800'
+                        }`}>
+                          {Math.round(opp.score)}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-muted-foreground">{opp.sector || "—"}</td>
+                      <td className="py-3 px-4 text-sm text-muted-foreground">{opp.thesis?.substring(0, 50)}...</td>
+                      <td className="py-3 px-4">
+                        <Button
+                          onClick={() => {
+                            setSelectedOpportunity(opp);
+                            setIsDetailsOpen(true);
+                          }}
+                          variant="outline"
+                          size="sm"
+                          className="border-blue-600 text-blue-600 hover:bg-blue-50"
+                        >
+                          <Eye className="w-4 h-4 mr-1" />
+                          Details
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <Button
+              onClick={handleBack}
+              variant="outline"
+              className="mt-6"
+            >
+              Back to Personas
+            </Button>
+          </Card>
+        ) : (
+          <Card className="p-12 text-center">
+            <h2 className="text-2xl font-bold mb-2">No opportunities found</h2>
+            <p className="text-muted-foreground mb-6">The scan completed but no opportunities matched the criteria.</p>
+            <Button
+              onClick={handleBack}
+              variant="outline"
+            >
+              Back to Personas
+            </Button>
+          </Card>
+        )}
 
-      {/* Empty State */}
-      {!isScanning && opportunities.length === 0 && dataStatus?.stocksCached === 0 && (
-        <Card className="p-8 text-center bg-gray-50">
-          <p className="text-gray-600 mb-4">
-            No financial data cached. Refresh data to start scanning.
-          </p>
-        </Card>
-      )}
+        {/* Details Modal */}
+        {selectedOpportunity && (
+          <OpportunityDetailsModal
+            isOpen={isDetailsOpen}
+            onClose={() => {
+              setIsDetailsOpen(false);
+              setSelectedOpportunity(null);
+            }}
+            opportunity={selectedOpportunity}
+          />
+        )}
+      </div>
     </div>
   );
 }
