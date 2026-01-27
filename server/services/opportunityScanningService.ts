@@ -232,6 +232,7 @@ export async function startTestScan(scanJobId: number, personaId: number): Promi
         id: i + 1,
         rank: i + 1,
         ticker: result.ticker,
+        company: result.ticker,
         companyName: result.ticker,
         score: result.finalScore,
         currentPrice: null,
@@ -239,6 +240,17 @@ export async function startTestScan(scanJobId: number, personaId: number): Promi
         sector: null,
         thesis: result.thesis,
         confidence: `${(result.confidence * 100).toFixed(0)}%`,
+        verdict: result.verdict || "strong_fit",
+        summaryBullets: result.summaryBullets || [],
+        criteria: result.criteria || [],
+        strengths: result.summaryBullets || [],
+        keyRisks: result.keyRisks || [],
+        whatWouldChangeMind: result.whatWouldChangeMind || [],
+        financialMetrics: result.financialMetrics || {},
+        dataUsed: {
+          sources: result.dataUsed?.sources || ["Batch AI Analysis Engine"],
+          timestamp: new Date().toISOString(),
+        },
         scoringDetails: {
           categories: [
             {

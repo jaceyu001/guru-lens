@@ -33,6 +33,13 @@ export interface HybridScoringResult {
   criteria: any[];
   keyRisks: string[];
   whatWouldChangeMind: string[];
+  summaryBullets?: string[];
+  strengths?: string[];
+  financialMetrics?: Record<string, number | undefined>;
+  dataUsed?: {
+    sources: string[];
+    timestamp?: string;
+  };
 }
 
 /**
@@ -225,9 +232,11 @@ export async function applyLLMFinalScoring(
     insufficient_data: "Insufficient Data",
   };
 
-  const results: HybridScoringResult[] = analysisInputs.map((input, index) => {
+    const results: HybridScoringResult[] = analysisInputs.map((input, index) => {
     const aiResult = batchResult.results[index];
     const candidate = candidates[index];
+    const financialData = candidate.financialData;
+    const ratios = financialData.ratios || {};
 
     return {
       ticker: input.symbol,
@@ -239,6 +248,28 @@ export async function applyLLMFinalScoring(
       criteria: aiResult.criteria,
       keyRisks: aiResult.keyRisks,
       whatWouldChangeMind: aiResult.whatWouldChangeMind,
+      summaryBullets: aiResult.summaryBullets,
+      strengths: aiResult.summaryBullets,
+      financialMetrics: {
+        peRatio: ratios.pe,
+        pbRatio: ratios.pb,
+        psRatio: ratios.ps,
+        pegRatio: ratios.pe && ratios.earningsGrowth ? ratios.pe / (ratios.earningsGrowth * 100) : undefined,
+        roe: ratios.roe,
+        roa: ratios.roa,
+        roic: ratios.roic,
+        debtToEquity: ratios.debtToEquity,
+        currentRatio: ratios.currentRatio,
+        netMargin: ratios.netMargin,
+        operatingMargin: ratios.operatingMargin,
+        grossMargin: ratios.grossMargin,
+        earningsGrowth: ratios.earningsGrowth,
+        revenueGrowth: ratios.revenueGrowth,
+      },
+      dataUsed: {
+        sources: ["Batch AI Analysis Engine", "Financial Data API"],
+        timestamp: new Date().toISOString(),
+      },
     };
   });
 

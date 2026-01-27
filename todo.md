@@ -344,3 +344,37 @@
   - [ ] Test scan with other personas
   - [ ] Measure actual time reduction
   - [ ] Verify results display correctly
+
+
+## ENHANCEMENT: Expand Opportunity Details Modal
+
+- [ ] Enhance OpportunityDetailsModal with comprehensive details
+  - [ ] Add financial metrics section (PE ratio, market cap, dividend yield, etc.)
+  - [ ] Add LLM analysis details (thesis, strengths, risks, catalysts)
+  - [ ] Add scoring criteria breakdown with pass/fail checks
+  - [ ] Add data sources and timestamps
+  - [ ] Make modal scrollable for long content
+  - [ ] Match layout/styling of individual analysis page
+  - [ ] Show confidence level with visual indicator
+  - [ ] Display all key ratios from analysis
+  - [ ] Show what would change my mind section
+- [ ] Test enhanced modal with various opportunities
+- [ ] Verify data display accuracy
+
+## COMPLETED: Expand Opportunity Details Modal
+
+- [x] Enhance OpportunityDetailsModal with comprehensive details
+  - [x] Add financial metrics section (PE ratio, market cap, dividend yield, etc.)
+  - [x] Add LLM analysis details (thesis, strengths, risks, catalysts)
+  - [x] Add scoring criteria breakdown with pass/fail checks
+  - [x] Add data sources and timestamps
+  - [x] Make modal scrollable for long content
+  - [x] Match layout/styling of individual analysis page
+  - [x] Show confidence level with visual indicator
+  - [x] Display all key ratios from analysis
+  - [x] Show what would change my mind section
+- [x] Enhanced OpportunityDetailsModal component with comprehensive layout
+- [x] Updated HybridScoringResult interface to include all detailed fields
+- [x] Modified opportunityScanningService to pass complete analysis data
+- [x] Updated hybridScoringOrchestrator to include financial metrics and LLM details
+- [ ] Test enhanced modal with various opportunities (in progress - scan running)
