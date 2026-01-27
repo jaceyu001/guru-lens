@@ -95,9 +95,9 @@ try:
         "roe": info.get("returnOnEquity", 0),
         "debt_to_equity": info.get("debtToEquity", 0),
         "current_ratio": info.get("currentRatio", 0),
-        "gross_margin": info.get("grossMargins", [0])[-1] if info.get("grossMargins") else 0,
-        "operating_margin": info.get("operatingMargins", [0])[-1] if info.get("operatingMargins") else 0,
-        "net_margin": info.get("profitMargins", [0])[-1] if info.get("profitMargins") else 0,
+        "gross_margin": (info.get("grossMargins", [0])[-1] if isinstance(info.get("grossMargins"), list) and len(info.get("grossMargins", [])) > 0 else info.get("grossMargins", 0)) or 0,
+        "operating_margin": (info.get("operatingMargins", [0])[-1] if isinstance(info.get("operatingMargins"), list) and len(info.get("operatingMargins", [])) > 0 else info.get("operatingMargins", 0)) or 0,
+        "net_margin": (info.get("profitMargins", [0])[-1] if isinstance(info.get("profitMargins"), list) and len(info.get("profitMargins", [])) > 0 else info.get("profitMargins", 0)) or 0,
         "revenue_growth": revenue_growth,
         "earnings_growth": earnings_growth,
         "sector": info.get("sector", ""),
@@ -117,7 +117,11 @@ except Exception as e:
     print(json.dumps({"error": str(e)}))
 `;
 
-    const result = execSync(`python3 -c "${pythonScript.replace(/"/g, '\\"')}"`, {
+    // Use the Python 3.13 from uv if available, otherwise fall back to python3
+    const pythonPath = process.env.PYTHONHOME 
+      ? `${process.env.PYTHONHOME}/bin/python3`
+      : 'python3';
+    const result = execSync(`${pythonPath} -c "${pythonScript.replace(/"/g, '\\"')}"`, {
       encoding: "utf-8",
       timeout: 30000,
     });

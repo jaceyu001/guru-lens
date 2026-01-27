@@ -114,7 +114,9 @@ export default function OpportunityScannerPage() {
       const result = await startScan.mutateAsync({ personaId, testMode });
       setScanJobId(result.scanJobId);
     } catch (error) {
-      console.error("Failed to start scan:", error);
+      console.error("[UI] Failed to start scan:", error);
+      alert(`Failed to start scan: ${error instanceof Error ? error.message : String(error)}`);
+      console.log("[UI] Alert shown to user");
       setIsScanning(false);
     }
   };
@@ -229,7 +231,7 @@ export default function OpportunityScannerPage() {
       </Card>
 
       {/* Persona Selection */}
-      {!isScanning && opportunities.length === 0 && (
+      {!isScanning && (
         <div className="mb-8">
           <h2 className="text-2xl font-bold mb-4">Select an Investor Persona</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
