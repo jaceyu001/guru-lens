@@ -8,6 +8,7 @@
  */
 
 import type { FinancialData } from '@shared/types';
+import { calculateTTM, hasSufficient2025Data } from './ttmCalculator';
 
 export type GrowthMetric = 'revenue' | 'netIncome' | 'operatingIncome' | 'freeCashFlow' | 'operatingCashFlow';
 export type ComparisonType = 'TTM_VS_FY' | 'TTM_VS_TTM' | 'FY_VS_FY' | 'INSUFFICIENT_DATA';
@@ -149,12 +150,33 @@ export function calculateGrowth(input: GrowthCalculationInput): GrowthCalculatio
 
 /**
  * Get TTM (Trailing Twelve Months) value from last 4 quarters
+ * Uses ttmCalculator for 2025 TTM calculations when 2025 data is available
  */
 function getTTMValue(quarterlyData: any[], metric: GrowthMetric): number {
   if (quarterlyData.length < 4) {
     return 0;
   }
 
+  // Check if we have 2025 data - if so, use ttmCalculator for accurate TTM
+  if (hasSufficient2025Data(quarterlyData)) {
+    const ttmMetrics = calculateTTM(quarterlyData);
+    switch (metric) {
+      case 'revenue':
+        return ttmMetrics.revenue;
+      case 'netIncome':
+        return ttmMetrics.netIncome;
+      case 'operatingIncome':
+        return ttmMetrics.operatingIncome;
+      case 'freeCashFlow':
+        return ttmMetrics.freeCashFlow;
+      case 'operatingCashFlow':
+        return ttmMetrics.operatingCashFlow;
+      default:
+        return 0;
+    }
+  }
+
+  // Fallback to original logic for older data
   let ttmValue = 0;
   for (let i = 0; i < 4; i++) {
     const value = getMetricValue(quarterlyData[i], metric);

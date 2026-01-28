@@ -404,7 +404,7 @@ function parseStockData(
       annualReports: annualIncomeReports.map((report: any) => {
         const cf = annualCashFlowMap.get(report.fiscalDateEnding) || {};
         const bs = annualBalanceMap.get(report.fiscalDateEnding) || {};
-        const ocf = parseInt(cf.operatingCashFlow || 0);
+        const ocf = parseInt(cf.operatingCashflow || cf.operatingCashFlow || 0);
         const capex = parseInt(cf.capitalExpenditures || 0);
         const ta = parseInt(bs.totalAssets || 0);
         const tl = parseInt(bs.totalLiabilities || 0);
@@ -426,7 +426,7 @@ function parseStockData(
       quarterlyReports: quarterlyIncomeReports.map((report: any) => {
         const cf = quarterlyCashFlowMap.get(report.fiscalDateEnding) || {};
         const bs = quarterlyBalanceMap.get(report.fiscalDateEnding) || {};
-        const ocf = parseInt(cf.operatingCashFlow || 0);
+        const ocf = parseInt(cf.operatingCashflow || cf.operatingCashFlow || 0);
         const capex = parseInt(cf.capitalExpenditures || 0);
         const ta = parseInt(bs.totalAssets || 0);
         const tl = parseInt(bs.totalLiabilities || 0);
