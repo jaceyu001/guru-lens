@@ -202,7 +202,7 @@ export const appRouter = router({
           fundamentalsAgent.analyzeFundamentals(financialData, financialData.dataQualityFlags || {}),
           valuationAgent.analyzeValuation({
             ticker: input.symbol,
-            currentPrice: financialData.price?.current || 0,
+            currentPrice: financialData.quote?.price || financialData.price?.current || 0,
             financialData,
             dataQualityFlags: financialData.dataQualityFlags || {},
           } as any),

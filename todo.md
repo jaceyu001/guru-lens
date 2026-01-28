@@ -144,6 +144,9 @@
 - [x] CRITICAL: Fix valuation agent - data flow fixed with correct API key
 - [x] Debug data flow from Alpha Vantage API to agents - identified rate limit issue
 - [x] Verify financial statement data is being extracted correctly - wrapper returns correct structure
+- [x] Fix valuation agent to use quote.price instead of price.current
+- [x] Fix fundamentals agent data flow - uses financial data correctly
+- [x] Remove debug logging from wrapper functions
 - [ ] Test individual stock analysis
   - [ ] Test cache-first strategy for individual stocks
   - [ ] Verify fundamentals agent works with new API

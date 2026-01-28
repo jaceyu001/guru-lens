@@ -25,6 +25,12 @@ function sanitizeString(value: any): string | null {
  * Build financial data structure from cache entry
  */
 function buildFinancialDataFromCache(cacheEntry: any): any {
+  console.log(`[buildFinancialDataFromCache] Building data for ${cacheEntry.ticker}:`, {
+    currentPrice: cacheEntry.currentPrice,
+    peRatio: cacheEntry.peRatio,
+    roe: cacheEntry.roe,
+  });
+  
   const parseNum = (val: any) => {
     if (val === null || val === undefined || val === "") return null;
     const num = Number(val);

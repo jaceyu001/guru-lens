@@ -151,6 +151,7 @@ async function getCompanyOverview(ticker: string): Promise<any> {
  */
 async function getGlobalQuote(ticker: string): Promise<any> {
   try {
+    console.log(`[alphaVantageWrapper] Calling GLOBAL_QUOTE for ${ticker}`);
     const response = await axios.get(BASE_URL, {
       params: {
         function: 'GLOBAL_QUOTE',
@@ -160,6 +161,8 @@ async function getGlobalQuote(ticker: string): Promise<any> {
       timeout: 10000,
     });
 
+    console.log(`[alphaVantageWrapper] Full API response for ${ticker}:`, JSON.stringify(response.data, null, 2).substring(0, 500));
+
     if (response.data.Note) {
       throw new Error(`API rate limited: ${response.data.Note}`);
     }
@@ -168,7 +171,11 @@ async function getGlobalQuote(ticker: string): Promise<any> {
       throw new Error(`API error: ${response.data.Error}`);
     }
 
-    return response.data['Global Quote'] || {};
+    const quote = response.data['Global Quote'] || {};
+    console.log(`[alphaVantageWrapper] Extracted quote for ${ticker}:`, JSON.stringify(quote, null, 2));
+    console.log(`[alphaVantageWrapper] Quote fields:`, Object.keys(quote).join(', '));
+    console.log(`[alphaVantageWrapper] Price field '05. price':`, quote['05. price']);
+    return quote;
   } catch (error) {
     console.error(`[alphaVantageWrapper] Error fetching quote for ${ticker}:`, error);
     throw error;
@@ -331,6 +338,12 @@ function parseStockData(
     interestCoverage: null, // Will be calculated if needed
   };
 
+  console.log(`[parseStockData] ${ticker} quote data:`, {
+    price_raw: quote?.['05. price'],
+    price_parsed: quote?.['05. price'] ? parseFloat(quote['05. price']) : 0,
+    quote_keys: Object.keys(quote || {}),
+  });
+  
   return {
     ticker,
     profile: {
