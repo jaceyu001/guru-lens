@@ -217,18 +217,18 @@ export default function Ticker() {
               </div>
             </div>
             
-            {price && price.current !== undefined && price.change !== undefined && price.changePercent !== undefined && (
+            {price && price.price !== undefined && price.change !== undefined && price.changePercent !== undefined && (
               <div className="text-right">
                 <div className="text-3xl font-bold font-mono-numbers text-foreground">
-                  ${price.current.toFixed(2)}
+                  {price && price.price !== undefined && price.price !== null ? `$${Number(price.price).toFixed(2)}` : "N/A"}
                 </div>
-                <div className={`flex items-center justify-end gap-1 text-sm font-semibold ${price.change >= 0 ? "text-positive" : "text-negative"}`}>
-                  {price.change >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-                  {price.change >= 0 ? "+" : ""}{price.change.toFixed(2)} ({price.changePercent.toFixed(2)}%)
+                <div className={`flex items-center justify-end gap-1 text-sm font-semibold ${price && price.change >= 0 ? "text-positive" : "text-negative"}`}>
+                  {price && price.change >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                  {price && price.change >= 0 ? "+" : ""}{price && price.change !== undefined ? Number(price.change).toFixed(2) : "N/A"} ({price && price.changePercent !== undefined ? Number(price.changePercent).toFixed(2) : "N/A"}%)
                 </div>
                 <div className="text-xs text-muted-foreground mt-1 flex items-center justify-end gap-1">
                   <Clock className="h-3 w-3" />
-                  {new Date(price.timestamp || new Date()).toLocaleString()}
+                  {price && price.timestamp ? new Date(price.timestamp).toLocaleString() : new Date().toLocaleString()}
                 </div>
               </div>
             )}
@@ -237,11 +237,11 @@ export default function Ticker() {
           {/* Key Metrics */}
           {price || ratios ? (
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mt-6 pt-6 border-t">
-              {price && price.current !== undefined && (
+              {price && price.price !== undefined && (
                 <div>
                   <div className="text-xs text-muted-foreground mb-1">Price</div>
                   <div className="font-semibold font-mono-numbers">
-                    ${price.current.toFixed(2)}
+                    ${Number(price.price).toFixed(2)}
                   </div>
                 </div>
               )}
