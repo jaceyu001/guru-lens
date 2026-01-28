@@ -160,9 +160,9 @@ export default function Ticker() {
     );
   }
 
-  const price = financialData.data.price;
-  const profile = financialData.data.profile;
-  const ratios = financialData.data.ratios;
+  const price = financialData.data?.price;
+  const profile = financialData.data?.profile;
+  const ratios = financialData.data?.ratios;
 
   return (
     <div className="min-h-screen bg-background py-8">
@@ -217,7 +217,7 @@ export default function Ticker() {
               </div>
             </div>
             
-            {price && (
+            {price && price.current !== undefined && (
               <div className="text-right">
                 <div className="text-3xl font-bold font-mono-numbers text-foreground">
                   ${price.current.toFixed(2)}
@@ -237,7 +237,7 @@ export default function Ticker() {
           {/* Key Metrics */}
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mt-6 pt-6 border-t">
             {/* Market cap calculation based on price and shares */}
-            {price?.current && (
+            {price && price.current !== undefined && (
               <div>
                 <div className="text-xs text-muted-foreground mb-1">Price</div>
                 <div className="font-semibold font-mono-numbers">
@@ -245,7 +245,7 @@ export default function Ticker() {
                 </div>
               </div>
             )}
-            {ratios?.pe !== undefined && (
+            {ratios && ratios.pe !== undefined && (
               <div>
                 <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
                   P/E Ratio
@@ -256,7 +256,7 @@ export default function Ticker() {
                 </div>
               </div>
             )}
-            {ratios?.pb !== undefined && (
+            {ratios && ratios.pb !== undefined && (
               <div>
                 <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
                   P/B Ratio
@@ -267,7 +267,7 @@ export default function Ticker() {
                 </div>
               </div>
             )}
-            {ratios?.roe !== undefined && (
+            {ratios && ratios.roe !== undefined && (
               <div>
                 <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
                   ROE
