@@ -314,6 +314,14 @@ function parseStockData(
   const quarterlyIncomeReports = limitDataToMaxYears(incomeStatement?.quarterlyReports || []);
   const quarterlyBalanceReports = limitDataToMaxYears(balanceSheet?.quarterlyReports || []);
   const quarterlyCashFlowReports = limitDataToMaxYears(cashFlow?.quarterlyReports || []);
+  
+  // Create maps for cash flow data by fiscal date for easy lookup
+  const annualCashFlowMap = new Map(
+    annualCashFlowReports.map((report: any) => [report.fiscalDateEnding, report])
+  );
+  const quarterlyCashFlowMap = new Map(
+    quarterlyCashFlowReports.map((report: any) => [report.fiscalDateEnding, report])
+  );
 
   // Calculate financial ratios from available data
   const latestAnnualIncome = annualIncomeReports[0];
@@ -387,32 +395,42 @@ function parseStockData(
     },
     ratios,
     financials: {
-      annualReports: annualIncomeReports.map((report: any) => ({
-        fiscalDateEnding: report.fiscalDateEnding,
-        revenue: parseInt(report.totalRevenue || report.revenue || 0),
-        operatingIncome: parseInt(report.operatingIncome || 0),
-        netIncome: parseInt(report.netIncome || 0),
-        grossProfit: parseInt(report.grossProfit || 0),
-        totalAssets: 0,
-        totalLiabilities: 0,
-        totalEquity: 0,
-        operatingCashFlow: 0,
-        capitalExpenditure: 0,
-        freeCashFlow: 0,
-      })),
-      quarterlyReports: quarterlyIncomeReports.map((report: any) => ({
-        fiscalDateEnding: report.fiscalDateEnding,
-        revenue: parseInt(report.totalRevenue || report.revenue || 0),
-        operatingIncome: parseInt(report.operatingIncome || 0),
-        netIncome: parseInt(report.netIncome || 0),
-        grossProfit: parseInt(report.grossProfit || 0),
-        totalAssets: 0,
-        totalLiabilities: 0,
-        totalEquity: 0,
-        operatingCashFlow: 0,
-        capitalExpenditure: 0,
-        freeCashFlow: 0,
-      })),
+      annualReports: annualIncomeReports.map((report: any) => {
+        const cf = annualCashFlowMap.get(report.fiscalDateEnding) || {};
+        const ocf = parseInt(cf.operatingCashFlow || 0);
+        const capex = parseInt(cf.capitalExpenditures || 0);
+        return {
+          fiscalDateEnding: report.fiscalDateEnding,
+          revenue: parseInt(report.totalRevenue || report.revenue || 0),
+          operatingIncome: parseInt(report.operatingIncome || 0),
+          netIncome: parseInt(report.netIncome || 0),
+          grossProfit: parseInt(report.grossProfit || 0),
+          totalAssets: 0,
+          totalLiabilities: 0,
+          totalEquity: 0,
+          operatingCashFlow: ocf,
+          capitalExpenditure: capex,
+          freeCashFlow: ocf - capex,
+        };
+      }),
+      quarterlyReports: quarterlyIncomeReports.map((report: any) => {
+        const cf = quarterlyCashFlowMap.get(report.fiscalDateEnding) || {};
+        const ocf = parseInt(cf.operatingCashFlow || 0);
+        const capex = parseInt(cf.capitalExpenditures || 0);
+        return {
+          fiscalDateEnding: report.fiscalDateEnding,
+          revenue: parseInt(report.totalRevenue || report.revenue || 0),
+          operatingIncome: parseInt(report.operatingIncome || 0),
+          netIncome: parseInt(report.netIncome || 0),
+          grossProfit: parseInt(report.grossProfit || 0),
+          totalAssets: 0,
+          totalLiabilities: 0,
+          totalEquity: 0,
+          operatingCashFlow: ocf,
+          capitalExpenditure: capex,
+          freeCashFlow: ocf - capex,
+        };
+      }),
     },
     balanceSheet: {
       annualReports: annualBalanceReports.map((report: any) => ({
