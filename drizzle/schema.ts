@@ -515,6 +515,21 @@ export const opportunityRecords = mysqlTable("opportunityRecords", {
   // Financial data snapshot (TTM + 3 years)
   financialDataSnapshot: json("financialDataSnapshot").$type<Record<string, any>>().notNull(),
   
+  // Phase 2: Hybrid Scoring Results
+  hybridScore: decimal("hybridScore", { precision: 5, scale: 2 }), // 0-100
+  buffettScore: decimal("buffettScore", { precision: 5, scale: 2 }),
+  woodScore: decimal("woodScore", { precision: 5, scale: 2 }),
+  grahamScore: decimal("grahamScore", { precision: 5, scale: 2 }),
+  lyncheScore: decimal("lyncheScore", { precision: 5, scale: 2 }),
+  fisherScore: decimal("fisherScore", { precision: 5, scale: 2 }),
+  
+  // Phase 2: Agent Analysis Results
+  fundamentalsAgentFindings: json("fundamentalsAgentFindings").$type<Record<string, any>>(),
+  valuationAgentFindings: json("valuationAgentFindings").$type<Record<string, any>>(),
+  
+  // Data Quality Assessment
+  dataQualityFlags: json("dataQualityFlags").$type<Record<string, boolean>>(),
+  
   // LLM Analysis results
   investmentThesis: text("investmentThesis"),
   summaryBullets: json("summaryBullets").$type<string[]>(),

@@ -36,6 +36,13 @@
       "when": 1769627549620,
       "tag": "0004_lethal_hydra",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1769631368566,
+      "tag": "0005_brave_beyonder",
+      "breakpoints": true
     }
   ]
 }

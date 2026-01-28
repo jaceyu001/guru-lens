@@ -10,6 +10,7 @@ import { getDb, getTickerBySymbol, upsertTicker, createAnalysis, createOpportuni
 import { scanJobs, scanOpportunities, scanOpportunityAnalyses, tickers } from "../../drizzle/schema";
 import { hybridScore } from "./hybridScoringOrchestrator";
 import { createScanJob as createCacheJob, updateScanProgress, addScanResult, completeScan, failScan, getScanProgress, getScanResults, getScanJob } from "./scanResultsCache";
+import { persistOpportunityRecord } from "./opportunityPersistence";
 import { eq, desc } from "drizzle-orm";
 
 let db: Awaited<ReturnType<typeof getDb>> | null = null;
@@ -436,6 +437,36 @@ export async function startRefreshJobWithAdaptiveRateLimit(scanJobId: number, pe
         // Add to in-memory cache
         addScanResult(scanJobId, cacheResult);
         resultsStored++;
+
+        // Persist to database
+        const resultAny = result as any;
+        const persistData: any = {
+          scanRecordId: scanJobId,
+          personaId: personaId,
+          ticker: result.ticker,
+          companyName: resultAny.companyName || result.ticker,
+          sector: resultAny.sector,
+          industry: resultAny.industry,
+          rank: resultsStored,
+          finalScore: result.finalScore,
+          preliminaryScore: result.preliminaryScore,
+          verdict: result.verdict || "Strong Fit",
+          confidence: result.confidence,
+          thesis: result.thesis,
+          summaryBullets: result.summaryBullets || [],
+          strengths: result.strengths || [],
+          keyRisks: result.keyRisks || [],
+          catalystAnalysis: resultAny.catalystAnalysis || [],
+          whatWouldChangeMind: result.whatWouldChangeMind || [],
+          criteria: result.criteria || [],
+          financialMetrics: result.financialMetrics || {},
+          dataQualityFlags: resultAny.dataQualityFlags || {},
+          personaScores: resultAny.personaScores,
+          fundamentalsAgent: resultAny.fundamentalsAgent,
+          valuationAgent: resultAny.valuationAgent,
+          dataUsed: Array.isArray(result.dataUsed) ? result.dataUsed : [],
+        };
+        await persistOpportunityRecord(persistData);
 
         console.log(`[FullScan ${scanJobId}] Added result ${resultsStored}/${hybridResults.length}: ${result.ticker} (score: ${result.finalScore})`);
       } else {

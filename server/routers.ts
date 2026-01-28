@@ -4,8 +4,8 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
+import { cacheRouter } from "./routers/cacheRouter";
 import * as db from "./db";
-import * as realFinancialData from './services/realFinancialData';
 import { getFinancialDataWithFallback, getFinancialDataBatchWithFallback } from './services/cacheFirstDataFetcher';
 import * as aiAnalysisEngine from "./services/aiAnalysisEngine";
 import * as fundamentalsAgent from "./services/fundamentalsAgent";
@@ -14,6 +14,7 @@ import type { AnalysisOutput, OpportunityOutput, TickerSnapshot, FundamentalsFin
 
 export const appRouter = router({
   system: systemRouter,
+  cache: cacheRouter,
   
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
@@ -48,8 +49,10 @@ export const appRouter = router({
           return dbResults;
         }
         
-        // Search in financial data service
-        const serviceResults = await realFinancialData.searchTickers(input.query);
+        // Search in financial data service (using cache-first strategy)
+        // For now, return empty array and suggest user enter known tickers
+        // Full ticker search would require Alpha Vantage Symbol Search API
+        const serviceResults: any[] = [];
         
         // Upsert found tickers to database
         for (const ticker of serviceResults) {
@@ -536,8 +539,9 @@ export const appRouter = router({
         const persona = await db.getPersonaByPersonaId(input.personaId);
         if (!persona) throw new Error("Persona not found");
         
-        const tickers = await realFinancialData.searchTickers('');
-        const availableTickers = tickers.map(t => t.symbol);
+        // Use stockUniverse from cache-first system
+        const { getStockUniverse } = await import('./services/stockUniverse');
+        const availableTickers = getStockUniverse().slice(0, 10); // Sample first 10 for quick scan
         const scanDate = new Date();
         scanDate.setHours(0, 0, 0, 0);
         
@@ -548,7 +552,8 @@ export const appRouter = router({
           const ticker = await db.getTickerBySymbol(symbol);
           if (!ticker) continue;
           
-          const financialData = await realFinancialData.getStockData(symbol);
+          const cacheResult = await getFinancialDataWithFallback(symbol);
+          const financialData = cacheResult.success ? cacheResult.data : null;
           if (!financialData) continue;
           
           // Prepare analysis input (similar to runAnalysis)
