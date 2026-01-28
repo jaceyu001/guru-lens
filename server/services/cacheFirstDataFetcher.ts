@@ -3,6 +3,24 @@ import { stockFinancialCache } from "../../drizzle/schema";
 import { eq } from "drizzle-orm";
 import { getStockData } from "./alphaVantageWrapper";
 
+/**
+ * Sanitize numeric value: convert NaN, Infinity, null, undefined to 0
+ */
+function sanitizeNumber(value: any): number {
+  if (value === null || value === undefined) return 0;
+  const num = Number(value);
+  if (!isFinite(num)) return 0;
+  return num;
+}
+
+/**
+ * Sanitize string value: convert null, undefined to empty string
+ */
+function sanitizeString(value: any): string | null {
+  if (value === null || value === undefined) return null;
+  return String(value);
+}
+
 export interface CacheCheckResult {
   found: boolean;
   data?: any;
@@ -54,37 +72,44 @@ export async function updateCache(ticker: string, freshData: any): Promise<boole
 
     const cacheData = {
       ticker,
-      companyName: freshData.profile?.companyName,
-      sector: freshData.profile?.sector,
-      industry: freshData.profile?.industry,
-      exchange: freshData.profile?.exchange,
-      currency: freshData.profile?.currency || "USD",
-      currentPrice: freshData.quote?.price,
-      marketCap: freshData.profile?.marketCap,
-      volume: freshData.quote?.volume,
-      peRatio: freshData.ratios?.pe,
-      pbRatio: freshData.ratios?.pb,
-      psRatio: freshData.ratios?.ps,
-      roe: freshData.ratios?.roe,
-      roa: freshData.ratios?.roa,
-      roic: freshData.ratios?.roic,
-      grossMargin: freshData.ratios?.grossMargin,
-      operatingMargin: freshData.ratios?.operatingMargin,
-      netMargin: freshData.ratios?.netMargin,
-      debtToEquity: freshData.ratios?.debtToEquity,
-      currentRatio: freshData.ratios?.currentRatio,
-      dividendYield: freshData.ratios?.dividendYield,
+      companyName: sanitizeString(freshData.profile?.companyName),
+      sector: sanitizeString(freshData.profile?.sector),
+      industry: sanitizeString(freshData.profile?.industry),
+      exchange: sanitizeString(freshData.profile?.exchange),
+      currency: sanitizeString(freshData.profile?.currency) || "USD",
+      currentPrice: sanitizeNumber(freshData.quote?.price),
+      marketCap: sanitizeNumber(freshData.profile?.marketCap),
+      volume: sanitizeNumber(freshData.quote?.volume),
+      peRatio: sanitizeNumber(freshData.ratios?.pe),
+      pbRatio: sanitizeNumber(freshData.ratios?.pb),
+      psRatio: sanitizeNumber(freshData.ratios?.ps),
+      roe: sanitizeNumber(freshData.ratios?.roe),
+      roa: sanitizeNumber(freshData.ratios?.roa),
+      roic: sanitizeNumber(freshData.ratios?.roic),
+      grossMargin: sanitizeNumber(freshData.ratios?.grossMargin),
+      operatingMargin: sanitizeNumber(freshData.ratios?.operatingMargin),
+      netMargin: sanitizeNumber(freshData.ratios?.netMargin),
+      debtToEquity: sanitizeNumber(freshData.ratios?.debtToEquity),
+      currentRatio: sanitizeNumber(freshData.ratios?.currentRatio),
+      dividendYield: sanitizeNumber(freshData.ratios?.dividendYield),
       financialDataJson: freshData,
       refreshRequired: false,
       fetchedAt: now,
     };
 
-    if (existing.length === 0) {
-      await (db as any).insert(stockFinancialCache).values(cacheData);
-      console.log(`[cacheFirstDataFetcher] Created new cache entry for ${ticker}`);
-    } else {
-      await (db as any).update(stockFinancialCache).set(cacheData).where(eq(stockFinancialCache.ticker, ticker));
-      console.log(`[cacheFirstDataFetcher] Updated cache entry for ${ticker}`);
+    try {
+      if (existing.length === 0) {
+        await (db as any).insert(stockFinancialCache).values(cacheData);
+        console.log(`[cacheFirstDataFetcher] Created new cache entry for ${ticker}`);
+      } else {
+        await (db as any).update(stockFinancialCache).set(cacheData).where(eq(stockFinancialCache.ticker, ticker));
+        console.log(`[cacheFirstDataFetcher] Updated cache entry for ${ticker}`);
+      }
+    } catch (dbError) {
+      console.error(`[cacheFirstDataFetcher] Database operation failed for ${ticker}:`, dbError);
+      // Log the problematic data for debugging
+      console.error(`[cacheFirstDataFetcher] Cache data that failed:`, JSON.stringify(cacheData, null, 2));
+      throw dbError;
     }
 
     return true;
