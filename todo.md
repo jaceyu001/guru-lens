@@ -691,3 +691,28 @@ All four final tasks completed successfully:
   - [ ] Verify valuation metrics reflect 2025 performance
   - [ ] Verify financial health metrics use latest data
 - [ ] Save checkpoint with 2025 TTM implementation
+
+
+## DERIVED METRICS IMPLEMENTATION (Current)
+- [ ] Create derivedMetricsCalculator.ts utility
+  - [ ] Implement ROIC calculation: NOPAT / Invested Capital
+  - [ ] Implement payout ratio calculation: Dividend Per Share / EPS
+  - [ ] Implement dividend growth tracking
+  - [ ] Add confidence scoring for each metric
+- [ ] Integrate into alphaVantageWrapper
+  - [ ] Add ROIC to ratios object
+  - [ ] Add payout ratio to ratios object
+  - [ ] Calculate for each financial period (TTM, annual, quarterly)
+- [ ] Update agents to use derived metrics
+  - [ ] Fundamentals agent: Use ROIC for capital efficiency analysis
+  - [ ] Financial health agent: Use payout ratio for dividend sustainability
+  - [ ] Persona agent: Use payout ratio for income investor analysis
+- [ ] Write comprehensive tests
+  - [ ] Test ROIC calculation with JNJ data
+  - [ ] Test payout ratio calculation with JNJ data
+  - [ ] Test edge cases (zero equity, zero earnings, zero dividends)
+  - [ ] Verify calculations match manual calculations
+- [ ] Verify and save checkpoint
+  - [ ] Test with multiple stocks (JNJ, TSLA, AAPL, MSFT)
+  - [ ] Verify all derived metrics display correctly
+  - [ ] Save checkpoint with derived metrics implementation
