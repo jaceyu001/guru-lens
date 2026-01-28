@@ -25,6 +25,12 @@ function sanitizeString(value: any): string | null {
  * Build financial data structure from cache entry
  */
 function buildFinancialDataFromCache(cacheEntry: any): any {
+  const parseNum = (val: any) => {
+    if (val === null || val === undefined || val === "" || val === "0") return null;
+    const num = Number(val);
+    return isFinite(num) ? num : null;
+  };
+  
   return {
     ticker: cacheEntry.ticker,
     profile: {
@@ -33,25 +39,25 @@ function buildFinancialDataFromCache(cacheEntry: any): any {
       industry: cacheEntry.industry || "N/A",
       exchange: cacheEntry.exchange || "N/A",
       currency: cacheEntry.currency || "USD",
-      marketCap: cacheEntry.marketCap ? Number(cacheEntry.marketCap) : 0,
+      marketCap: cacheEntry.marketCap && cacheEntry.marketCap !== "0" ? Number(cacheEntry.marketCap) : 0,
     },
     quote: {
-      price: cacheEntry.currentPrice ? Number(cacheEntry.currentPrice) : 0,
-      volume: cacheEntry.volume ? Number(cacheEntry.volume) : 0,
+      price: cacheEntry.currentPrice && cacheEntry.currentPrice !== "0" ? Number(cacheEntry.currentPrice) : 0,
+      volume: cacheEntry.volume && cacheEntry.volume !== "0" ? Number(cacheEntry.volume) : 0,
     },
     ratios: {
-      pe: cacheEntry.peRatio ? Number(cacheEntry.peRatio) : null,
-      pb: cacheEntry.pbRatio ? Number(cacheEntry.pbRatio) : null,
-      ps: cacheEntry.psRatio ? Number(cacheEntry.psRatio) : null,
-      roe: cacheEntry.roe ? Number(cacheEntry.roe) : null,
-      roa: cacheEntry.roa ? Number(cacheEntry.roa) : null,
-      roic: cacheEntry.roic ? Number(cacheEntry.roic) : null,
-      grossMargin: cacheEntry.grossMargin ? Number(cacheEntry.grossMargin) : null,
-      operatingMargin: cacheEntry.operatingMargin ? Number(cacheEntry.operatingMargin) : null,
-      netMargin: cacheEntry.netMargin ? Number(cacheEntry.netMargin) : null,
-      debtToEquity: cacheEntry.debtToEquity ? Number(cacheEntry.debtToEquity) : null,
-      currentRatio: cacheEntry.currentRatio ? Number(cacheEntry.currentRatio) : null,
-      dividendYield: cacheEntry.dividendYield ? Number(cacheEntry.dividendYield) : null,
+      pe: parseNum(cacheEntry.peRatio),
+      pb: parseNum(cacheEntry.pbRatio),
+      ps: parseNum(cacheEntry.psRatio),
+      roe: parseNum(cacheEntry.roe),
+      roa: parseNum(cacheEntry.roa),
+      roic: parseNum(cacheEntry.roic),
+      grossMargin: parseNum(cacheEntry.grossMargin),
+      operatingMargin: parseNum(cacheEntry.operatingMargin),
+      netMargin: parseNum(cacheEntry.netMargin),
+      debtToEquity: parseNum(cacheEntry.debtToEquity),
+      currentRatio: parseNum(cacheEntry.currentRatio),
+      dividendYield: parseNum(cacheEntry.dividendYield),
     },
   };
 }

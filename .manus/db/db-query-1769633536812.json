@@ -1,0 +1,21 @@
+{
+  "query": "SELECT ticker, peRatio, pbRatio, roe, debtToEquity, netMargin, currentPrice, marketCap, financialDataJson IS NOT NULL as hasJson FROM stockFinancialCache WHERE ticker = 'BIDU'",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user UUbFzi3je6DVETn.root --database fYeU4CZLQAgsjxQh24yAiF --execute SELECT ticker, peRatio, pbRatio, roe, debtToEquity, netMargin, currentPrice, marketCap, financialDataJson IS NOT NULL as hasJson FROM stockFinancialCache WHERE ticker = 'BIDU'",
+  "rows": [
+    {
+      "ticker": "BIDU",
+      "peRatio": "NULL",
+      "pbRatio": "NULL",
+      "roe": "NULL",
+      "debtToEquity": "NULL",
+      "netMargin": "NULL",
+      "currentPrice": "0.00",
+      "marketCap": "0",
+      "hasJson": "1"
+    }
+  ],
+  "messages": [],
+  "stdout": "ticker\tpeRatio\tpbRatio\troe\tdebtToEquity\tnetMargin\tcurrentPrice\tmarketCap\thasJson\nBIDU\tNULL\tNULL\tNULL\tNULL\tNULL\t0.00\t0\t1\n",
+  "stderr": "",
+  "execution_time_ms": 51
+}

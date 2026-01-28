@@ -235,67 +235,75 @@ export default function Ticker() {
           </div>
 
           {/* Key Metrics */}
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mt-6 pt-6 border-t">
-            {/* Market cap calculation based on price and shares */}
-            {price && price.current !== undefined && (
-              <div>
-                <div className="text-xs text-muted-foreground mb-1">Price</div>
-                <div className="font-semibold font-mono-numbers">
-                  ${price.current.toFixed(2)}
+          {price || ratios ? (
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mt-6 pt-6 border-t">
+              {price && price.current !== undefined && (
+                <div>
+                  <div className="text-xs text-muted-foreground mb-1">Price</div>
+                  <div className="font-semibold font-mono-numbers">
+                    ${price.current.toFixed(2)}
+                  </div>
                 </div>
+              )}
+              {ratios && ratios.pe !== null && ratios.pe !== undefined && (
+                <div>
+                  <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                    P/E Ratio
+                    {isMetricAnomalous("P/E Ratio") && <Badge variant="destructive" className="text-xs">TBC</Badge>}
+                  </div>
+                  <div className={`font-semibold font-mono-numbers ${isMetricAnomalous("P/E Ratio") ? "text-yellow-600" : ""}`}>
+                    {ratios.pe?.toFixed(2)}
+                  </div>
+                </div>
+              )}
+              {ratios && ratios.pb !== null && ratios.pb !== undefined && (
+                <div>
+                  <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                    P/B Ratio
+                    {isMetricAnomalous("P/B Ratio") && <Badge variant="destructive" className="text-xs">TBC</Badge>}
+                  </div>
+                  <div className={`font-semibold font-mono-numbers ${isMetricAnomalous("P/B Ratio") ? "text-yellow-600" : ""}`}>
+                    {ratios.pb?.toFixed(2)}
+                  </div>
+                </div>
+              )}
+              {ratios && ratios.roe !== null && ratios.roe !== undefined && (
+                <div>
+                  <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                    ROE
+                    {isMetricAnomalous("ROE") && <Badge variant="destructive" className="text-xs">TBC</Badge>}
+                  </div>
+                  <div className={`font-semibold font-mono-numbers ${isMetricAnomalous("ROE") ? "text-yellow-600" : ""}`}>
+                    {ratios.roe?.toFixed(2)}%
+                  </div>
+                </div>
+              )}
+              {ratios?.debtToEquity !== null && ratios?.debtToEquity !== undefined && (
+                <div>
+                  <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                    Debt/Equity
+                    {isMetricAnomalous("Debt/Equity") && <Badge variant="destructive" className="text-xs">TBC</Badge>}
+                  </div>
+                  <div className={`font-semibold font-mono-numbers ${isMetricAnomalous("Debt/Equity") ? "text-yellow-600" : ""}`}>
+                    {((ratios.debtToEquity ?? 0) * 100).toFixed(2)}%
+                  </div>
+                </div>
+              )}
+              {ratios?.netMargin !== null && ratios?.netMargin !== undefined && (
+                <div>
+                  <div className="text-xs text-muted-foreground mb-1">Net Margin</div>
+                  <div className="font-semibold font-mono-numbers">{(ratios.netMargin ?? 0).toFixed(2)}%</div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="mt-6 pt-6 border-t">
+              <div className="p-4 bg-muted/50 rounded-lg text-center">
+                <AlertCircle className="mx-auto h-5 w-5 text-muted-foreground mb-2" />
+                <p className="text-sm text-muted-foreground">Financial metrics data is currently unavailable for this ticker.</p>
               </div>
-            )}
-            {ratios && ratios.pe !== null && ratios.pe !== undefined && (
-              <div>
-                <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-                  P/E Ratio
-                  {isMetricAnomalous("P/E Ratio") && <Badge variant="destructive" className="text-xs">TBC</Badge>}
-                </div>
-                <div className={`font-semibold font-mono-numbers ${isMetricAnomalous("P/E Ratio") ? "text-yellow-600" : ""}`}>
-                  {ratios.pe?.toFixed(2) ?? "N/A"}
-                </div>
-              </div>
-            )}
-            {ratios && ratios.pb !== null && ratios.pb !== undefined && (
-              <div>
-                <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-                  P/B Ratio
-                  {isMetricAnomalous("P/B Ratio") && <Badge variant="destructive" className="text-xs">TBC</Badge>}
-                </div>
-                <div className={`font-semibold font-mono-numbers ${isMetricAnomalous("P/B Ratio") ? "text-yellow-600" : ""}`}>
-                  {ratios.pb?.toFixed(2) ?? "N/A"}
-                </div>
-              </div>
-            )}
-            {ratios && ratios.roe !== null && ratios.roe !== undefined && (
-              <div>
-                <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-                  ROE
-                  {isMetricAnomalous("ROE") && <Badge variant="destructive" className="text-xs">TBC</Badge>}
-                </div>
-                <div className={`font-semibold font-mono-numbers ${isMetricAnomalous("ROE") ? "text-yellow-600" : ""}`}>
-                  {ratios.roe?.toFixed(2) ?? "N/A"}%
-                </div>
-              </div>
-            )}
-            {ratios?.debtToEquity !== null && ratios?.debtToEquity !== undefined && (
-              <div>
-                <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-                  Debt/Equity
-                  {isMetricAnomalous("Debt/Equity") && <Badge variant="destructive" className="text-xs">TBC</Badge>}
-                </div>
-                <div className={`font-semibold font-mono-numbers ${isMetricAnomalous("Debt/Equity") ? "text-yellow-600" : ""}`}>
-                  {((ratios.debtToEquity ?? 0) * 100).toFixed(2)}%
-                </div>
-              </div>
-            )}
-            {ratios?.netMargin !== null && ratios?.netMargin !== undefined && (
-              <div>
-                <div className="text-xs text-muted-foreground mb-1">Net Margin</div>
-                <div className="font-semibold font-mono-numbers">{(ratios.netMargin ?? 0).toFixed(2)}%</div>
-              </div>
-            )}
-          </div>
+            </div>
+          )}
         </Card>
 
         {/* Agent Analysis Cards */}
