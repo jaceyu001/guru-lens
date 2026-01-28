@@ -150,12 +150,15 @@
 - [x] Fix Debt/Equity calculation with null handling for missing fields
 - [x] Fix Net Margin calculation with null handling
 - [x] Fix router to use quote field instead of non-existent price field
+- [x] Fix annualData.find is not a function error in growthCalculator
+  - [x] Ensure annualData and quarterlyData are always arrays
+  - [x] Add type checking before calling array methods
 - [ ] Test individual stock analysis
   - [ ] Test cache-first strategy for individual stocks
   - [ ] Verify fundamentals agent works with new API
   - [ ] Verify valuation agent works with new API
   - [ ] Test end-to-end analysis flow
-  - [ ] Test price display for TSLA, BIDU, AAPL, MSFT
+  - [ ] Test price display for TSLA, BIDU, AAPL, MSFT, PDD
   - [ ] Test Debt/Equity and Net Margin display
   - [ ] Test Valuation Agent with correct price
   - [ ] Test Fundamentals Agent growth metrics

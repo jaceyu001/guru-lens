@@ -44,12 +44,22 @@ export function calculateGrowth(input: GrowthCalculationInput): GrowthCalculatio
   let quarterlyData = (financialData as any).quarterlyFinancials || [];
   let annualData = financialData.financials || [];
   
-  // If using new Alpha Vantage format, extract from nested structure
-  if (!quarterlyData || quarterlyData.length === 0) {
-    quarterlyData = (financialData as any).financials?.quarterlyReports || [];
+  // Ensure both are arrays (not objects)
+  if (!Array.isArray(quarterlyData)) {
+    quarterlyData = [];
   }
-  if (!annualData || annualData.length === 0) {
-    annualData = (financialData as any).financials?.annualReports || [];
+  if (!Array.isArray(annualData)) {
+    annualData = [];
+  }
+  
+  // If using new Alpha Vantage format, extract from nested structure
+  if (quarterlyData.length === 0) {
+    const qReports = (financialData as any).financials?.quarterlyReports;
+    quarterlyData = Array.isArray(qReports) ? qReports : [];
+  }
+  if (annualData.length === 0) {
+    const aReports = (financialData as any).financials?.annualReports;
+    annualData = Array.isArray(aReports) ? aReports : [];
   }
   
 
