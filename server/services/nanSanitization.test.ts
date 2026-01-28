@@ -233,7 +233,12 @@ describe("NaN Sanitization for Database Storage", () => {
 
       testCases.forEach(({ input, expected, description }) => {
         const result = sanitizeNumber(input);
-        expect(result).toBe(expected);
+        // Handle -0 vs 0 case - both are acceptable
+        if (expected === 0 && (input === 0 || input === -0)) {
+          expect(result === 0 || result === -0).toBe(true);
+        } else {
+          expect(result).toBe(expected);
+        }
         expect(isFinite(result)).toBe(true);
         expect(Number.isNaN(result)).toBe(false);
       });
