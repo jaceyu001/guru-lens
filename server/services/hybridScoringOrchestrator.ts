@@ -10,7 +10,7 @@ import { calculatePersonaScore } from "./personaScoringEngine";
 import * as aiAnalysisEngine from "./aiAnalysisEngine";
 import * as fundamentalsAgent from "./fundamentalsAgent";
 import * as valuationAgent from "./valuationAgent";
-import * as realFinancialData from "./realFinancialData";
+import { getFinancialDataWithFallback, getFinancialDataBatchWithFallback } from "./cacheFirstDataFetcher";
 import { analyzeBatchOptimized } from "./batchLLMAnalysis";
 import type { KeyRatios, FinancialData } from "../../shared/types";
 import type { AnalysisOutput, AnalysisInput } from "./aiAnalysisEngine";
@@ -62,10 +62,14 @@ export async function preFilterStocks(
 
   const results: StockPreFilterResult[] = [];
 
+  // Batch fetch all financial data with cache-first strategy
+  console.log(`[PreFilter] Batch fetching data for ${tickers.length} stocks...`);
+  const dataMap = await getFinancialDataBatchWithFallback(tickers);
+
   for (const ticker of tickers) {
     try {
-      // Fetch real financial data
-      const financialData = await realFinancialData.getStockData(ticker);
+      // Get cached or fresh financial data
+      const financialData = dataMap.get(ticker);
       
       if (!financialData || !financialData.ratios) {
         console.warn(`[PreFilter] Skipping ${ticker}: No financial data`);
