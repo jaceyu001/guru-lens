@@ -445,3 +445,70 @@
 - [ ] Test financial data fetching for multiple tickers
 - [ ] Verify individual analysis page works
 - [ ] Verify scanner works
+
+
+## CURRENT WORK: Alpha Vantage API Integration & Cache System
+
+### Phase 1: Planning & Setup
+- [x] Create comprehensive system architecture document
+- [x] Define cache-first data fetching strategy
+- [x] Plan database schema for cache and opportunities
+- [x] Define 4-year financial data limit
+- [ ] Save checkpoint with planning documents
+
+### Phase 2: Alpha Vantage API Wrapper
+- [ ] Create alphaVantageWrapper.ts
+- [ ] Implement getStockData() function
+- [ ] Implement getCompanyProfile() function
+- [ ] Implement getFinancialStatements() function
+- [ ] Add 4-year data limitation logic
+- [ ] Add error handling and logging
+- [ ] Write unit tests for wrapper
+
+### Phase 3: Database Schema
+- [ ] Create stock_financial_cache table
+- [ ] Create opportunity_scan table
+- [ ] Create opportunity table
+- [ ] Add all indexes for performance
+- [ ] Create migration scripts
+- [ ] Test schema with sample data
+
+### Phase 4: Cache System Implementation
+- [ ] Implement getFinancialDataWithFallback() function
+- [ ] Implement updateStockFinancialCache() function
+- [ ] Implement cache query functions
+- [ ] Add refresh_required flag logic
+- [ ] Add stale cache fallback mechanism
+- [ ] Write unit tests for cache functions
+
+### Phase 5: Financial Data Pipeline
+- [ ] Replace yfinanceWrapper with alphaVantageWrapper
+- [ ] Update realFinancialData.ts to use Alpha Vantage
+- [ ] Maintain TTM calculations (unchanged)
+- [ ] Maintain all ratio calculations (unchanged)
+- [ ] Verify data mapping accuracy
+- [ ] Write integration tests
+
+### Phase 6: Scan Workflow Integration
+- [ ] Update opportunityScanningService.ts
+- [ ] Implement Phase 1 preliminary filtering with cache
+- [ ] Implement Phase 2 detailed analysis with cache
+- [ ] Implement Phase 3 finalization
+- [ ] Add scan statistics tracking
+- [ ] Write end-to-end tests
+
+### Phase 7: Testing & Validation
+- [ ] Test cache hit rates
+- [ ] Test API fallback mechanism
+- [ ] Test stale cache fallback
+- [ ] Verify financial data accuracy (±1%)
+- [ ] Verify TTM calculations match
+- [ ] Verify agent scores consistency
+- [ ] Load test with 1000+ scans
+
+### Phase 8: Deployment
+- [ ] Migrate production database
+- [ ] Deploy Alpha Vantage wrapper
+- [ ] Deploy cache system
+- [ ] Monitor for issues
+- [ ] Gradual rollout to users
