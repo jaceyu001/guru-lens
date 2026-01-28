@@ -217,7 +217,7 @@ export default function Ticker() {
               </div>
             </div>
             
-            {price && price.current !== undefined && (
+            {price && price.current !== undefined && price.change !== undefined && price.changePercent !== undefined && (
               <div className="text-right">
                 <div className="text-3xl font-bold font-mono-numbers text-foreground">
                   ${price.current.toFixed(2)}
@@ -228,7 +228,7 @@ export default function Ticker() {
                 </div>
                 <div className="text-xs text-muted-foreground mt-1 flex items-center justify-end gap-1">
                   <Clock className="h-3 w-3" />
-                  {new Date(price.timestamp).toLocaleString()}
+                  {new Date(price.timestamp || new Date()).toLocaleString()}
                 </div>
               </div>
             )}
@@ -245,54 +245,54 @@ export default function Ticker() {
                 </div>
               </div>
             )}
-            {ratios && ratios.pe !== undefined && (
+            {ratios && ratios.pe !== null && ratios.pe !== undefined && (
               <div>
                 <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
                   P/E Ratio
                   {isMetricAnomalous("P/E Ratio") && <Badge variant="destructive" className="text-xs">TBC</Badge>}
                 </div>
                 <div className={`font-semibold font-mono-numbers ${isMetricAnomalous("P/E Ratio") ? "text-yellow-600" : ""}`}>
-                  {ratios.pe.toFixed(2)}
+                  {ratios.pe?.toFixed(2) ?? "N/A"}
                 </div>
               </div>
             )}
-            {ratios && ratios.pb !== undefined && (
+            {ratios && ratios.pb !== null && ratios.pb !== undefined && (
               <div>
                 <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
                   P/B Ratio
                   {isMetricAnomalous("P/B Ratio") && <Badge variant="destructive" className="text-xs">TBC</Badge>}
                 </div>
                 <div className={`font-semibold font-mono-numbers ${isMetricAnomalous("P/B Ratio") ? "text-yellow-600" : ""}`}>
-                  {ratios.pb.toFixed(2)}
+                  {ratios.pb?.toFixed(2) ?? "N/A"}
                 </div>
               </div>
             )}
-            {ratios && ratios.roe !== undefined && (
+            {ratios && ratios.roe !== null && ratios.roe !== undefined && (
               <div>
                 <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
                   ROE
                   {isMetricAnomalous("ROE") && <Badge variant="destructive" className="text-xs">TBC</Badge>}
                 </div>
                 <div className={`font-semibold font-mono-numbers ${isMetricAnomalous("ROE") ? "text-yellow-600" : ""}`}>
-                  {ratios.roe.toFixed(2)}%
+                  {ratios.roe?.toFixed(2) ?? "N/A"}%
                 </div>
               </div>
             )}
-            {ratios?.debtToEquity !== undefined && (
+            {ratios?.debtToEquity !== null && ratios?.debtToEquity !== undefined && (
               <div>
                 <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
                   Debt/Equity
                   {isMetricAnomalous("Debt/Equity") && <Badge variant="destructive" className="text-xs">TBC</Badge>}
                 </div>
                 <div className={`font-semibold font-mono-numbers ${isMetricAnomalous("Debt/Equity") ? "text-yellow-600" : ""}`}>
-                  {(ratios.debtToEquity * 100).toFixed(2)}%
+                  {((ratios.debtToEquity ?? 0) * 100).toFixed(2)}%
                 </div>
               </div>
             )}
-            {ratios?.netMargin !== undefined && (
+            {ratios?.netMargin !== null && ratios?.netMargin !== undefined && (
               <div>
                 <div className="text-xs text-muted-foreground mb-1">Net Margin</div>
-                <div className="font-semibold font-mono-numbers">{ratios.netMargin.toFixed(2)}%</div>
+                <div className="font-semibold font-mono-numbers">{(ratios.netMargin ?? 0).toFixed(2)}%</div>
               </div>
             )}
           </div>
