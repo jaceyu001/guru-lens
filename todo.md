@@ -426,3 +426,22 @@
   - [x] Updated ScanResult cache interface
   - [x] Updated OpportunityScannerPage data mapping
 - [x] All TypeScript compilation clean with no errors
+
+
+## BUG: Individual Analysis Page Blank for PDD
+
+- [ ] Investigate why /ticker/PDD shows blank page
+- [ ] Check if issue is specific to PDD or all tickers
+- [ ] Review Ticker.tsx component for rendering issues
+- [ ] Check if yfinance data fetching is failing
+- [ ] Verify tRPC procedure is returning data correctly
+
+
+## BUG FIX: yfinance API Rate Limiting
+
+- [ ] Create FMP API financial data fetcher as primary source
+- [ ] Update realFinancialData.ts to use FMP API
+- [ ] Implement retry logic with exponential backoff
+- [ ] Test financial data fetching for multiple tickers
+- [ ] Verify individual analysis page works
+- [ ] Verify scanner works

@@ -133,7 +133,7 @@ export default function Ticker() {
     );
   }
 
-  if (!financialData.data) {
+  if (financialData.isError || !financialData.data) {
     return (
       <div className="min-h-screen bg-background py-8">
         <div className="container">
@@ -143,11 +143,17 @@ export default function Ticker() {
           </Button>
           <Card className="p-12 text-center">
             <AlertCircle className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-            <h2 className="text-2xl font-bold mb-2">Ticker Not Found</h2>
+            <h2 className="text-2xl font-bold mb-2">{financialData.isError ? "Unable to Load Data" : "Ticker Not Found"}</h2>
             <p className="text-muted-foreground mb-6">
-              We couldn't find data for ticker symbol "{symbol}". Please try another ticker.
+              {financialData.isError 
+                ? `We encountered an error loading data for ${symbol}. This may be a temporary issue. Please try again.`
+                : `We couldn't find data for ticker symbol "${symbol}". Please try another ticker.`
+              }
             </p>
-            <Button onClick={() => setLocation("/")}>Return to Home</Button>
+            <div className="flex gap-2 justify-center">
+              <Button onClick={() => financialData.refetch()}>Retry</Button>
+              <Button variant="outline" onClick={() => setLocation("/")}>Return to Home</Button>
+            </div>
           </Card>
         </div>
       </div>

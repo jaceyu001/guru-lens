@@ -1,6 +1,6 @@
 """
-yfinance Wrapper Service - With Socket Timeout
-Provides real financial data for stocks via yfinance with timeout handling
+yfinance Wrapper Service - With Subprocess Timeout
+Provides real financial data for stocks via yfinance with proper timeout handling
 This script is called from Node.js to fetch stock data
 """
 
@@ -9,13 +9,10 @@ import sys
 import os
 import time
 import random
-import socket
+import signal
 import yfinance as yf
 from datetime import datetime
 import math
-
-# Set global socket timeout to prevent hanging on rate limits
-socket.setdefaulttimeout(10)
 
 # Import currency detection utility
 try:
@@ -31,6 +28,12 @@ except ImportError:
         return {'reportingCurrency': currency, 'conversionApplied': False, 'conversionRate': 1.0}
     def convert_to_usd(value, currency):
         return value
+
+class TimeoutException(Exception):
+    pass
+
+def timeout_handler(signum, frame):
+    raise TimeoutException("yfinance API call timed out")
 
 def calculate_interest_coverage(ticker):
     """Calculate interest coverage ratio from EBIT / Interest Expense"""
@@ -65,20 +68,42 @@ def get_stock_data(symbol, retry_count=0, max_retries=2):
             print(f"[DEBUG] Waiting {wait_time:.1f}s before retry for {symbol}", file=sys.stderr)
             time.sleep(wait_time)
         
-        # Create ticker - socket timeout will apply
-        ticker = yf.Ticker(symbol)
+        # Set alarm for 15 second timeout (allow for slow network)
+        signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(15)
         
-        print(f"[DEBUG] Fetching info for {symbol}", file=sys.stderr)
-        info = ticker.info
+        try:
+            print(f"[DEBUG] Creating ticker for {symbol}", file=sys.stderr)
+            ticker = yf.Ticker(symbol)
+            
+            print(f"[DEBUG] Fetching info for {symbol}", file=sys.stderr)
+            info = ticker.info
+            
+            print(f"[DEBUG] Fetching historical data for {symbol}", file=sys.stderr)
+            hist = ticker.history(period="1y")
+            
+            # Cancel alarm
+            signal.alarm(0)
+            
+        except TimeoutException:
+            signal.alarm(0)
+            print(f"[ERROR] Timeout fetching {symbol}", file=sys.stderr)
+            if retry_count < max_retries:
+                return get_stock_data(symbol, retry_count + 1, max_retries)
+            raise Exception(f"Timeout fetching {symbol} after {max_retries + 1} attempts")
+        except Exception as curl_error:
+            signal.alarm(0)
+            if "Failure writing output" in str(curl_error) or "Connection closed" in str(curl_error):
+                print(f"[ERROR] Connection error for {symbol}: {str(curl_error)}", file=sys.stderr)
+                if retry_count < max_retries:
+                    return get_stock_data(symbol, retry_count + 1, max_retries)
+            raise
         
         if not info or not isinstance(info, dict):
             print(f"[WARNING] Invalid info for {symbol}: {type(info)}", file=sys.stderr)
             if retry_count < max_retries:
                 return get_stock_data(symbol, retry_count + 1, max_retries)
             info = {}
-        
-        print(f"[DEBUG] Fetching historical data for {symbol}", file=sys.stderr)
-        hist = ticker.history(period="1y")
         
         try:
             latest_price = hist['Close'].iloc[-1] if len(hist) > 0 else info.get('currentPrice', 0)
@@ -155,11 +180,11 @@ def get_stock_data(symbol, retry_count=0, max_retries=2):
         print(f"[DEBUG] Successfully fetched data for {symbol}", file=sys.stderr)
         return result
         
-    except socket.timeout:
-        print(f"[ERROR] Socket timeout for {symbol}", file=sys.stderr)
+    except TimeoutException as e:
+        print(f"[ERROR] Timeout for {symbol}: {str(e)}", file=sys.stderr)
         if retry_count < max_retries:
             return get_stock_data(symbol, retry_count + 1, max_retries)
-        raise Exception(f"Timeout fetching {symbol} after {max_retries + 1} attempts")
+        raise
     except Exception as e:
         print(f"[ERROR] Failed to fetch {symbol}: {str(e)}", file=sys.stderr)
         if retry_count < max_retries:
@@ -178,7 +203,7 @@ def get_stock_data_batch(symbols):
             
             # Add delay between requests to avoid rate limiting
             if i < len(symbols) - 1:
-                delay = random.uniform(1.5, 3.0)
+                delay = random.uniform(2.0, 3.0)
                 print(f"[DEBUG] Waiting {delay:.1f}s before next request", file=sys.stderr)
                 time.sleep(delay)
                 
