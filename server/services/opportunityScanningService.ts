@@ -356,7 +356,7 @@ export async function startRefreshJobWithAdaptiveRateLimit(scanJobId: number, pe
     const dataMap = await getFinancialDataBatchWithFallback(allStocks);
     const phase1TimeMs = Date.now() - startPhase1;
     console.log(`[FullScan ${scanJobId}] Phase 1 completed in ${phase1TimeMs}ms`);
-    console.log(`[FullScan ${scanJobId}] Retrieved data for ${dataMap.size} stocks`);
+    console.log(`[FullScan ${scanJobId}] Retrieved data for ${Object.keys(dataMap).length} stocks`);
 
     // Update progress
     updateScanProgress(scanJobId, {
@@ -367,7 +367,7 @@ export async function startRefreshJobWithAdaptiveRateLimit(scanJobId: number, pe
     // Phase 2: Pre-filter and select top 50 for LLM analysis
     console.log(`[FullScan ${scanJobId}] Phase 2: Pre-filtering and selecting top 50 candidates...`);
     const startPhase2 = Date.now();
-    const tickers = Array.from(dataMap.keys());
+    const tickers = Object.keys(dataMap);
     const hybridResults = await hybridScore(tickers, personaId, persona.name, 50, scanJobId);
     const phase2TimeMs = Date.now() - startPhase2;
     console.log(`[FullScan ${scanJobId}] Phase 2 completed in ${phase2TimeMs}ms`);

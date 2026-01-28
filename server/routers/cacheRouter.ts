@@ -7,7 +7,7 @@ import { router, publicProcedure } from "../_core/trpc";
 import { z } from "zod";
 import { getDb } from "../db";
 import { stockFinancialCache } from "../../drizzle/schema";
-import { getFinancialDataWithFallback, markForRefresh } from "../services/cacheFirstDataFetcher";
+import { getFinancialDataWithFallback } from "../services/cacheFirstDataFetcher";
 import { eq } from "drizzle-orm";
 
 export const cacheRouter = router({

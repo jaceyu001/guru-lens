@@ -23,12 +23,14 @@ function sanitizeString(value: any): string | null {
 
 /**
  * Build financial data structure from cache entry
+ * CRITICAL: Extract financials from stored JSON to enable growth calculations
  */
 function buildFinancialDataFromCache(cacheEntry: any): any {
   console.log(`[buildFinancialDataFromCache] Building data for ${cacheEntry.ticker}:`, {
     currentPrice: cacheEntry.currentPrice,
     peRatio: cacheEntry.peRatio,
     roe: cacheEntry.roe,
+    hasFinancialDataJson: !!cacheEntry.financialDataJson,
   });
   
   const parseNum = (val: any) => {
@@ -36,6 +38,36 @@ function buildFinancialDataFromCache(cacheEntry: any): any {
     const num = Number(val);
     return isFinite(num) ? num : null;
   };
+  
+  // CRITICAL FIX: Extract financials from stored JSON
+  let financials = { annualReports: [], quarterlyReports: [] };
+  let balanceSheet = { annualReports: [], quarterlyReports: [] };
+  let cashFlow = { annualReports: [], quarterlyReports: [] };
+  
+  if (cacheEntry.financialDataJson) {
+    try {
+      const jsonData = typeof cacheEntry.financialDataJson === "string"
+        ? JSON.parse(cacheEntry.financialDataJson)
+        : cacheEntry.financialDataJson;
+      
+      if (jsonData.financials) {
+        financials = jsonData.financials;
+      }
+      if (jsonData.balanceSheet) {
+        balanceSheet = jsonData.balanceSheet;
+      }
+      if (jsonData.cashFlow) {
+        cashFlow = jsonData.cashFlow;
+      }
+      
+      console.log(`[buildFinancialDataFromCache] Extracted from JSON:`, {
+        annualReports: financials.annualReports?.length || 0,
+        quarterlyReports: financials.quarterlyReports?.length || 0,
+      });
+    } catch (e) {
+      console.error(`[buildFinancialDataFromCache] Failed to extract from JSON:`, e);
+    }
+  }
   
   return {
     ticker: cacheEntry.ticker,
@@ -72,18 +104,10 @@ function buildFinancialDataFromCache(cacheEntry: any): any {
       dividendYield: parseNum(cacheEntry.dividendYield),
       earningsGrowth: 0,
     },
-    financials: {
-      annualReports: [],
-      quarterlyReports: [],
-    },
-    balanceSheet: {
-      annualReports: [],
-      quarterlyReports: [],
-    },
-    cashFlow: {
-      annualReports: [],
-      quarterlyReports: [],
-    },
+    // CRITICAL: Return extracted financials, not empty arrays
+    financials,
+    balanceSheet,
+    cashFlow,
   };
 }
 
@@ -177,6 +201,7 @@ export async function updateCache(ticker: string, freshData: any): Promise<boole
       debtToEquity: String(sanitizeNumber(freshData.ratios?.debtToEquity)),
       currentRatio: String(sanitizeNumber(freshData.ratios?.currentRatio)),
       dividendYield: String(sanitizeNumber(freshData.ratios?.dividendYield)),
+      // Store complete financial data as JSON for later extraction
       financialDataJson: freshData,
       refreshRequired: false,
       fetchedAt: new Date(),
@@ -278,96 +303,54 @@ export async function getFinancialDataWithFallback(
         };
       }
 
-      return { success: false, source: "error", cacheHit: false, apiUsed: false, error: `Failed to fetch data: ${String(apiError)}` };
-    }
-  } catch (error) {
-    console.error(`[cacheFirstDataFetcher] Unexpected error for ${ticker}:`, error);
-    return { success: false, source: "error", cacheHit: false, apiUsed: false, error: String(error) };
-  }
-}
-
-/**
- * Get financial data for multiple tickers in batch
- */
-export async function getFinancialDataBatchWithFallback(
-  tickers: string[],
-  forceRefresh: boolean = false,
-): Promise<Map<string, FinancialDataResult>> {
-  const results = new Map<string, FinancialDataResult>();
-  const errors = new Map<string, Error>();
-
-  for (const ticker of tickers) {
-    try {
-      const result = await getFinancialDataWithFallback(ticker, forceRefresh);
-      results.set(ticker, result);
-    } catch (error) {
-      errors.set(ticker, error as Error);
-      results.set(ticker, {
+      // Step 4: Return error
+      console.error(`[cacheFirstDataFetcher] All strategies failed for ${ticker}`);
+      return {
         success: false,
         source: "error",
         cacheHit: false,
         apiUsed: false,
-        error: String(error),
-      });
+        error: `Failed to fetch data for ${ticker}: ${String(apiError)}`,
+      };
     }
-  }
-
-  if (errors.size > 0) {
-    console.error(`[cacheFirstDataFetcher] Batch fetch completed with ${errors.size} errors`);
-  }
-
-  return results;
-}
-
-/**
- * Mark a cache entry for refresh
- */
-export async function markForRefresh(ticker: string, reason: string = "manual_refresh"): Promise<boolean> {
-  try {
-    const db = await getDb();
-    if (!db) {
-      console.error("[cacheFirstDataFetcher] Database not available");
-      return false;
-    }
-
-    await db.update(stockFinancialCache).set({ refreshRequired: true, lastRefreshReason: reason }).where(eq(stockFinancialCache.ticker, ticker));
-
-    console.log(`[cacheFirstDataFetcher] Marked ${ticker} for refresh (reason: ${reason})`);
-    return true;
   } catch (error) {
-    console.error(`[cacheFirstDataFetcher] Error marking ${ticker} for refresh:`, error);
-    return false;
-  }
-}
-
-/**
- * Get cache statistics
- */
-export async function getCacheStatistics(): Promise<{
-  totalCached: number;
-  cacheHitRate: number;
-  averageAge: number;
-  needsRefresh: number;
-}> {
-  try {
-    const db = await getDb();
-    if (!db) {
-      return { totalCached: 0, cacheHitRate: 0, averageAge: 0, needsRefresh: 0 };
-    }
-
-    const cached = await db.select().from(stockFinancialCache);
-
-    const needsRefresh = cached.filter((c) => c.refreshRequired).length;
-    const totalCached = cached.length;
-
+    console.error(`[cacheFirstDataFetcher] Unexpected error for ${ticker}:`, error);
     return {
-      totalCached,
-      cacheHitRate: totalCached > 0 ? ((totalCached - needsRefresh) / totalCached) * 100 : 0,
-      averageAge: 0, // Would need to calculate from timestamps
-      needsRefresh,
+      success: false,
+      source: "error",
+      cacheHit: false,
+      apiUsed: false,
+      error: String(error),
     };
-  } catch (error) {
-    console.error("[cacheFirstDataFetcher] Error getting cache statistics:", error);
-    return { totalCached: 0, cacheHitRate: 0, averageAge: 0, needsRefresh: 0 };
   }
+}
+
+/**
+ * Get financial data for multiple tickers with batch optimization
+ */
+export async function getFinancialDataBatchWithFallback(
+  tickers: string[],
+  forceRefresh: boolean = false,
+): Promise<Record<string, FinancialDataResult>> {
+  const results: Record<string, FinancialDataResult> = {};
+  
+  // Fetch in parallel with rate limiting
+  const batchSize = 5;
+  for (let i = 0; i < tickers.length; i += batchSize) {
+    const batch = tickers.slice(i, i + batchSize);
+    const batchResults = await Promise.all(
+      batch.map(ticker => getFinancialDataWithFallback(ticker, forceRefresh))
+    );
+    
+    batch.forEach((ticker, idx) => {
+      results[ticker] = batchResults[idx];
+    });
+    
+    // Add delay between batches to respect rate limits
+    if (i + batchSize < tickers.length) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+  }
+  
+  return results;
 }
