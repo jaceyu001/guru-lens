@@ -147,11 +147,18 @@
 - [x] Fix valuation agent to use quote.price instead of price.current
 - [x] Fix fundamentals agent data flow - uses financial data correctly
 - [x] Remove debug logging from wrapper functions
+- [x] Fix Debt/Equity calculation with null handling for missing fields
+- [x] Fix Net Margin calculation with null handling
+- [x] Fix router to use quote field instead of non-existent price field
 - [ ] Test individual stock analysis
   - [ ] Test cache-first strategy for individual stocks
   - [ ] Verify fundamentals agent works with new API
   - [ ] Verify valuation agent works with new API
   - [ ] Test end-to-end analysis flow
+  - [ ] Test price display for TSLA, BIDU, AAPL, MSFT
+  - [ ] Test Debt/Equity and Net Margin display
+  - [ ] Test Valuation Agent with correct price
+  - [ ] Test Fundamentals Agent growth metrics
 - [ ] Test full scan with cache
   - [ ] Test Phase 1 (batch fetch)
   - [ ] Test Phase 2 (hybrid scoring)

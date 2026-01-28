@@ -209,19 +209,19 @@ export const appRouter = router({
         ]).catch(() => [undefined, undefined]);
         
         // PHASE 1 OPTIMIZATION: Pre-compute shared data (computed once, not per persona)
-        const price = financialData.price!;
+        const quote = financialData.quote!;
         const stockPrice = {
           symbol: input.symbol,
-          current: price.current,
-          open: price.open,
-          high: price.high,
-          low: price.low,
-          close: price.current,
-          volume: price.volume,
-          previousClose: price.current - price.change,
-          change: price.change,
-          changePercent: price.changePercent,
-          timestamp: price.timestamp,
+          current: quote.price,
+          open: quote.price,
+          high: quote.price,
+          low: quote.price,
+          close: quote.price,
+          volume: quote.volume,
+          previousClose: quote.price - quote.change,
+          change: quote.change,
+          changePercent: quote.changePercent,
+          timestamp: quote.timestamp,
         };
         
         const profile = financialData.profile!;

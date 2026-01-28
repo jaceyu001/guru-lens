@@ -319,6 +319,16 @@ function parseStockData(
   const latestAnnualIncome = annualIncomeReports[0];
   const latestAnnualBalance = annualBalanceReports[0];
   const latestQuarterlyIncome = quarterlyIncomeReports[0];
+  
+  console.log(`[parseStockData] ${ticker} balance sheet:`, {
+    annualReports_length: annualBalanceReports.length,
+    first_report_keys: annualBalanceReports[0] ? Object.keys(annualBalanceReports[0]) : [],
+    debtToEquity_calc: latestAnnualBalance ? {
+      longTermDebt: latestAnnualBalance.longTermDebt,
+      shortTermDebt: latestAnnualBalance.shortTermDebt,
+      totalEquity: latestAnnualBalance.totalEquity,
+    } : null,
+  });
 
   const ratios = {
     pe: overview?.PERatio ? parseFloat(overview.PERatio) : null,
@@ -334,15 +344,15 @@ function parseStockData(
       ? (parseFloat(latestAnnualIncome.operatingIncome) / parseFloat(latestAnnualIncome.revenue)) *
         100
       : null,
-    netMargin: latestAnnualIncome
+    netMargin: latestAnnualIncome && latestAnnualIncome.netIncome && latestAnnualIncome.revenue
       ? (parseFloat(latestAnnualIncome.netIncome) / parseFloat(latestAnnualIncome.revenue)) * 100
       : null,
-    currentRatio: latestAnnualBalance
+    currentRatio: latestAnnualBalance && latestAnnualBalance.currentAssets && latestAnnualBalance.currentLiabilities
       ? parseFloat(latestAnnualBalance.currentAssets) / parseFloat(latestAnnualBalance.currentLiabilities)
       : null,
-    debtToEquity: latestAnnualBalance
-      ? (parseFloat(latestAnnualBalance.longTermDebt) + parseFloat(latestAnnualBalance.shortTermDebt)) /
-        parseFloat(latestAnnualBalance.totalEquity)
+    debtToEquity: latestAnnualBalance && latestAnnualBalance.totalEquity
+      ? ((parseFloat(latestAnnualBalance.longTermDebt || 0) + parseFloat(latestAnnualBalance.shortTermDebt || 0)) /
+        parseFloat(latestAnnualBalance.totalEquity))
       : null,
     dividendYield: overview?.DividendYield ? parseFloat(overview.DividendYield) * 100 : null,
     interestCoverage: null, // Will be calculated if needed
