@@ -381,3 +381,173 @@ export const scanOpportunityAnalyses = mysqlTable("scanOpportunityAnalyses", {
 
 export type ScanOpportunityAnalysis = typeof scanOpportunityAnalyses.$inferSelect;
 export type InsertScanOpportunityAnalysis = typeof scanOpportunityAnalyses.$inferInsert;
+
+/**
+ * Stock financial cache for Alpha Vantage data
+ * Stores 5000+ stocks with preliminary financial data for fast filtering
+ * Cache persists until manual refresh (refresh_required flag)
+ */
+export const stockFinancialCache = mysqlTable("stockFinancialCache", {
+  id: int("id").autoincrement().primaryKey(),
+  ticker: varchar("ticker", { length: 10 }).notNull().unique(),
+  companyName: varchar("companyName", { length: 255 }),
+  sector: varchar("sector", { length: 100 }),
+  industry: varchar("industry", { length: 100 }),
+  exchange: varchar("exchange", { length: 50 }),
+  currency: varchar("currency", { length: 10 }).default("USD").notNull(),
+  
+  // Latest quote data
+  currentPrice: decimal("currentPrice", { precision: 10, scale: 2 }),
+  marketCap: decimal("marketCap", { precision: 20, scale: 0 }),
+  volume: decimal("volume", { precision: 20, scale: 0 }),
+  
+  // Key financial ratios (for preliminary filtering)
+  peRatio: decimal("peRatio", { precision: 10, scale: 2 }),
+  pbRatio: decimal("pbRatio", { precision: 10, scale: 2 }),
+  psRatio: decimal("psRatio", { precision: 10, scale: 2 }),
+  roe: decimal("roe", { precision: 10, scale: 2 }), // Return on Equity %
+  roa: decimal("roa", { precision: 10, scale: 2 }), // Return on Assets %
+  roic: decimal("roic", { precision: 10, scale: 2 }), // Return on Invested Capital %
+  
+  // Margins
+  grossMargin: decimal("grossMargin", { precision: 10, scale: 2 }), // %
+  operatingMargin: decimal("operatingMargin", { precision: 10, scale: 2 }), // %
+  netMargin: decimal("netMargin", { precision: 10, scale: 2 }), // %
+  
+  // Leverage and liquidity
+  debtToEquity: decimal("debtToEquity", { precision: 10, scale: 2 }),
+  currentRatio: decimal("currentRatio", { precision: 10, scale: 2 }),
+  
+  // Dividend
+  dividendYield: decimal("dividendYield", { precision: 10, scale: 2 }), // %
+  
+  // Complete financial data snapshot (TTM + 3 years)
+  financialDataJson: json("financialDataJson").$type<Record<string, any>>().notNull(),
+  
+  // Refresh control
+  refreshRequired: boolean("refreshRequired").default(false).notNull(),
+  lastRefreshReason: varchar("lastRefreshReason", { length: 255 }), // price_change, manual_refresh, etc.
+  
+  // Timestamps
+  fetchedAt: timestamp("fetchedAt").notNull(),
+  lastUpdated: timestamp("lastUpdated").defaultNow().onUpdateNow().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  tickerIdx: index("ticker_idx").on(table.ticker),
+  sectorIdx: index("sector_idx").on(table.sector),
+  refreshRequiredIdx: index("refresh_required_idx").on(table.refreshRequired),
+  lastUpdatedIdx: index("last_updated_idx").on(table.lastUpdated),
+}));
+
+export type StockFinancialCache = typeof stockFinancialCache.$inferSelect;
+export type InsertStockFinancialCache = typeof stockFinancialCache.$inferInsert;
+
+/**
+ * Opportunity scan records
+ * Stores metadata about each scan run (persona, date, statistics)
+ */
+export const opportunityScanRecords = mysqlTable("opportunityScanRecords", {
+  id: int("id").autoincrement().primaryKey(),
+  personaId: int("personaId").notNull().references(() => personas.id),
+  
+  status: mysqlEnum("status", ["pending", "phase1_filtering", "phase2_analysis", "completed", "failed"]).default("pending").notNull(),
+  
+  // Phase 1: Preliminary Filtering
+  phase1StartedAt: timestamp("phase1StartedAt"),
+  phase1CompletedAt: timestamp("phase1CompletedAt"),
+  phase1StocksProcessed: int("phase1StocksProcessed").default(0).notNull(),
+  phase1CandidatesFound: int("phase1CandidatesFound").default(0).notNull(),
+  phase1ApiCallsUsed: int("phase1ApiCallsUsed").default(0).notNull(),
+  phase1CacheHits: int("phase1CacheHits").default(0).notNull(),
+  
+  // Phase 2: Detailed Analysis
+  phase2StartedAt: timestamp("phase2StartedAt"),
+  phase2CompletedAt: timestamp("phase2CompletedAt"),
+  phase2OpportunitiesAnalyzed: int("phase2OpportunitiesAnalyzed").default(0).notNull(),
+  phase2LlmCallsUsed: int("phase2LlmCallsUsed").default(0).notNull(),
+  phase2ApiCallsUsed: int("phase2ApiCallsUsed").default(0).notNull(),
+  phase2CacheHits: int("phase2CacheHits").default(0).notNull(),
+  
+  // Results
+  opportunitiesStored: int("opportunitiesStored").default(0).notNull(),
+  
+  // Error tracking
+  errorMessage: text("errorMessage"),
+  failedTickers: json("failedTickers").$type<string[]>(),
+  
+  // Timing
+  totalDurationMs: int("totalDurationMs"),
+  
+  // Timestamps
+  startedAt: timestamp("startedAt").notNull(),
+  completedAt: timestamp("completedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  personaStatusIdx: index("persona_status_idx").on(table.personaId, table.status),
+  startedAtIdx: index("started_at_idx").on(table.startedAt),
+  completedAtIdx: index("completed_at_idx").on(table.completedAt),
+}));
+
+export type OpportunityScanRecord = typeof opportunityScanRecords.$inferSelect;
+export type InsertOpportunityScanRecord = typeof opportunityScanRecords.$inferInsert;
+
+/**
+ * Opportunity records with complete financial and LLM analysis data
+ * Stores 50 opportunities per persona scan with full analysis results
+ */
+export const opportunityRecords = mysqlTable("opportunityRecords", {
+  id: int("id").autoincrement().primaryKey(),
+  scanRecordId: int("scanRecordId").notNull().references(() => opportunityScanRecords.id, { onDelete: "cascade" }),
+  personaId: int("personaId").notNull().references(() => personas.id),
+  ticker: varchar("ticker", { length: 10 }).notNull(),
+  companyName: varchar("companyName", { length: 255 }),
+  sector: varchar("sector", { length: 100 }),
+  
+  // Ranking
+  rank: int("rank").notNull(), // 1-50 within this scan
+  
+  // Score and verdict
+  investmentScore: int("investmentScore").notNull(), // 0-100
+  verdict: varchar("verdict", { length: 50 }), // "Strong Fit", "Fit", etc.
+  confidence: decimal("confidence", { precision: 3, scale: 2 }), // 0.00-1.00
+  
+  // Financial data snapshot (TTM + 3 years)
+  financialDataSnapshot: json("financialDataSnapshot").$type<Record<string, any>>().notNull(),
+  
+  // LLM Analysis results
+  investmentThesis: text("investmentThesis"),
+  summaryBullets: json("summaryBullets").$type<string[]>(),
+  keyStrengths: json("keyStrengths").$type<string[]>(),
+  keyRisks: json("keyRisks").$type<string[]>(),
+  catalystAnalysis: json("catalystAnalysis").$type<string[]>(),
+  whatWouldChangeMind: json("whatWouldChangeMind").$type<string[]>(),
+  
+  // Scoring criteria breakdown
+  scoringCriteria: json("scoringCriteria").$type<Array<{
+    name: string;
+    weight: number;
+    status: "pass" | "fail" | "partial";
+    metricsUsed: string[];
+    explanation: string;
+  }>>(),
+  
+  // Data provenance
+  dataUsed: json("dataUsed").$type<Array<{
+    source: string;
+    endpoint: string;
+    timestamp: number;
+  }>>(),
+  
+  // Timestamps
+  analyzedAt: timestamp("analyzedAt").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  scanRecordIdIdx: index("scan_record_id_idx").on(table.scanRecordId),
+  personaTickerIdx: index("persona_ticker_idx").on(table.personaId, table.ticker),
+  rankIdx: index("rank_idx").on(table.scanRecordId, table.rank),
+  uniqueScanTicker: unique("unique_scan_ticker_record").on(table.scanRecordId, table.ticker),
+}));
+
+export type OpportunityRecord = typeof opportunityRecords.$inferSelect;
+export type InsertOpportunityRecord = typeof opportunityRecords.$inferInsert;
