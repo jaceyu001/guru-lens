@@ -26,7 +26,7 @@ function sanitizeString(value: any): string | null {
  */
 function buildFinancialDataFromCache(cacheEntry: any): any {
   const parseNum = (val: any) => {
-    if (val === null || val === undefined || val === "" || val === "0") return null;
+    if (val === null || val === undefined || val === "") return null;
     const num = Number(val);
     return isFinite(num) ? num : null;
   };
@@ -39,11 +39,17 @@ function buildFinancialDataFromCache(cacheEntry: any): any {
       industry: cacheEntry.industry || "N/A",
       exchange: cacheEntry.exchange || "N/A",
       currency: cacheEntry.currency || "USD",
-      marketCap: cacheEntry.marketCap && cacheEntry.marketCap !== "0" ? Number(cacheEntry.marketCap) : 0,
+      marketCap: cacheEntry.marketCap ? Number(cacheEntry.marketCap) : 0,
+      description: null,
+      website: null,
+      employees: null,
     },
     quote: {
-      price: cacheEntry.currentPrice && cacheEntry.currentPrice !== "0" ? Number(cacheEntry.currentPrice) : 0,
-      volume: cacheEntry.volume && cacheEntry.volume !== "0" ? Number(cacheEntry.volume) : 0,
+      price: cacheEntry.currentPrice ? Number(cacheEntry.currentPrice) : 0,
+      volume: cacheEntry.volume ? Number(cacheEntry.volume) : 0,
+      change: 0,
+      changePercent: 0,
+      timestamp: new Date().toISOString(),
     },
     ratios: {
       pe: parseNum(cacheEntry.peRatio),
@@ -58,6 +64,19 @@ function buildFinancialDataFromCache(cacheEntry: any): any {
       debtToEquity: parseNum(cacheEntry.debtToEquity),
       currentRatio: parseNum(cacheEntry.currentRatio),
       dividendYield: parseNum(cacheEntry.dividendYield),
+      earningsGrowth: 0,
+    },
+    financials: {
+      annualReports: [],
+      quarterlyReports: [],
+    },
+    balanceSheet: {
+      annualReports: [],
+      quarterlyReports: [],
+    },
+    cashFlow: {
+      annualReports: [],
+      quarterlyReports: [],
     },
   };
 }
@@ -136,6 +155,7 @@ export async function updateCache(ticker: string, freshData: any): Promise<boole
       industry: sanitizeString(freshData.profile?.industry),
       exchange: sanitizeString(freshData.profile?.exchange),
       currency: sanitizeString(freshData.profile?.currency) || "USD",
+      // Store as strings for decimal columns
       currentPrice: String(sanitizeNumber(freshData.quote?.price)),
       marketCap: String(sanitizeNumber(freshData.profile?.marketCap)),
       volume: String(sanitizeNumber(freshData.quote?.volume)),

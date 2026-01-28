@@ -124,9 +124,11 @@ export const appRouter = router({
           }
           const financialData = cacheResult.data;
           console.log(`[getFinancialData] Success for ${input.symbol} (source: ${cacheResult.source})`);
-          
-          
-          
+          console.log(`[getFinancialData] Returning data:`, {
+            quote: financialData.quote,
+            ratios: financialData.ratios,
+            profile: financialData.profile,
+          });
           
           return financialData;
         } catch (error) {

@@ -39,20 +39,30 @@ export interface GrowthCalculationResult {
  */
 export function calculateGrowth(input: GrowthCalculationInput): GrowthCalculationResult {
   const { financialData, metric } = input;
-  const quarterlyData = (financialData as any).quarterlyFinancials || [];
-  const annualData = financialData.financials || [];
+  
+  // Handle both old format (quarterlyFinancials/financials arrays) and new format (financials.quarterlyReports/annualReports)
+  let quarterlyData = (financialData as any).quarterlyFinancials || [];
+  let annualData = financialData.financials || [];
+  
+  // If using new Alpha Vantage format, extract from nested structure
+  if (!quarterlyData || quarterlyData.length === 0) {
+    quarterlyData = (financialData as any).financials?.quarterlyReports || [];
+  }
+  if (!annualData || annualData.length === 0) {
+    annualData = (financialData as any).financials?.annualReports || [];
+  }
   
 
 
   // Detect current year and quarter
   const latestQuarter = quarterlyData[0];
   if (!latestQuarter) {
-
     return createInsufficientDataResult(metric);
   }
 
-  const currentYear = latestQuarter.fiscalYear;
-  const currentQuarter = getQuarterFromPeriod(latestQuarter.period);
+  // Extract fiscal year from fiscalDateEnding (e.g., "2025-03-31" -> 2025)
+  const currentYear = latestQuarter.fiscalYear || new Date(latestQuarter.fiscalDateEnding).getFullYear();
+  const currentQuarter = getQuarterFromPeriod(latestQuarter.period || latestQuarter.fiscalDateEnding);
   const currentYearQuartersCount = quarterlyData.filter((q: any) => q.fiscalYear === currentYear).length;
 
   // Strategy 1: TTM vs Prior Year FY (when Q2+ available)
@@ -195,30 +205,43 @@ function getFullYearValue(annualData: any[], metric: GrowthMetric, year: number)
  * Extract metric value from financial data object
  */
 function getMetricValue(data: any, metric: GrowthMetric): number {
-  const metricMap: Record<GrowthMetric, string> = {
-    revenue: 'revenue',
-    netIncome: 'netIncome',
-    operatingIncome: 'operatingIncome',
-    freeCashFlow: 'freeCashFlow',
-    operatingCashFlow: 'operatingCashFlow',
+  const metricMap: Record<GrowthMetric, string[]> = {
+    revenue: ['revenue', 'totalRevenue'],
+    netIncome: ['netIncome'],
+    operatingIncome: ['operatingIncome'],
+    freeCashFlow: ['freeCashFlow'],
+    operatingCashFlow: ['operatingCashFlow'],
   };
 
-  const key = metricMap[metric];
-  const value = data[key];
-  return typeof value === 'number' ? value : 0;
+  const keys = metricMap[metric];
+  for (const key of keys) {
+    const value = data[key];
+    if (typeof value === 'number' && value !== 0) {
+      return value;
+    }
+  }
+  return 0;
 }
 
 /**
  * Extract quarter from period string (e.g., "2025-03-31" -> "Q1")
  */
 function getQuarterFromPeriod(period: string): 'Q1' | 'Q2' | 'Q3' | 'Q4' {
-  const date = new Date(period);
-  const month = date.getMonth() + 1;
-  
-  if (month <= 3) return 'Q1';
-  if (month <= 6) return 'Q2';
-  if (month <= 9) return 'Q3';
-  return 'Q4';
+  try {
+    const date = new Date(period);
+    if (isNaN(date.getTime())) {
+      // If date parsing fails, return Q1 as default
+      return 'Q1';
+    }
+    const month = date.getMonth() + 1;
+    
+    if (month <= 3) return 'Q1';
+    if (month <= 6) return 'Q2';
+    if (month <= 9) return 'Q3';
+    return 'Q4';
+  } catch (e) {
+    return 'Q1';
+  }
 }
 
 /**

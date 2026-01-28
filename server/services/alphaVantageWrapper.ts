@@ -3,6 +3,8 @@ import axios from 'axios';
 const API_KEY = process.env.ALPHA_VANTAGE_API_KEY || 'KXUI9PV4W0B6HHFS';
 const BASE_URL = 'https://www.alphavantage.co/query';
 
+console.log(`[alphaVantageWrapper] Using API Key: ${API_KEY?.substring(0, 8)}... (from ${process.env.ALPHA_VANTAGE_API_KEY ? 'env' : 'fallback'})`);
+
 // Maximum years of financial data to fetch (TTM + 3 full years)
 const MAX_DATA_YEARS = 4;
 
@@ -119,6 +121,7 @@ interface StockDataResponse {
  */
 async function getCompanyOverview(ticker: string): Promise<any> {
   try {
+    console.log(`[alphaVantageWrapper] Fetching OVERVIEW for ${ticker}`);
     const response = await axios.get(BASE_URL, {
       params: {
         function: 'OVERVIEW',
