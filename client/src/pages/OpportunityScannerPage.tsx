@@ -15,6 +15,19 @@ interface Opportunity {
   score: number;
   thesis?: string;
   confidence?: string;
+  verdict?: string;
+  preliminaryScore?: number;
+  finalScore?: number;
+  criteria?: any[];
+  keyRisks?: string[];
+  whatWouldChangeMind?: string[];
+  summaryBullets?: string[];
+  strengths?: string[];
+  financialMetrics?: Record<string, number | undefined>;
+  dataUsed?: {
+    sources: string[];
+    timestamp?: string;
+  };
 }
 
 export default function OpportunityScannerPage() {
@@ -60,6 +73,16 @@ export default function OpportunityScannerPage() {
         score: opp.score || opp.finalScore,
         thesis: opp.thesis,
         confidence: opp.confidence,
+        verdict: opp.verdict,
+        preliminaryScore: opp.preliminaryScore,
+        finalScore: opp.finalScore,
+        criteria: opp.criteria,
+        keyRisks: opp.keyRisks,
+        whatWouldChangeMind: opp.whatWouldChangeMind,
+        summaryBullets: opp.summaryBullets,
+        strengths: opp.strengths,
+        financialMetrics: opp.financialMetrics,
+        dataUsed: opp.dataUsed,
       }));
       setOpportunities(mapped);
       setIsScanning(false);

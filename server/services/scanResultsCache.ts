@@ -11,11 +11,23 @@ export interface ScanResult {
   ticker: string;
   companyName: string;
   score: number;
+  preliminaryScore?: number;
   currentPrice: number | null;
   marketCap: number | null;
   sector: string | null;
   thesis?: string;
   confidence?: string;
+  verdict?: string;
+  criteria?: any[];
+  keyRisks?: string[];
+  whatWouldChangeMind?: string[];
+  summaryBullets?: string[];
+  strengths?: string[];
+  financialMetrics?: Record<string, number | undefined>;
+  dataUsed?: {
+    sources: string[];
+    timestamp?: string;
+  };
   scoringDetails?: {
     categories: Array<{
       name: string;
