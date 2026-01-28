@@ -79,7 +79,7 @@ export const appRouter = router({
         
         if (!ticker) {
           // Try to fetch from cache-first financial data service
-          const cacheResult = await getFinancialDataWithFallback(input.symbol, false);
+          const cacheResult = await getFinancialDataWithFallback(input.symbol, true); // forceRefresh=true for live data
           if (!cacheResult.success || !cacheResult.data) {
             throw new Error(`Failed to fetch financial data for ${input.symbol}`);
           }
@@ -118,7 +118,7 @@ export const appRouter = router({
       .query(async ({ input }) => {
         try {
           console.log(`[getFinancialData] Fetching data for ${input.symbol}`);
-          const cacheResult = await getFinancialDataWithFallback(input.symbol, false);
+          const cacheResult = await getFinancialDataWithFallback(input.symbol, true); // forceRefresh=true for live data
           if (!cacheResult.success || !cacheResult.data) {
             throw new Error(`Failed to fetch financial data for ${input.symbol}`);
           }
@@ -148,7 +148,7 @@ export const appRouter = router({
         // Get or create ticker
         let ticker = await db.getTickerBySymbol(input.symbol);
         if (!ticker) {
-          const cacheResult = await getFinancialDataWithFallback(input.symbol, false);
+          const cacheResult = await getFinancialDataWithFallback(input.symbol, true); // forceRefresh=true for live data
           if (!cacheResult.success || !cacheResult.data) {
             throw new Error(`Failed to fetch financial data for ${input.symbol}`);
           }
@@ -181,8 +181,8 @@ export const appRouter = router({
         
         if (!ticker) throw new Error("Failed to create ticker");
         
-        // Get financial data using cache-first strategy
-        const cacheResult = await getFinancialDataWithFallback(input.symbol, false);
+        // Get financial data using API-first strategy for live analysis
+        const cacheResult = await getFinancialDataWithFallback(input.symbol, true); // forceRefresh=true for live data
         if (!cacheResult.success || !cacheResult.data) {
           throw new Error(`No financial data available for ${input.symbol}`);
         }
@@ -810,7 +810,7 @@ export const appRouter = router({
     fundamentals: publicProcedure
       .input(z.object({ symbol: z.string() }))
       .query(async ({ input }) => {
-        const cacheResult = await getFinancialDataWithFallback(input.symbol, false);
+        const cacheResult = await getFinancialDataWithFallback(input.symbol, true); // forceRefresh=true for live data
         if (!cacheResult.success || !cacheResult.data) {
           throw new Error(`Failed to fetch financial data for ${input.symbol}`);
         }
@@ -828,7 +828,7 @@ export const appRouter = router({
     valuation: publicProcedure
       .input(z.object({ symbol: z.string() }))
       .query(async ({ input }) => {
-        const cacheResult = await getFinancialDataWithFallback(input.symbol, false);
+        const cacheResult = await getFinancialDataWithFallback(input.symbol, true); // forceRefresh=true for live data
         if (!cacheResult.success || !cacheResult.data) {
           throw new Error(`Failed to fetch financial data for ${input.symbol}`);
         }

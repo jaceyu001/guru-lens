@@ -160,7 +160,7 @@ export default function Ticker() {
     );
   }
 
-  const price = financialData.data?.price;
+  const price = financialData.data?.quote;  // quote contains price, volume, change, changePercent
   const profile = financialData.data?.profile;
   const ratios = financialData.data?.ratios;
 
