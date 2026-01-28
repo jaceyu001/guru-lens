@@ -334,8 +334,8 @@ function parseStockData(
     pe: overview?.PERatio ? parseFloat(overview.PERatio) : null,
     pb: overview?.PriceToBookRatio ? parseFloat(overview.PriceToBookRatio) : null,
     ps: overview?.PriceToSalesRatioTTM ? parseFloat(overview.PriceToSalesRatioTTM) : null,
-    roe: overview?.ReturnOnEquityTTM ? parseFloat(overview.ReturnOnEquityTTM) : null,
-    roa: overview?.ReturnOnAssetsTTM ? parseFloat(overview.ReturnOnAssetsTTM) : null,
+    roe: overview?.ReturnOnEquityTTM ? parseFloat(overview.ReturnOnEquityTTM) * 100 : null,
+    roa: overview?.ReturnOnAssetsTTM ? parseFloat(overview.ReturnOnAssetsTTM) * 100 : null,
     roic: null, // Will be calculated if needed
     grossMargin: latestAnnualIncome
       ? (parseFloat(latestAnnualIncome.grossProfit) / parseFloat(latestAnnualIncome.revenue)) * 100

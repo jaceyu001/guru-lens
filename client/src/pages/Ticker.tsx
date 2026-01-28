@@ -274,7 +274,7 @@ export default function Ticker() {
                     {isMetricAnomalous("ROE") && <Badge variant="destructive" className="text-xs">TBC</Badge>}
                   </div>
                   <div className={`font-semibold font-mono-numbers ${isMetricAnomalous("ROE") ? "text-yellow-600" : ""}`}>
-                    {ratios.roe?.toFixed(2)}%
+                          {ratios.roe?.toFixed(2)}%
                   </div>
                 </div>
               )}
