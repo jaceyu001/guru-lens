@@ -128,6 +128,7 @@ export async function updateCache(ticker: string, freshData: any): Promise<boole
 
     const existing = await db.select().from(stockFinancialCache).where(eq(stockFinancialCache.ticker, ticker)).limit(1);
 
+    console.log(`[cacheFirstDataFetcher] Storing data for ${ticker}:`, { quote: freshData.quote, price: freshData.quote?.price });
     const cacheData = {
       ticker,
       companyName: sanitizeString(freshData.profile?.companyName),
