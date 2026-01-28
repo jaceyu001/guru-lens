@@ -315,12 +315,18 @@ function parseStockData(
   const quarterlyBalanceReports = limitDataToMaxYears(balanceSheet?.quarterlyReports || []);
   const quarterlyCashFlowReports = limitDataToMaxYears(cashFlow?.quarterlyReports || []);
   
-  // Create maps for cash flow data by fiscal date for easy lookup
+  // Create maps for cash flow and balance sheet data by fiscal date for easy lookup
   const annualCashFlowMap = new Map(
     annualCashFlowReports.map((report: any) => [report.fiscalDateEnding, report])
   );
   const quarterlyCashFlowMap = new Map(
     quarterlyCashFlowReports.map((report: any) => [report.fiscalDateEnding, report])
+  );
+  const annualBalanceMap = new Map(
+    annualBalanceReports.map((report: any) => [report.fiscalDateEnding, report])
+  );
+  const quarterlyBalanceMap = new Map(
+    quarterlyBalanceReports.map((report: any) => [report.fiscalDateEnding, report])
   );
 
   // Calculate financial ratios from available data
@@ -397,17 +403,21 @@ function parseStockData(
     financials: {
       annualReports: annualIncomeReports.map((report: any) => {
         const cf = annualCashFlowMap.get(report.fiscalDateEnding) || {};
+        const bs = annualBalanceMap.get(report.fiscalDateEnding) || {};
         const ocf = parseInt(cf.operatingCashFlow || 0);
         const capex = parseInt(cf.capitalExpenditures || 0);
+        const ta = parseInt(bs.totalAssets || 0);
+        const tl = parseInt(bs.totalLiabilities || 0);
+        const te = parseInt(bs.totalEquity || 0);
         return {
           fiscalDateEnding: report.fiscalDateEnding,
           revenue: parseInt(report.totalRevenue || report.revenue || 0),
           operatingIncome: parseInt(report.operatingIncome || 0),
           netIncome: parseInt(report.netIncome || 0),
           grossProfit: parseInt(report.grossProfit || 0),
-          totalAssets: 0,
-          totalLiabilities: 0,
-          totalEquity: 0,
+          totalAssets: ta,
+          totalLiabilities: tl,
+          totalEquity: te,
           operatingCashFlow: ocf,
           capitalExpenditure: capex,
           freeCashFlow: ocf - capex,
@@ -415,17 +425,21 @@ function parseStockData(
       }),
       quarterlyReports: quarterlyIncomeReports.map((report: any) => {
         const cf = quarterlyCashFlowMap.get(report.fiscalDateEnding) || {};
+        const bs = quarterlyBalanceMap.get(report.fiscalDateEnding) || {};
         const ocf = parseInt(cf.operatingCashFlow || 0);
         const capex = parseInt(cf.capitalExpenditures || 0);
+        const ta = parseInt(bs.totalAssets || 0);
+        const tl = parseInt(bs.totalLiabilities || 0);
+        const te = parseInt(bs.totalEquity || 0);
         return {
           fiscalDateEnding: report.fiscalDateEnding,
           revenue: parseInt(report.totalRevenue || report.revenue || 0),
           operatingIncome: parseInt(report.operatingIncome || 0),
           netIncome: parseInt(report.netIncome || 0),
           grossProfit: parseInt(report.grossProfit || 0),
-          totalAssets: 0,
-          totalLiabilities: 0,
-          totalEquity: 0,
+          totalAssets: ta,
+          totalLiabilities: tl,
+          totalEquity: te,
           operatingCashFlow: ocf,
           capitalExpenditure: capex,
           freeCashFlow: ocf - capex,
