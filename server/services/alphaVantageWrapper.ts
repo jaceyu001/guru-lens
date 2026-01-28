@@ -17,6 +17,7 @@ interface StockDataResponse {
     marketCap: number;
     currency: string;
     exchange: string;
+    sharesOutstanding: number | null;
   };
   quote: {
     price: number;
@@ -39,6 +40,11 @@ interface StockDataResponse {
     debtToEquity: number | null;
     dividendYield: number | null;
     interestCoverage: number | null;
+    eps: number | null;
+    dilutedEps: number | null;
+    revenuePerShare: number | null;
+    bookValuePerShare: number | null;
+    dividendPerShare: number | null;
   };
   financials: {
     annualReports: Array<{
@@ -53,6 +59,11 @@ interface StockDataResponse {
       operatingCashFlow: number;
       capitalExpenditure: number;
       freeCashFlow: number;
+      interestExpense: number | null;
+      basicEps: number | null;
+      dilutedEps: number | null;
+      basicAverageShares: number | null;
+      dilutedAverageShares: number | null;
     }>;
     quarterlyReports: Array<{
       fiscalDateEnding: string;
@@ -389,6 +400,7 @@ function parseStockData(
       marketCap: overview?.MarketCapitalization ? parseInt(overview.MarketCapitalization) : 0,
       currency: overview?.Currency || 'USD',
       exchange: overview?.Exchange || 'N/A',
+      sharesOutstanding: overview?.SharesOutstanding ? parseInt(overview.SharesOutstanding) : null,
     },
     quote: {
       price: quote?.['05. price'] ? parseFloat(quote['05. price']) : 0,
@@ -399,7 +411,14 @@ function parseStockData(
         : 0,
       timestamp: quote?.['07. latest trading day'] || new Date().toISOString(),
     },
-    ratios,
+    ratios: {
+      ...ratios,
+      eps: overview?.EPS ? parseFloat(overview.EPS) : null,
+      dilutedEps: overview?.DilutedEPSTTM ? parseFloat(overview.DilutedEPSTTM) : null,
+      revenuePerShare: overview?.RevenuePerShareTTM ? parseFloat(overview.RevenuePerShareTTM) : null,
+      bookValuePerShare: overview?.BookValue ? parseFloat(overview.BookValue) : null,
+      dividendPerShare: overview?.DividendPerShare ? parseFloat(overview.DividendPerShare) : null,
+    },
     financials: {
       annualReports: annualIncomeReports.map((report: any) => {
         const cf = annualCashFlowMap.get(report.fiscalDateEnding) || {};
@@ -421,6 +440,11 @@ function parseStockData(
           operatingCashFlow: ocf,
           capitalExpenditure: capex,
           freeCashFlow: ocf - capex,
+          interestExpense: parseInt(report.interestExpense || 0) || null,
+          basicEps: report.basicEPS ? parseFloat(report.basicEPS) : null,
+          dilutedEps: report.dilutedEPS ? parseFloat(report.dilutedEPS) : null,
+          basicAverageShares: report.basicAverageShares ? parseInt(report.basicAverageShares) : null,
+          dilutedAverageShares: report.dilutedAverageShares ? parseInt(report.dilutedAverageShares) : null,
         };
       }),
       quarterlyReports: quarterlyIncomeReports.map((report: any) => {
@@ -443,6 +467,11 @@ function parseStockData(
           operatingCashFlow: ocf,
           capitalExpenditure: capex,
           freeCashFlow: ocf - capex,
+          interestExpense: parseInt(report.interestExpense || 0) || null,
+          basicEps: report.basicEPS ? parseFloat(report.basicEPS) : null,
+          dilutedEps: report.dilutedEPS ? parseFloat(report.dilutedEPS) : null,
+          basicAverageShares: report.basicAverageShares ? parseInt(report.basicAverageShares) : null,
+          dilutedAverageShares: report.dilutedAverageShares ? parseInt(report.dilutedAverageShares) : null,
         };
       }),
     },
