@@ -175,6 +175,16 @@ async function getGlobalQuote(ticker: string): Promise<any> {
     console.log(`[alphaVantageWrapper] Extracted quote for ${ticker}:`, JSON.stringify(quote, null, 2));
     console.log(`[alphaVantageWrapper] Quote fields:`, Object.keys(quote).join(', '));
     console.log(`[alphaVantageWrapper] Price field '05. price':`, quote['05. price']);
+    
+    // Check if quote is empty
+    if (Object.keys(quote).length === 0) {
+      console.warn(`[alphaVantageWrapper] WARNING: Empty Global Quote for ${ticker}`);
+      console.warn(`[alphaVantageWrapper] Full response keys:`, Object.keys(response.data));
+      console.warn(`[alphaVantageWrapper] Full response:`, JSON.stringify(response.data, null, 2).substring(0, 1000));
+      // Throw error instead of returning empty quote
+      throw new Error(`Empty Global Quote returned for ${ticker}. API may be rate limited or ticker may be invalid.`);
+    }
+    
     return quote;
   } catch (error) {
     console.error(`[alphaVantageWrapper] Error fetching quote for ${ticker}:`, error);
@@ -338,10 +348,12 @@ function parseStockData(
     interestCoverage: null, // Will be calculated if needed
   };
 
+  const quoteKeys = Object.keys(quote || {});
   console.log(`[parseStockData] ${ticker} quote data:`, {
     price_raw: quote?.['05. price'],
     price_parsed: quote?.['05. price'] ? parseFloat(quote['05. price']) : 0,
-    quote_keys: Object.keys(quote || {}),
+    quote_keys: quoteKeys,
+    quote_empty: quoteKeys.length === 0,
   });
   
   return {
