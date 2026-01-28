@@ -1,5 +1,7 @@
 import axios from 'axios';
 
+import { calculateROIC, calculatePayoutRatio } from './derivedMetricsCalculator';
+
 const API_KEY = process.env.ALPHA_VANTAGE_API_KEY || 'KXUI9PV4W0B6HHFS';
 const BASE_URL = 'https://www.alphavantage.co/query';
 
@@ -45,6 +47,7 @@ interface StockDataResponse {
     revenuePerShare: number | null;
     bookValuePerShare: number | null;
     dividendPerShare: number | null;
+    payoutRatio: number | null;
   };
   financials: {
     annualReports: Array<{
@@ -355,13 +358,23 @@ function parseStockData(
     } : null,
   });
 
+  // Calculate derived metrics
+  const operatingIncome = latestAnnualIncome ? parseFloat(latestAnnualIncome.operatingIncome || 0) : null;
+  const totalAssets = latestAnnualBalance ? parseFloat(latestAnnualBalance.totalAssets || 0) : null;
+  const currentLiabilities = latestAnnualBalance ? parseFloat(latestAnnualBalance.currentLiabilities || 0) : null;
+  const eps = overview?.EPS ? parseFloat(overview.EPS) : null;
+  const dividendPerShare = overview?.DividendPerShare ? parseFloat(overview.DividendPerShare) : null;
+  
+  const calculatedROIC = calculateROIC(operatingIncome, totalAssets, currentLiabilities);
+  const calculatedPayoutRatio = calculatePayoutRatio(dividendPerShare, eps);
+
   const ratios = {
     pe: overview?.PERatio ? parseFloat(overview.PERatio) : null,
     pb: overview?.PriceToBookRatio ? parseFloat(overview.PriceToBookRatio) : null,
     ps: overview?.PriceToSalesRatioTTM ? parseFloat(overview.PriceToSalesRatioTTM) : null,
     roe: overview?.ReturnOnEquityTTM ? parseFloat(overview.ReturnOnEquityTTM) * 100 : null,
     roa: overview?.ReturnOnAssetsTTM ? parseFloat(overview.ReturnOnAssetsTTM) * 100 : null,
-    roic: null, // Will be calculated if needed
+    roic: calculatedROIC,
     grossMargin: latestAnnualIncome
       ? (parseFloat(latestAnnualIncome.grossProfit) / parseFloat(latestAnnualIncome.revenue)) * 100
       : null,
@@ -418,6 +431,7 @@ function parseStockData(
       revenuePerShare: overview?.RevenuePerShareTTM ? parseFloat(overview.RevenuePerShareTTM) : null,
       bookValuePerShare: overview?.BookValue ? parseFloat(overview.BookValue) : null,
       dividendPerShare: overview?.DividendPerShare ? parseFloat(overview.DividendPerShare) : null,
+      payoutRatio: calculatedPayoutRatio,
     },
     financials: {
       annualReports: annualIncomeReports.map((report: any) => {

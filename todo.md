@@ -716,3 +716,20 @@ All four final tasks completed successfully:
   - [ ] Test with multiple stocks (JNJ, TSLA, AAPL, MSFT)
   - [ ] Verify all derived metrics display correctly
   - [ ] Save checkpoint with derived metrics implementation
+
+
+## DERIVED METRICS IMPLEMENTATION (Current - Jan 28, 2026)
+- [x] Create derivedMetricsCalculator.ts utility
+  - [x] Implement calculateROIC: NOPAT / Invested Capital
+  - [x] Implement calculatePayoutRatio: DPS / EPS
+  - [x] Add confidence scoring for each metric
+- [x] Integrate into alphaVantageWrapper
+  - [x] Calculate ROIC and add to ratios object
+  - [x] Calculate payout ratio and add to ratios object
+- [x] Update database schema if needed
+  - [x] roic column already exists in stockFinancialCache
+  - [x] payoutRatio stored in financialDataJson (no separate column needed)
+- [x] Test and verify
+  - [x] Test ROIC calculation logic
+  - [x] Test payout ratio calculation with JNJ data (46.64% ✓)
+  - [x] Save checkpoint with derived metrics
