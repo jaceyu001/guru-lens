@@ -69,10 +69,16 @@ export async function preFilterStocks(
   for (const ticker of tickers) {
     try {
       // Get cached or fresh financial data
-      const financialData = dataMap.get(ticker);
+      const result = dataMap.get(ticker);
       
-      if (!financialData || !financialData.ratios) {
+      if (!result || !result.success || !result.data) {
         console.warn(`[PreFilter] Skipping ${ticker}: No financial data`);
+        continue;
+      }
+      
+      const financialData = result.data;
+      if (!financialData.ratios) {
+        console.warn(`[PreFilter] Skipping ${ticker}: No ratios data`);
         continue;
       }
 

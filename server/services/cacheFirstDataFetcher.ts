@@ -21,6 +21,41 @@ function sanitizeString(value: any): string | null {
   return String(value);
 }
 
+/**
+ * Build financial data structure from cache entry
+ */
+function buildFinancialDataFromCache(cacheEntry: any): any {
+  return {
+    ticker: cacheEntry.ticker,
+    profile: {
+      companyName: cacheEntry.companyName || "N/A",
+      sector: cacheEntry.sector || "N/A",
+      industry: cacheEntry.industry || "N/A",
+      exchange: cacheEntry.exchange || "N/A",
+      currency: cacheEntry.currency || "USD",
+      marketCap: cacheEntry.marketCap ? Number(cacheEntry.marketCap) : 0,
+    },
+    quote: {
+      price: cacheEntry.currentPrice ? Number(cacheEntry.currentPrice) : 0,
+      volume: cacheEntry.volume ? Number(cacheEntry.volume) : 0,
+    },
+    ratios: {
+      pe: cacheEntry.peRatio ? Number(cacheEntry.peRatio) : null,
+      pb: cacheEntry.pbRatio ? Number(cacheEntry.pbRatio) : null,
+      ps: cacheEntry.psRatio ? Number(cacheEntry.psRatio) : null,
+      roe: cacheEntry.roe ? Number(cacheEntry.roe) : null,
+      roa: cacheEntry.roa ? Number(cacheEntry.roa) : null,
+      roic: cacheEntry.roic ? Number(cacheEntry.roic) : null,
+      grossMargin: cacheEntry.grossMargin ? Number(cacheEntry.grossMargin) : null,
+      operatingMargin: cacheEntry.operatingMargin ? Number(cacheEntry.operatingMargin) : null,
+      netMargin: cacheEntry.netMargin ? Number(cacheEntry.netMargin) : null,
+      debtToEquity: cacheEntry.debtToEquity ? Number(cacheEntry.debtToEquity) : null,
+      currentRatio: cacheEntry.currentRatio ? Number(cacheEntry.currentRatio) : null,
+      dividendYield: cacheEntry.dividendYield ? Number(cacheEntry.dividendYield) : null,
+    },
+  };
+}
+
 export interface CacheCheckResult {
   found: boolean;
   data?: any;
@@ -45,11 +80,29 @@ export async function checkCache(ticker: string): Promise<CacheCheckResult> {
     }
 
     const cacheEntry = cached[0];
+    
+    // Try to extract parsed financial data from JSON
+    let financialData: any = null;
+    if (cacheEntry.financialDataJson) {
+      try {
+        financialData = typeof cacheEntry.financialDataJson === "string" 
+          ? JSON.parse(cacheEntry.financialDataJson)
+          : cacheEntry.financialDataJson;
+      } catch (e) {
+        console.error(`[cacheFirstDataFetcher] Failed to parse financialDataJson for ${ticker}:`, e);
+      }
+    }
+    
+    // If we don't have parsed financial data, construct it from cache columns
+    if (!financialData) {
+      financialData = buildFinancialDataFromCache(cacheEntry);
+    }
+    
     if (!cacheEntry.refreshRequired) {
-      return { found: true, data: cacheEntry, source: "cache" };
+      return { found: true, data: financialData, source: "cache" };
     }
 
-    return { found: true, data: cacheEntry, source: "stale_cache", reason: "Cache marked for refresh" };
+    return { found: true, data: financialData, source: "stale_cache", reason: "Cache marked for refresh" };
   } catch (error) {
     console.error(`[cacheFirstDataFetcher] Error checking cache for ${ticker}:`, error);
     return { found: false, source: "error", reason: String(error) };
@@ -68,7 +121,6 @@ export async function updateCache(ticker: string, freshData: any): Promise<boole
     }
 
     const existing = await db.select().from(stockFinancialCache).where(eq(stockFinancialCache.ticker, ticker)).limit(1);
-    const now = new Date();
 
     const cacheData = {
       ticker,
@@ -77,62 +129,83 @@ export async function updateCache(ticker: string, freshData: any): Promise<boole
       industry: sanitizeString(freshData.profile?.industry),
       exchange: sanitizeString(freshData.profile?.exchange),
       currency: sanitizeString(freshData.profile?.currency) || "USD",
-      currentPrice: sanitizeNumber(freshData.quote?.price),
-      marketCap: sanitizeNumber(freshData.profile?.marketCap),
-      volume: sanitizeNumber(freshData.quote?.volume),
-      peRatio: sanitizeNumber(freshData.ratios?.pe),
-      pbRatio: sanitizeNumber(freshData.ratios?.pb),
-      psRatio: sanitizeNumber(freshData.ratios?.ps),
-      roe: sanitizeNumber(freshData.ratios?.roe),
-      roa: sanitizeNumber(freshData.ratios?.roa),
-      roic: sanitizeNumber(freshData.ratios?.roic),
-      grossMargin: sanitizeNumber(freshData.ratios?.grossMargin),
-      operatingMargin: sanitizeNumber(freshData.ratios?.operatingMargin),
-      netMargin: sanitizeNumber(freshData.ratios?.netMargin),
-      debtToEquity: sanitizeNumber(freshData.ratios?.debtToEquity),
-      currentRatio: sanitizeNumber(freshData.ratios?.currentRatio),
-      dividendYield: sanitizeNumber(freshData.ratios?.dividendYield),
+      currentPrice: String(sanitizeNumber(freshData.quote?.price)),
+      marketCap: String(sanitizeNumber(freshData.profile?.marketCap)),
+      volume: String(sanitizeNumber(freshData.quote?.volume)),
+      peRatio: String(sanitizeNumber(freshData.ratios?.pe)),
+      pbRatio: String(sanitizeNumber(freshData.ratios?.pb)),
+      psRatio: String(sanitizeNumber(freshData.ratios?.ps)),
+      roe: String(sanitizeNumber(freshData.ratios?.roe)),
+      roa: String(sanitizeNumber(freshData.ratios?.roa)),
+      roic: String(sanitizeNumber(freshData.ratios?.roic)),
+      grossMargin: String(sanitizeNumber(freshData.ratios?.grossMargin)),
+      operatingMargin: String(sanitizeNumber(freshData.ratios?.operatingMargin)),
+      netMargin: String(sanitizeNumber(freshData.ratios?.netMargin)),
+      debtToEquity: String(sanitizeNumber(freshData.ratios?.debtToEquity)),
+      currentRatio: String(sanitizeNumber(freshData.ratios?.currentRatio)),
+      dividendYield: String(sanitizeNumber(freshData.ratios?.dividendYield)),
       financialDataJson: freshData,
       refreshRequired: false,
-      fetchedAt: now,
+      fetchedAt: new Date(),
     };
 
-    try {
-      if (existing.length === 0) {
-        await (db as any).insert(stockFinancialCache).values(cacheData);
-        console.log(`[cacheFirstDataFetcher] Created new cache entry for ${ticker}`);
-      } else {
-        await (db as any).update(stockFinancialCache).set(cacheData).where(eq(stockFinancialCache.ticker, ticker));
-        console.log(`[cacheFirstDataFetcher] Updated cache entry for ${ticker}`);
-      }
-    } catch (dbError) {
-      console.error(`[cacheFirstDataFetcher] Database operation failed for ${ticker}:`, dbError);
-      // Log the problematic data for debugging
-      console.error(`[cacheFirstDataFetcher] Cache data that failed:`, JSON.stringify(cacheData, null, 2));
-      throw dbError;
+    if (existing.length > 0) {
+      await db.update(stockFinancialCache).set(cacheData).where(eq(stockFinancialCache.ticker, ticker));
+    } else {
+      await db.insert(stockFinancialCache).values(cacheData as any);
     }
 
+    console.log(`[cacheFirstDataFetcher] Cache updated for ${ticker}`);
     return true;
   } catch (error) {
     console.error(`[cacheFirstDataFetcher] Error updating cache for ${ticker}:`, error);
+    console.error(`[cacheFirstDataFetcher] Cache data that failed:`, {
+      ticker,
+      companyName: freshData.profile?.companyName,
+      sector: freshData.profile?.sector,
+      industry: freshData.profile?.industry,
+      exchange: freshData.profile?.exchange,
+      currency: freshData.profile?.currency,
+      currentPrice: freshData.quote?.price,
+      marketCap: freshData.profile?.marketCap,
+      volume: freshData.quote?.volume,
+      peRatio: freshData.ratios?.pe,
+      pbRatio: freshData.ratios?.pb,
+      psRatio: freshData.ratios?.ps,
+      roe: freshData.ratios?.roe,
+      roa: freshData.ratios?.roa,
+      roic: freshData.ratios?.roic,
+      grossMargin: freshData.ratios?.grossMargin,
+      operatingMargin: freshData.ratios?.operatingMargin,
+      netMargin: freshData.ratios?.netMargin,
+      debtToEquity: freshData.ratios?.debtToEquity,
+      currentRatio: freshData.ratios?.currentRatio,
+      dividendYield: freshData.ratios?.dividendYield,
+      financialDataJson: freshData,
+      refreshRequired: false,
+      fetchedAt: new Date(),
+    });
     return false;
   }
 }
 
-/**
- * Get financial data with cache-first strategy
- */
-export async function getFinancialDataWithFallback(
-  ticker: string,
-  forceRefresh: boolean = false
-): Promise<{
+export interface FinancialDataResult {
   success: boolean;
   data?: any;
   source: "cache" | "api" | "stale_cache" | "error";
   cacheHit: boolean;
   apiUsed: boolean;
   error?: string;
-}> {
+}
+
+/**
+ * Get financial data with cache-first strategy
+ * Priority: Cache → API → Stale Cache → Error
+ */
+export async function getFinancialDataWithFallback(
+  ticker: string,
+  forceRefresh: boolean = false,
+): Promise<FinancialDataResult> {
   try {
     console.log(`[cacheFirstDataFetcher] Fetching data for ${ticker} (forceRefresh: ${forceRefresh})`);
 
@@ -181,9 +254,42 @@ export async function getFinancialDataWithFallback(
 }
 
 /**
- * Mark stock for refresh
+ * Get financial data for multiple tickers in batch
  */
-export async function markForRefresh(ticker: string, reason: string): Promise<boolean> {
+export async function getFinancialDataBatchWithFallback(
+  tickers: string[],
+  forceRefresh: boolean = false,
+): Promise<Map<string, FinancialDataResult>> {
+  const results = new Map<string, FinancialDataResult>();
+  const errors = new Map<string, Error>();
+
+  for (const ticker of tickers) {
+    try {
+      const result = await getFinancialDataWithFallback(ticker, forceRefresh);
+      results.set(ticker, result);
+    } catch (error) {
+      errors.set(ticker, error as Error);
+      results.set(ticker, {
+        success: false,
+        source: "error",
+        cacheHit: false,
+        apiUsed: false,
+        error: String(error),
+      });
+    }
+  }
+
+  if (errors.size > 0) {
+    console.error(`[cacheFirstDataFetcher] Batch fetch completed with ${errors.size} errors`);
+  }
+
+  return results;
+}
+
+/**
+ * Mark a cache entry for refresh
+ */
+export async function markForRefresh(ticker: string, reason: string = "manual_refresh"): Promise<boolean> {
   try {
     const db = await getDb();
     if (!db) {
@@ -191,9 +297,9 @@ export async function markForRefresh(ticker: string, reason: string): Promise<bo
       return false;
     }
 
-    await (db as any).update(stockFinancialCache).set({ refreshRequired: true, lastRefreshReason: reason }).where(eq(stockFinancialCache.ticker, ticker));
+    await db.update(stockFinancialCache).set({ refreshRequired: true, lastRefreshReason: reason }).where(eq(stockFinancialCache.ticker, ticker));
 
-    console.log(`[cacheFirstDataFetcher] Marked ${ticker} for refresh: ${reason}`);
+    console.log(`[cacheFirstDataFetcher] Marked ${ticker} for refresh (reason: ${reason})`);
     return true;
   } catch (error) {
     console.error(`[cacheFirstDataFetcher] Error marking ${ticker} for refresh:`, error);
@@ -202,79 +308,33 @@ export async function markForRefresh(ticker: string, reason: string): Promise<bo
 }
 
 /**
- * Get all stocks marked for refresh
- */
-export async function getStocksMarkedForRefresh(limit: number = 100): Promise<string[]> {
-  try {
-    const db = await getDb();
-    if (!db) {
-      console.error("[cacheFirstDataFetcher] Database not available");
-      return [];
-    }
-
-    const results = await db.select({ ticker: stockFinancialCache.ticker }).from(stockFinancialCache).where(eq(stockFinancialCache.refreshRequired, true)).limit(limit);
-
-    return results.map((r: any) => r.ticker);
-  } catch (error) {
-    console.error(`[cacheFirstDataFetcher] Error getting stocks marked for refresh:`, error);
-    return [];
-  }
-}
-
-/**
- * Batch fetch with cache-first strategy
- */
-export async function getFinancialDataBatchWithFallback(tickers: string[], forceRefresh: boolean = false): Promise<Map<string, any>> {
-  const results = new Map<string, any>();
-
-  for (const ticker of tickers) {
-    try {
-      const result = await getFinancialDataWithFallback(ticker, forceRefresh);
-      if (result.success && result.data) {
-        results.set(ticker, result.data);
-      }
-    } catch (error) {
-      console.error(`[cacheFirstDataFetcher] Batch fetch error for ${ticker}:`, error);
-    }
-  }
-
-  return results;
-}
-
-/**
  * Get cache statistics
  */
 export async function getCacheStatistics(): Promise<{
   totalCached: number;
-  markedForRefresh: number;
   cacheHitRate: number;
-  oldestEntry: Date | null;
-  newestEntry: Date | null;
+  averageAge: number;
+  needsRefresh: number;
 }> {
   try {
     const db = await getDb();
     if (!db) {
-      console.error("[cacheFirstDataFetcher] Database not available");
-      return { totalCached: 0, markedForRefresh: 0, cacheHitRate: 0, oldestEntry: null, newestEntry: null };
+      return { totalCached: 0, cacheHitRate: 0, averageAge: 0, needsRefresh: 0 };
     }
 
-    const all = await db.select().from(stockFinancialCache);
-    const markedForRefresh = all.filter((c: any) => c.refreshRequired).length;
+    const cached = await db.select().from(stockFinancialCache);
 
-    const dates = all
-      .map((c: any) => c.fetchedAt)
-      .filter((d: any) => d !== null)
-      .sort((a: any, b: any) => (a as Date).getTime() - (b as Date).getTime());
+    const needsRefresh = cached.filter((c) => c.refreshRequired).length;
+    const totalCached = cached.length;
 
     return {
-      totalCached: all.length,
-      markedForRefresh,
-      cacheHitRate: all.length > 0 ? ((all.length - markedForRefresh) / all.length) * 100 : 0,
-      oldestEntry: dates.length > 0 ? (dates[0] as Date) : null,
-      newestEntry: dates.length > 0 ? (dates[dates.length - 1] as Date) : null,
+      totalCached,
+      cacheHitRate: totalCached > 0 ? ((totalCached - needsRefresh) / totalCached) * 100 : 0,
+      averageAge: 0, // Would need to calculate from timestamps
+      needsRefresh,
     };
   } catch (error) {
-    console.error(`[cacheFirstDataFetcher] Error getting cache statistics:`, error);
-    return { totalCached: 0, markedForRefresh: 0, cacheHitRate: 0, oldestEntry: null, newestEntry: null };
+    console.error("[cacheFirstDataFetcher] Error getting cache statistics:", error);
+    return { totalCached: 0, cacheHitRate: 0, averageAge: 0, needsRefresh: 0 };
   }
 }
