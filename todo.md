@@ -733,3 +733,49 @@ All four final tasks completed successfully:
   - [x] Test ROIC calculation logic
   - [x] Test payout ratio calculation with JNJ data (46.64% ✓)
   - [x] Save checkpoint with derived metrics
+
+
+## DATA SOURCE AUDIT (Current - Jan 28, 2026)
+- [ ] Fetch live JNJ data from Alpha Vantage API
+  - [ ] Fetch OVERVIEW endpoint
+  - [ ] Fetch INCOME_STATEMENT endpoint
+  - [ ] Fetch BALANCE_SHEET endpoint
+  - [ ] Fetch CASH_FLOW endpoint
+  - [ ] Fetch GLOBAL_QUOTE endpoint
+- [ ] Map all data points to dashboard and agent usage
+  - [ ] Identify which data points are used by Dashboard
+  - [ ] Identify which data points are used by Fundamentals Agent
+  - [ ] Identify which data points are used by Valuation Agent
+  - [ ] Identify which data points are used by Financial Health Agent
+  - [ ] Identify which data points are used by Persona Agent
+- [ ] Create comprehensive data source table
+  - [ ] Include data point name
+  - [ ] Include which agent/dashboard uses it
+  - [ ] Include actual value from API for JNJ
+  - [ ] Include API source (endpoint + field name)
+  - [ ] Include unit (%, $, ratio, etc.)
+  - [ ] Include formula if calculated
+- [ ] Identify missing or problematic data points
+  - [ ] Flag data points that return null/undefined
+  - [ ] Flag data points with incorrect units
+  - [ ] Flag data points with calculation errors
+
+
+## FIX BALANCE SHEET METRICS TO USE QUARTERLY DATA (Current - Jan 28, 2026)
+- [x] Verify latest quarterly balance sheet data availability for JNJ
+  - [x] Check totalAssets in quarterly report (2025-09-30: $192.82B ✓)
+  - [x] Check totalLiabilities in quarterly report ($113.54B ✓)
+  - [x] Check totalEquity in quarterly report ($79.28B ✓)
+  - [x] Check currentAssets in quarterly report (field: totalCurrentAssets ✓)
+  - [x] Check currentLiabilities in quarterly report (field: totalCurrentLiabilities ✓)
+  - [x] Check longTermDebt in quarterly report ($39.41B ✓)
+  - [x] Check shortTermDebt in quarterly report ($6.39B ✓)
+  - [x] Check cash in quarterly report ($18.23B ✓)
+- [x] Update alphaVantageWrapper to prioritize quarterly balance sheet
+  - [x] Add latestQuarterlyBalance with data validation
+  - [x] Update Debt/Equity calculation to use quarterly data
+  - [x] Update Current Ratio calculation to use quarterly data (totalCurrentAssets/totalCurrentLiabilities)
+  - [x] Update ROIC calculation to use quarterly balance sheet
+- [x] Clear cache to force fresh data fetch
+- [x] Update data source table with quarterly values (will regenerate after testing)
+- [x] Test with JNJ and save checkpoint

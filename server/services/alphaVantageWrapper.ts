@@ -348,6 +348,11 @@ function parseStockData(
   const latestAnnualBalance = annualBalanceReports[0];
   const latestQuarterlyIncome = quarterlyIncomeReports[0];
   
+  // Use latest quarterly balance sheet with actual data (more current than annual)
+  const latestQuarterlyBalance = quarterlyBalanceReports.find((report: any) => 
+    report.totalAssets && report.totalAssets !== 'None' && parseFloat(report.totalAssets) > 0
+  ) || quarterlyBalanceReports[0];
+  
   console.log(`[parseStockData] ${ticker} balance sheet:`, {
     annualReports_length: annualBalanceReports.length,
     first_report_keys: annualBalanceReports[0] ? Object.keys(annualBalanceReports[0]) : [],
@@ -358,10 +363,10 @@ function parseStockData(
     } : null,
   });
 
-  // Calculate derived metrics
+  // Calculate derived metrics using quarterly balance sheet (more current)
   const operatingIncome = latestAnnualIncome ? parseFloat(latestAnnualIncome.operatingIncome || 0) : null;
-  const totalAssets = latestAnnualBalance ? parseFloat(latestAnnualBalance.totalAssets || 0) : null;
-  const currentLiabilities = latestAnnualBalance ? parseFloat(latestAnnualBalance.currentLiabilities || 0) : null;
+  const totalAssets = latestQuarterlyBalance ? parseFloat(latestQuarterlyBalance.totalAssets || 0) : null;
+  const currentLiabilities = latestQuarterlyBalance ? parseFloat(latestQuarterlyBalance.totalCurrentLiabilities || 0) : null;
   const eps = overview?.EPS ? parseFloat(overview.EPS) : null;
   const dividendPerShare = overview?.DividendPerShare ? parseFloat(overview.DividendPerShare) : null;
   
@@ -385,12 +390,12 @@ function parseStockData(
     netMargin: latestAnnualIncome && latestAnnualIncome.netIncome && latestAnnualIncome.revenue
       ? (parseFloat(latestAnnualIncome.netIncome) / parseFloat(latestAnnualIncome.revenue)) * 100
       : null,
-    currentRatio: latestAnnualBalance && latestAnnualBalance.currentAssets && latestAnnualBalance.currentLiabilities
-      ? parseFloat(latestAnnualBalance.currentAssets) / parseFloat(latestAnnualBalance.currentLiabilities)
+    currentRatio: latestQuarterlyBalance && latestQuarterlyBalance.totalCurrentAssets && latestQuarterlyBalance.totalCurrentLiabilities
+      ? parseFloat(latestQuarterlyBalance.totalCurrentAssets) / parseFloat(latestQuarterlyBalance.totalCurrentLiabilities)
       : null,
-    debtToEquity: latestAnnualBalance && latestAnnualBalance.totalEquity
-      ? ((parseFloat(latestAnnualBalance.longTermDebt || 0) + parseFloat(latestAnnualBalance.shortTermDebt || 0)) /
-        parseFloat(latestAnnualBalance.totalEquity))
+    debtToEquity: latestQuarterlyBalance && latestQuarterlyBalance.totalShareholderEquity
+      ? ((parseFloat(latestQuarterlyBalance.longTermDebt || 0) + parseFloat(latestQuarterlyBalance.shortTermDebt || 0)) /
+        parseFloat(latestQuarterlyBalance.totalShareholderEquity))
       : null,
     dividendYield: overview?.DividendYield ? parseFloat(overview.DividendYield) * 100 : null,
     interestCoverage: null, // Will be calculated if needed
