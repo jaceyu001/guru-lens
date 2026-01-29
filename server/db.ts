@@ -12,6 +12,7 @@ import {
   alerts,
   financialDataCache,
   jobs,
+  stockFinancialCache,
   type Persona,
   type Ticker,
   type Analysis,
@@ -24,6 +25,7 @@ import {
   type InsertAlert,
   type InsertFinancialDataCache,
   type InsertJob,
+  type StockFinancialCache,
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -337,9 +339,11 @@ export async function getUserWatchlistTickers(userId: number) {
   const result = await db.select({
     watchlistItem: watchlistTickers,
     ticker: tickers,
+    cache: stockFinancialCache,
   })
   .from(watchlistTickers)
   .innerJoin(tickers, eq(watchlistTickers.tickerId, tickers.id))
+  .leftJoin(stockFinancialCache, eq(tickers.symbol, stockFinancialCache.ticker))
   .where(eq(watchlistTickers.userId, userId))
   .orderBy(desc(watchlistTickers.createdAt));
   

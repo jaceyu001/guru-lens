@@ -243,12 +243,28 @@ export default function Ticker() {
 
           {/* Key Metrics */}
           {price || ratios ? (
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mt-6 pt-6 border-t">
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 mt-6 pt-6 border-t">
               {price && price.price !== undefined && (
                 <div>
                   <div className="text-xs text-muted-foreground mb-1">Price</div>
                   <div className="font-semibold font-mono-numbers">
                     ${Number(price.price).toFixed(2)}
+                  </div>
+                </div>
+              )}
+              {profile?.marketCap !== null && profile?.marketCap !== undefined && (
+                <div>
+                  <div className="text-xs text-muted-foreground mb-1">Market Cap</div>
+                  <div className="font-semibold font-mono-numbers">
+                    ${(Number(profile.marketCap) / 1e9).toFixed(2)}B
+                  </div>
+                </div>
+              )}
+              {price && price.volume !== undefined && (
+                <div>
+                  <div className="text-xs text-muted-foreground mb-1">Volume</div>
+                  <div className="font-semibold font-mono-numbers">
+                    {(Number(price.volume) / 1e6).toFixed(2)}M
                   </div>
                 </div>
               )}
@@ -274,6 +290,14 @@ export default function Ticker() {
                   </div>
                 </div>
               )}
+              {ratios && ratios.ps !== null && ratios.ps !== undefined && (
+                <div>
+                  <div className="text-xs text-muted-foreground mb-1">P/S Ratio</div>
+                  <div className="font-semibold font-mono-numbers">
+                    {ratios.ps?.toFixed(2)}
+                  </div>
+                </div>
+              )}
               {ratios && ratios.roe !== null && ratios.roe !== undefined && (
                 <div>
                   <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
@@ -281,7 +305,23 @@ export default function Ticker() {
                     {isMetricAnomalous("ROE") && <Badge variant="destructive" className="text-xs">TBC</Badge>}
                   </div>
                   <div className={`font-semibold font-mono-numbers ${isMetricAnomalous("ROE") ? "text-yellow-600" : ""}`}>
-                          {ratios.roe?.toFixed(2)}%
+                    {ratios.roe?.toFixed(2)}%
+                  </div>
+                </div>
+              )}
+              {ratios && ratios.roa !== null && ratios.roa !== undefined && (
+                <div>
+                  <div className="text-xs text-muted-foreground mb-1">ROA</div>
+                  <div className="font-semibold font-mono-numbers">
+                    {ratios.roa?.toFixed(2)}%
+                  </div>
+                </div>
+              )}
+              {ratios && ratios.roic !== null && ratios.roic !== undefined && (
+                <div>
+                  <div className="text-xs text-muted-foreground mb-1">ROIC</div>
+                  <div className="font-semibold font-mono-numbers">
+                    {ratios.roic?.toFixed(2)}%
                   </div>
                 </div>
               )}
@@ -296,10 +336,39 @@ export default function Ticker() {
                   </div>
                 </div>
               )}
+              {ratios?.currentRatio !== null && ratios?.currentRatio !== undefined && (
+                <div>
+                  <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                    Current Ratio
+                    {isMetricAnomalous("Current Ratio") && <Badge variant="destructive" className="text-xs">TBC</Badge>}
+                  </div>
+                  <div className="font-semibold font-mono-numbers">
+                    {(ratios.currentRatio ?? 0).toFixed(2)}
+                  </div>
+                </div>
+              )}
+              {ratios?.grossMargin !== null && ratios?.grossMargin !== undefined && (
+                <div>
+                  <div className="text-xs text-muted-foreground mb-1">Gross Margin</div>
+                  <div className="font-semibold font-mono-numbers">{(ratios.grossMargin ?? 0).toFixed(2)}%</div>
+                </div>
+              )}
+              {ratios?.operatingMargin !== null && ratios?.operatingMargin !== undefined && (
+                <div>
+                  <div className="text-xs text-muted-foreground mb-1">Operating Margin</div>
+                  <div className="font-semibold font-mono-numbers">{(ratios.operatingMargin ?? 0).toFixed(2)}%</div>
+                </div>
+              )}
               {ratios?.netMargin !== null && ratios?.netMargin !== undefined && (
                 <div>
                   <div className="text-xs text-muted-foreground mb-1">Net Margin</div>
                   <div className="font-semibold font-mono-numbers">{(ratios.netMargin ?? 0).toFixed(2)}%</div>
+                </div>
+              )}
+              {ratios?.dividendYield !== null && ratios?.dividendYield !== undefined && (
+                <div>
+                  <div className="text-xs text-muted-foreground mb-1">Dividend Yield</div>
+                  <div className="font-semibold font-mono-numbers">{(ratios.dividendYield ?? 0).toFixed(2)}%</div>
                 </div>
               )}
             </div>
@@ -354,206 +423,127 @@ export default function Ticker() {
               {analyses.data.map((analysis) => (
                 <Card
                   key={analysis.id}
-                  className="persona-card cursor-pointer"
+                  className={`p-6 cursor-pointer hover:shadow-lg transition-all border-l-4 ${getVerdictColor(analysis.verdict)}`}
                   onClick={() => setSelectedAnalysis(analysis)}
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div>
                       <h3 className="font-bold text-lg">{analysis.personaName}</h3>
-                      <Badge className={`mt-2 ${getVerdictColor(analysis.verdict)}`}>
-                        {analysis.verdict}
-                      </Badge>
+                      <Badge variant="outline" className="mt-1">{analysis.verdict}</Badge>
                     </div>
-                    <div className="text-right">
-                      <div className={`text-3xl font-bold font-mono-numbers ${getScoreColor(analysis.score)}`}>
-                        {analysis.score}
-                      </div>
-                      <div className="text-xs text-muted-foreground">/ 100</div>
+                    <div className={`text-3xl font-bold font-mono-numbers ${getScoreColor(analysis.score)}`}>
+                      {analysis.score}
                     </div>
                   </div>
                   
-                  <Progress value={analysis.score} className="mb-4" />
-                  
-                  <div className="space-y-2">
-                    {analysis.summaryBullets.slice(0, 2).map((bullet, idx) => (
-                      <p key={idx} className="text-sm text-muted-foreground">
-                        • {bullet}
-                      </p>
-                    ))}
+                  <div className="mb-3">
+                    <div className="text-xs text-muted-foreground mb-1">Confidence</div>
+                    <Progress value={Number(analysis.confidence) * 100} className="h-2" />
+                    <div className="text-xs text-muted-foreground mt-1">{(Number(analysis.confidence) * 100).toFixed(0)}%</div>
                   </div>
-                  
-                  <div className="mt-4 pt-4 border-t space-y-2">
-                    <div className="text-xs text-muted-foreground">
-                      Confidence: {(analysis.confidence * 100).toFixed(0)}%
-                      {analysis.baseConfidence && analysis.baseConfidence !== analysis.confidence && (
-                        <span className="ml-2 text-yellow-600 dark:text-yellow-400">
-                          (base: {(analysis.baseConfidence * 100).toFixed(0)}%)
-                        </span>
-                      )}
+
+                  {analysis.summaryBullets && analysis.summaryBullets.length > 0 && (
+                    <div className="space-y-2">
+                      {analysis.summaryBullets.slice(0, 2).map((bullet, idx) => (
+                        <div key={idx} className="text-sm text-foreground">
+                          • {bullet}
+                        </div>
+                      ))}
                     </div>
-                    {analysis.missingMetricsImpact && analysis.missingMetricsImpact.length > 0 && (
-                      <div className="text-xs bg-orange-50 dark:bg-orange-950 text-orange-800 dark:text-orange-200 p-2 rounded">
-                        <div className="font-semibold mb-1">Missing Critical Data:</div>
-                        {analysis.missingMetricsImpact.map((impact, idx) => (
-                          <div key={idx} className="mb-1">
-                            <div className="font-medium">{impact.metric}</div>
-                            <div className="text-xs opacity-90">Affects: {impact.affectedCriteria.join(", ")}</div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {analysis.dataQualityIssues && analysis.dataQualityIssues.length > 0 && (
-                      <div className="text-xs bg-yellow-50 dark:bg-yellow-950 text-yellow-800 dark:text-yellow-200 p-2 rounded">
-                        <div className="font-semibold mb-1">⚠️ Data Quality Issues:</div>
-                        <div className="text-xs">{analysis.dataQualityIssues.join(', ')} unavailable</div>
-                      </div>
-                    )}
-                  </div>
+                  )}
                 </Card>
               ))}
             </div>
           ) : (
             <Card className="p-12 text-center">
               <AlertCircle className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-xl font-semibold mb-2">No Analysis Available</h3>
+              <h3 className="text-xl font-semibold mb-2">No Analyses Yet</h3>
               <p className="text-muted-foreground mb-6">
-                Run an analysis to see how different investor personas rate this stock.
+                Run an analysis to see how legendary investors would rate this stock.
               </p>
-              <Button onClick={handleRunAnalysis} disabled={isRunning}>
+              <Button onClick={handleRunAnalysis} disabled={isRunning || runAnalysisMutation.isPending}>
                 <RefreshCw className={`mr-2 h-4 w-4 ${isRunning ? "animate-spin" : ""}`} />
-                Run Analysis
+                {isRunning ? "Running..." : "Run Analysis"}
               </Button>
             </Card>
           )}
         </div>
 
         {/* Analysis Detail Dialog */}
-        <Dialog open={!!selectedAnalysis} onOpenChange={() => setSelectedAnalysis(null)}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-            {selectedAnalysis && (
-              <>
-                <DialogHeader>
-                  <DialogTitle className="text-2xl">
-                    {selectedAnalysis.personaName}'s Analysis of {symbol}
-                  </DialogTitle>
-                </DialogHeader>
-                
-                <div className="space-y-6">
-                  {/* Score & Verdict */}
-                  <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
-                    <div>
-                      <div className="text-sm text-muted-foreground mb-1">Overall Score</div>
-                      <div className={`text-4xl font-bold font-mono-numbers ${getScoreColor(selectedAnalysis.score)}`}>
-                        {selectedAnalysis.score} / 100
-                      </div>
-                    </div>
-                    <Badge className={`text-lg px-4 py-2 ${getVerdictColor(selectedAnalysis.verdict)}`}>
-                      {selectedAnalysis.verdict}
-                    </Badge>
-                  </div>
+        {selectedAnalysis && (
+          <Dialog open={!!selectedAnalysis} onOpenChange={() => setSelectedAnalysis(null)}>
+            <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>{selectedAnalysis.personaName} Analysis</DialogTitle>
+              </DialogHeader>
+              
+              <Tabs defaultValue="summary" className="w-full">
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger value="summary">Summary</TabsTrigger>
+                  <TabsTrigger value="criteria">Criteria</TabsTrigger>
+                  <TabsTrigger value="risks">Risks</TabsTrigger>
+                </TabsList>
 
-                  {/* Data Quality Warnings */}
-                  {(selectedAnalysis.missingMetricsImpact?.length || 0) > 0 && (
-                    <Card className="p-4 bg-orange-50 dark:bg-orange-950 border-orange-200 dark:border-orange-800">
-                      <h3 className="font-semibold text-orange-900 dark:text-orange-100 mb-3">Missing Critical Data</h3>
-                      <div className="space-y-3">
-                        {selectedAnalysis.missingMetricsImpact?.map((impact: any, idx: number) => (
-                          <div key={idx} className="text-sm">
-                            <div className="font-medium text-orange-900 dark:text-orange-100">{impact.metric}</div>
-                            <div className="text-orange-800 dark:text-orange-200 text-xs mt-1">{impact.description}</div>
-                            <div className="text-orange-700 dark:text-orange-300 text-xs mt-1">
-                              <strong>Impacts:</strong> {impact.affectedCriteria.join(", ")}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="text-xs text-orange-700 dark:text-orange-300 mt-3 pt-3 border-t border-orange-200 dark:border-orange-800">
-                        Analysis based on available metrics only. Results may be incomplete.
-                      </div>
-                    </Card>
-                  )}
-
-                  {/* Summary */}
+                <TabsContent value="summary" className="space-y-4">
                   <div>
-                    <h3 className="font-semibold text-lg mb-3">Summary</h3>
+                    <h4 className="font-semibold mb-2">Score: {selectedAnalysis.score}/100</h4>
+                    <Progress value={selectedAnalysis.score} className="h-3" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold mb-2">Verdict</h4>
+                    <Badge className="mb-4">{selectedAnalysis.verdict}</Badge>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold mb-2">Summary</h4>
                     <ul className="space-y-2">
-                      {selectedAnalysis.summaryBullets.map((bullet, idx) => (
-                        <li key={idx} className="flex gap-2">
-                          <span className="text-primary mt-1">•</span>
-                          <span>{bullet}</span>
-                        </li>
+                      {selectedAnalysis.summaryBullets?.map((bullet, idx) => (
+                        <li key={idx} className="text-sm">• {bullet}</li>
                       ))}
                     </ul>
                   </div>
+                </TabsContent>
 
-                  {/* Criteria Breakdown */}
-                  <div>
-                    <h3 className="font-semibold text-lg mb-3">Criteria Breakdown</h3>
-                    <div className="space-y-4">
-                      {selectedAnalysis.criteria.map((criterion, idx) => (
-                        <Card key={idx} className="p-4">
-                          <div className="flex items-start justify-between mb-2">
-                            <div className="font-semibold">{criterion.name}</div>
-                            <Badge
-                              variant={criterion.status === "pass" ? "default" : criterion.status === "partial" ? "secondary" : "destructive"}
-                            >
-                              {criterion.status}
-                            </Badge>
-                          </div>
-                          <p className="text-sm text-muted-foreground mb-2">{criterion.explanation}</p>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <span>Weight: {(criterion.weight * 100).toFixed(0)}%</span>
-                            <span>•</span>
-                            <span>Metrics: {criterion.metricsUsed.join(", ")}</span>
-                          </div>
-                        </Card>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Key Risks */}
-                  <div>
-                    <h3 className="font-semibold text-lg mb-3">Key Risks</h3>
-                    <ul className="space-y-2">
-                      {selectedAnalysis.keyRisks.map((risk, idx) => (
-                        <li key={idx} className="flex gap-2 text-sm">
-                          <AlertCircle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
-                          <span>{risk}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  {/* What Would Change My Mind */}
-                  <div>
-                    <h3 className="font-semibold text-lg mb-3">What Would Change My Mind</h3>
-                    <ul className="space-y-2">
-                      {selectedAnalysis.whatWouldChangeMind.map((item, idx) => (
-                        <li key={idx} className="flex gap-2 text-sm">
-                          <span className="text-primary mt-1">•</span>
-                          <span>{item}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  {/* Run Metadata */}
-                  <div className="pt-4 border-t text-xs text-muted-foreground">
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>Model: {selectedAnalysis.runMetadata.model}</div>
-                      <div>Version: {selectedAnalysis.runMetadata.version}</div>
-                      <div>Run Time: {selectedAnalysis.runMetadata.runTime}ms</div>
-                      <div>Mode: {selectedAnalysis.runMetadata.mode}</div>
-                      <div className="col-span-2">
-                        Analyzed: {new Date(selectedAnalysis.runTimestamp).toLocaleString()}
+                <TabsContent value="criteria" className="space-y-4">
+                  {selectedAnalysis.criteria?.map((criterion, idx) => (
+                    <div key={idx} className="border rounded-lg p-4">
+                      <div className="flex items-start justify-between mb-2">
+                        <h4 className="font-semibold">{criterion.name}</h4>
+                        <Badge variant={criterion.status === "pass" ? "default" : criterion.status === "partial" ? "secondary" : "destructive"}>
+                          {criterion.status}
+                        </Badge>
                       </div>
+                      <p className="text-sm text-muted-foreground mb-2">{criterion.explanation}</p>
+                      {criterion.metricsUsed && criterion.metricsUsed.length > 0 && (
+                        <div className="text-xs text-muted-foreground">
+                          Metrics: {criterion.metricsUsed.join(", ")}
+                        </div>
+                      )}
                     </div>
+                  ))}
+                </TabsContent>
+
+                <TabsContent value="risks" className="space-y-4">
+                  <div>
+                    <h4 className="font-semibold mb-2">Key Risks</h4>
+                    <ul className="space-y-2">
+                      {selectedAnalysis.keyRisks?.map((risk, idx) => (
+                        <li key={idx} className="text-sm">• {risk}</li>
+                      ))}
+                    </ul>
                   </div>
-                </div>
-              </>
-            )}
-          </DialogContent>
-        </Dialog>
+                  <div>
+                    <h4 className="font-semibold mb-2">What Would Change Mind</h4>
+                    <ul className="space-y-2">
+                      {selectedAnalysis.whatWouldChangeMind?.map((item, idx) => (
+                        <li key={idx} className="text-sm">• {item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
     </div>
   );
