@@ -204,15 +204,26 @@ export const appRouter = router({
         
         // Fetch agent findings in parallel
         console.log('[analyzeTicker] financialData.quote:', JSON.stringify(financialData.quote, null, 2));
+        const extractedPrice = financialData.quote?.price || financialData.price?.current || 0;
+        console.log('[analyzeTicker] Extracted price:', extractedPrice);
+        console.log('[analyzeTicker] financialData.quote?.price:', financialData.quote?.price);
+        console.log('[analyzeTicker] financialData.price?.current:', financialData.price?.current);
+        console.log('[analyzeTicker] Full financialData keys:', Object.keys(financialData));
         const [fundamentalsFindings, valuationFindings] = await Promise.all([
           fundamentalsAgent.analyzeFundamentals(financialData, financialData.dataQualityFlags || {}),
           valuationAgent.analyzeValuation({
             ticker: input.symbol,
-            currentPrice: financialData.quote?.price || financialData.price?.current || 0,
+            currentPrice: extractedPrice,
             financialData,
             dataQualityFlags: financialData.dataQualityFlags || {},
           } as any),
         ]).catch(() => [undefined, undefined]);
+        
+        console.log('[analyzeTicker] fundamentalsFindings:', fundamentalsFindings ? 'exists' : 'undefined');
+        console.log('[analyzeTicker] valuationFindings:', valuationFindings ? 'exists' : 'undefined');
+        if (valuationFindings) {
+          console.log('[analyzeTicker] valuationFindings.currentPrice:', valuationFindings.currentPrice);
+        }
         
         // PHASE 1 OPTIMIZATION: Pre-compute shared data (computed once, not per persona)
         const quote = financialData.quote!;
@@ -841,7 +852,7 @@ export const appRouter = router({
           throw new Error(`Failed to fetch financial data for ${input.symbol}`);
         }
         const financialData = cacheResult.data;
-        const currentPrice = financialData.price?.current || 0;
+        const currentPrice = financialData.quote?.price || financialData.price?.current || 0;
         const dataQualityFlags = financialData.dataQualityFlags || {};
         
         const findings = await valuationAgent.analyzeValuation({
