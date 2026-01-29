@@ -1,0 +1,18 @@
+{
+  "query": "SELECT ticker, currentPrice, peRatio, roe, refreshRequired, fetchedAt FROM stockFinancialCache WHERE ticker = 'JNJ' LIMIT 1;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user UUbFzi3je6DVETn.root --database fYeU4CZLQAgsjxQh24yAiF --execute SELECT ticker, currentPrice, peRatio, roe, refreshRequired, fetchedAt FROM stockFinancialCache WHERE ticker = 'JNJ' LIMIT 1;",
+  "rows": [
+    {
+      "ticker": "JNJ",
+      "currentPrice": "227.72",
+      "peRatio": "20.37",
+      "roe": "35.60",
+      "refreshRequired": "0",
+      "fetchedAt": "2026-01-29 00:26:19"
+    }
+  ],
+  "messages": [],
+  "stdout": "ticker\tcurrentPrice\tpeRatio\troe\trefreshRequired\tfetchedAt\nJNJ\t227.72\t20.37\t35.60\t0\t2026-01-29 00:26:19\n",
+  "stderr": "",
+  "execution_time_ms": 57
+}

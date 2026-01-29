@@ -189,6 +189,11 @@ export const appRouter = router({
           throw new Error(`No financial data available for ${input.symbol}`);
         }
         const financialData = cacheResult.data;
+        console.log(`[analyzeTicker] Financial data for ${input.symbol}:`, {
+          quote: financialData.quote,
+          price: financialData.price,
+          currentPrice: financialData.quote?.price || financialData.price?.current || 0,
+        });
         
         // Get personas to analyze
         const personas = input.personaIds && input.personaIds.length > 0
