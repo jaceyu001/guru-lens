@@ -11,6 +11,24 @@ const BASE_URL = 'https://www.alphavantage.co/query';
 
 console.log(`[alphaVantageWrapper] Using API Key: ${API_KEY?.substring(0, 8)}... (from ${process.env.ALPHA_VANTAGE_API_KEY ? 'env' : 'fallback'})`);
 
+// Rate limiting: Premium API allows 75 requests per minute (1.25 per second)
+// To be safe, we'll limit to 1 request per 200ms (5 per second)
+let lastRequestTime = 0;
+const MIN_REQUEST_INTERVAL = 200; // milliseconds
+
+async function throttledRequest(url: string, config: any) {
+  const now = Date.now();
+  const timeSinceLastRequest = now - lastRequestTime;
+  
+  if (timeSinceLastRequest < MIN_REQUEST_INTERVAL) {
+    const delayNeeded = MIN_REQUEST_INTERVAL - timeSinceLastRequest;
+    await new Promise(resolve => setTimeout(resolve, delayNeeded));
+  }
+  
+  lastRequestTime = Date.now();
+  return axios.get(url, config);
+}
+
 // Maximum years of financial data to fetch (TTM + 3 full years)
 const MAX_DATA_YEARS = 4;
 
@@ -140,9 +158,9 @@ export interface StockDataResponse {
 async function getCompanyOverview(ticker: string): Promise<any> {
   try {
     console.log(`[alphaVantageWrapper] Fetching OVERVIEW for ${ticker}`);
-    const response = await axios.get(BASE_URL, {
+    const response = await throttledRequest(BASE_URL, {
       params: {
-        function: 'OVERVIEW',
+        function: 'COMPANY_OVERVIEW',
         symbol: ticker,
         apikey: API_KEY,
       },
@@ -170,7 +188,7 @@ async function getCompanyOverview(ticker: string): Promise<any> {
 async function getGlobalQuote(ticker: string): Promise<any> {
   try {
     console.log(`[alphaVantageWrapper] Calling GLOBAL_QUOTE for ${ticker}`);
-    const response = await axios.get(BASE_URL, {
+    const response = await throttledRequest(BASE_URL, {
       params: {
         function: 'GLOBAL_QUOTE',
         symbol: ticker,
@@ -179,7 +197,7 @@ async function getGlobalQuote(ticker: string): Promise<any> {
       timeout: 10000,
     });
 
-    console.log(`[alphaVantageWrapper] Full API response for ${ticker}:`, JSON.stringify(response.data, null, 2).substring(0, 500));
+    console.log(`[alphaVantageWrapper] Full API response for ${ticker}:`, JSON.stringify(response.data, null, 2));
 
     if (response.data.Note) {
       throw new Error(`API rate limited: ${response.data.Note}`);
@@ -215,7 +233,7 @@ async function getGlobalQuote(ticker: string): Promise<any> {
  */
 async function getIncomeStatement(ticker: string): Promise<any> {
   try {
-    const response = await axios.get(BASE_URL, {
+    const response = await throttledRequest(BASE_URL, {
       params: {
         function: 'INCOME_STATEMENT',
         symbol: ticker,
@@ -244,7 +262,7 @@ async function getIncomeStatement(ticker: string): Promise<any> {
  */
 async function getBalanceSheet(ticker: string): Promise<any> {
   try {
-    const response = await axios.get(BASE_URL, {
+    const response = await throttledRequest(BASE_URL, {
       params: {
         function: 'BALANCE_SHEET',
         symbol: ticker,
@@ -273,7 +291,7 @@ async function getBalanceSheet(ticker: string): Promise<any> {
  */
 async function getCashFlow(ticker: string): Promise<any> {
   try {
-    const response = await axios.get(BASE_URL, {
+    const response = await throttledRequest(BASE_URL, {
       params: {
         function: 'CASH_FLOW',
         symbol: ticker,
