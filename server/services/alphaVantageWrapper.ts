@@ -10,7 +10,7 @@ console.log(`[alphaVantageWrapper] Using API Key: ${API_KEY?.substring(0, 8)}...
 // Maximum years of financial data to fetch (TTM + 3 full years)
 const MAX_DATA_YEARS = 4;
 
-interface StockDataResponse {
+export interface StockDataResponse {
   ticker: string;
   profile: {
     companyName: string;

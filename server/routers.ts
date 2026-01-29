@@ -281,7 +281,7 @@ export const appRouter = router({
           inventoryTurnover: 8.0,
         };
         
-        const financials = (financialData.financials || []).map((f: any) => ({
+        const financials = (Array.isArray(financialData.financials) ? financialData.financials : (financialData.financials?.annualReports || [])).map((f: any) => ({
           period: f.period,
           periodType: "quarterly" as const,
           fiscalYear: f.fiscalYear,
@@ -609,7 +609,7 @@ export const appRouter = router({
             inventoryTurnover: 8.0,
           };
           
-          const financials = (financialData.financials || []).map((f: any) => ({
+          const financials = (Array.isArray(financialData.financials) ? financialData.financials : (financialData.financials?.annualReports || [])).map((f: any) => ({
             period: f.period,
             periodType: "quarterly" as const,
             fiscalYear: f.fiscalYear,

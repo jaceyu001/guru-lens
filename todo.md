@@ -779,3 +779,13 @@ All four final tasks completed successfully:
 - [x] Clear cache to force fresh data fetch
 - [x] Update data source table with quarterly values (will regenerate after testing)
 - [x] Test with JNJ and save checkpoint
+
+
+## FIX FINANCIALS ARRAY ERROR (Current - Jan 29, 2026)
+- [x] Identify where financials is being accessed as an array
+  - [x] Found in routers.ts (2 occurrences)
+  - [x] Found in hybridScoringOrchestrator.ts (1 occurrence)
+- [x] Fix the code to access annualReports and quarterlyReports
+  - [x] Added Array.isArray check to handle both formats
+  - [x] Falls back to annualReports if not an array
+- [x] Test with BIDU and save checkpoint

@@ -195,7 +195,7 @@ export async function applyLLMFinalScoring(
         revenueGrowth: ratios.revenueGrowth || 0,
       };
 
-      const financials = (financialData.financials || []).map(f => ({
+      const financials = (Array.isArray(financialData.financials) ? financialData.financials : ((financialData.financials as any)?.annualReports || [])).map((f: any) => ({
         period: f.period,
         periodType: "quarterly" as const,
         fiscalYear: f.fiscalYear,
