@@ -203,6 +203,7 @@ export const appRouter = router({
         const validPersonas = personas.filter((p): p is NonNullable<typeof p> => p !== undefined);
         
         // Fetch agent findings in parallel
+        console.log('[analyzeTicker] financialData.quote:', JSON.stringify(financialData.quote, null, 2));
         const [fundamentalsFindings, valuationFindings] = await Promise.all([
           fundamentalsAgent.analyzeFundamentals(financialData, financialData.dataQualityFlags || {}),
           valuationAgent.analyzeValuation({

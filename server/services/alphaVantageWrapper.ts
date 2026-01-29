@@ -2,7 +2,11 @@ import axios from 'axios';
 
 import { calculateROIC, calculatePayoutRatio } from './derivedMetricsCalculator';
 
-const API_KEY = process.env.ALPHA_VANTAGE_API_KEY || 'KXUI9PV4W0B6HHFS';
+const API_KEY = process.env.ALPHA_VANTAGE_API_KEY;
+
+if (!API_KEY) {
+  throw new Error('ALPHA_VANTAGE_API_KEY environment variable is not set');
+}
 const BASE_URL = 'https://www.alphavantage.co/query';
 
 console.log(`[alphaVantageWrapper] Using API Key: ${API_KEY?.substring(0, 8)}... (from ${process.env.ALPHA_VANTAGE_API_KEY ? 'env' : 'fallback'})`);

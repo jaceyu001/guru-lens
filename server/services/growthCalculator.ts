@@ -72,7 +72,37 @@ export function calculateGrowth(input: GrowthCalculationInput): GrowthCalculatio
   
   console.log(`[growthCalculator] Data extraction: quarterly=${quarterlyData.length}, annual=${annualData.length}`);
   
-
+  // Log first few quarterly reports to see structure
+  if (quarterlyData.length > 0) {
+    console.log(`[growthCalculator] First quarterly report - ALL KEYS:`, Object.keys(quarterlyData[0]));
+    console.log(`[growthCalculator] First quarterly report:`, {
+      fiscalYear: quarterlyData[0].fiscalYear,
+      period: quarterlyData[0].period,
+      fiscalDateEnding: quarterlyData[0].fiscalDateEnding,
+      reportedDate: quarterlyData[0].reportedDate,
+      revenue: quarterlyData[0].revenue,
+      totalRevenue: quarterlyData[0].totalRevenue,
+      netIncome: quarterlyData[0].netIncome,
+      operatingIncome: quarterlyData[0].operatingIncome,
+      freeCashFlow: quarterlyData[0].freeCashFlow,
+      operatingCashFlow: quarterlyData[0].operatingCashFlow,
+    });
+  }
+  
+  if (annualData.length > 0) {
+    console.log(`[growthCalculator] First annual report - ALL KEYS:`, Object.keys(annualData[0]));
+    console.log(`[growthCalculator] First annual report:`, {
+      fiscalYear: annualData[0].fiscalYear,
+      fiscalDateEnding: annualData[0].fiscalDateEnding,
+      reportedDate: annualData[0].reportedDate,
+      revenue: annualData[0].revenue,
+      totalRevenue: annualData[0].totalRevenue,
+      netIncome: annualData[0].netIncome,
+      operatingIncome: annualData[0].operatingIncome,
+      freeCashFlow: annualData[0].freeCashFlow,
+      operatingCashFlow: annualData[0].operatingCashFlow,
+    });
+  }
 
   // Detect current year and quarter
   const latestQuarter = quarterlyData[0];
@@ -83,14 +113,25 @@ export function calculateGrowth(input: GrowthCalculationInput): GrowthCalculatio
   // Extract fiscal year from fiscalDateEnding (e.g., "2025-03-31" -> 2025)
   const currentYear = latestQuarter.fiscalYear || new Date(latestQuarter.fiscalDateEnding).getFullYear();
   const currentQuarter = getQuarterFromPeriod(latestQuarter.period || latestQuarter.fiscalDateEnding);
-  const currentYearQuartersCount = quarterlyData.filter((q: any) => q.fiscalYear === currentYear).length;
+  
+  console.log(`[growthCalculator] Extracted currentYear: ${currentYear}, currentQuarter: ${currentQuarter}`);
+  console.log(`[growthCalculator] Latest quarter fiscalDateEnding: ${latestQuarter.fiscalDateEnding}`);
+  
+  // Count quarters from current year by extracting year from fiscalDateEnding
+  const currentYearQuartersCount = quarterlyData.filter((q: any) => {
+    const qYear = q.fiscalYear || new Date(q.fiscalDateEnding).getFullYear();
+    return qYear === currentYear;
+  }).length;
+  
+  console.log(`[growthCalculator] Current year quarters count: ${currentYearQuartersCount}`);
 
   // Strategy 1: TTM vs Prior Year FY (when Q2+ available)
   if (currentQuarter !== 'Q1' && currentYearQuartersCount >= 2) {
     const ttmValue = getTTMValue(quarterlyData, metric);
     const priorFYValue = getFullYearValue(annualData, metric, currentYear - 1);
-
     
+    console.log(`[growthCalculator] Strategy 1 (TTM vs Prior FY): TTM=${ttmValue}, PriorFY=${priorFYValue}`);
+
     if (ttmValue !== 0 && priorFYValue !== 0) {
       const growthRate = ((ttmValue - priorFYValue) / Math.abs(priorFYValue)) * 100;
       return {
@@ -110,8 +151,9 @@ export function calculateGrowth(input: GrowthCalculationInput): GrowthCalculatio
   if (currentYearQuartersCount >= 1) {
     const ttmValue = getTTMValue(quarterlyData, metric);
     const priorYearTTM = getPriorYearTTMValue(quarterlyData, annualData, metric, currentYear);
-
     
+    console.log(`[growthCalculator] Strategy 2 (TTM vs Prior TTM): TTM=${ttmValue}, PriorTTM=${priorYearTTM}`);
+
     if (ttmValue !== 0 && priorYearTTM !== 0) {
       const growthRate = ((ttmValue - priorYearTTM) / Math.abs(priorYearTTM)) * 100;
       return {
@@ -133,8 +175,9 @@ export function calculateGrowth(input: GrowthCalculationInput): GrowthCalculatio
   // Strategy 3: FY vs FY (fallback)
   const currentFYValue = getFullYearValue(annualData, metric, currentYear - 1);
   const priorFYValue = getFullYearValue(annualData, metric, currentYear - 2);
-
   
+  console.log(`[growthCalculator] Strategy 3 (FY vs FY): CurrentFY=${currentFYValue}, PriorFY=${priorFYValue}`);
+
   if (currentFYValue !== 0 && priorFYValue !== 0) {
     const growthRate = ((currentFYValue - priorFYValue) / Math.abs(priorFYValue)) * 100;
     return {
@@ -207,8 +250,11 @@ function getPriorYearTTMValue(
 ): number {
   const priorYear = currentYear - 1;
 
-  // Find all quarters from prior year
-  const priorYearQuarters = quarterlyData.filter((q: any) => q.fiscalYear === priorYear);
+  // Find all quarters from prior year (extract year from fiscalDateEnding if fiscalYear not available)
+  const priorYearQuarters = quarterlyData.filter((q: any) => {
+    const qYear = q.fiscalYear || new Date(q.fiscalDateEnding).getFullYear();
+    return qYear === priorYear;
+  });
 
   if (priorYearQuarters.length >= 4) {
     // Sum all 4 quarters from prior year
@@ -235,7 +281,10 @@ function getPriorYearTTMValue(
  * Get full year value for a specific fiscal year
  */
 function getFullYearValue(annualData: any[], metric: GrowthMetric, year: number): number {
-  const annual = annualData.find((f: any) => f.fiscalYear === year);
+  const annual = annualData.find((f: any) => {
+    const fYear = f.fiscalYear || new Date(f.fiscalDateEnding).getFullYear();
+    return fYear === year;
+  });
   if (!annual) {
     return 0;
   }
@@ -261,6 +310,10 @@ function getMetricValue(data: any, metric: GrowthMetric): number {
       return value;
     }
   }
+  
+  // Log when no value found
+  console.log(`[getMetricValue] No value found for metric '${metric}' in period ${data.fiscalYear || data.period}. Available keys:`, Object.keys(data).filter(k => k.includes('revenue') || k.includes('income') || k.includes('cash') || k.includes('flow')));
+  
   return 0;
 }
 
