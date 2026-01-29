@@ -17,6 +17,7 @@ export default function Ticker() {
   const { symbol } = useParams<{ symbol: string }>();
   const [, setLocation] = useLocation();
   const { isAuthenticated } = useAuth();
+  const utils = trpc.useUtils();
   
   const [selectedAnalysis, setSelectedAnalysis] = useState<AnalysisOutput | null>(null);
   const [isRunning, setIsRunning] = useState(false);
@@ -48,12 +49,18 @@ export default function Ticker() {
 
   const runAnalysisMutation = trpc.analyses.runAnalysis.useMutation({
     onSuccess: () => {
-      analyses.refetch();
-      setIsRunning(false);
+      // Add delay to ensure database is updated before invalidating cache
+      setTimeout(() => {
+        // Invalidate the analyses query cache to force a fresh fetch
+        utils.analyses.getLatestForTicker.invalidate({ symbol: symbol?.toUpperCase() || "" });
+        setIsRunning(false);
+      }, 500);
     },
     onError: (error) => {
       console.error("Analysis failed:", error);
       setIsRunning(false);
+      // Still invalidate to show any partial results
+      utils.analyses.getLatestForTicker.invalidate({ symbol: symbol?.toUpperCase() || "" });
     },
   });
 
