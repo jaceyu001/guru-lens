@@ -146,8 +146,8 @@ export const cacheRouter = router({
       try {
         console.log(`[cacheRouter] Refreshing cache for ${input.ticker}`);
         
-        // Fetch fresh data from API
-        const freshData = await getFinancialDataWithFallback(input.ticker);
+        // Fetch fresh data from API (force refresh)
+        const freshData = await getFinancialDataWithFallback(input.ticker, true);
         
         if (freshData) {
           console.log(`[cacheRouter] Successfully refreshed ${input.ticker}`);

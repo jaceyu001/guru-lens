@@ -68,8 +68,7 @@ function buildFinancialDataFromCache(cacheEntry: any): any {
       console.error(`[buildFinancialDataFromCache] Failed to extract from JSON:`, e);
     }
   }
-  
-  return {
+return {
     ticker: cacheEntry.ticker,
     profile: {
       companyName: cacheEntry.companyName || "N/A",
@@ -260,6 +259,7 @@ export interface FinancialDataResult {
  * Get financial data with cache-first strategy
  * Priority: Cache → API → Stale Cache → Error
  */
+
 export async function getFinancialDataWithFallback(
   ticker: string,
   forceRefresh: boolean = false,

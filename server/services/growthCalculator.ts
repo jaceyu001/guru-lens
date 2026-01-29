@@ -41,19 +41,26 @@ export interface GrowthCalculationResult {
 export function calculateGrowth(input: GrowthCalculationInput): GrowthCalculationResult {
   const { financialData, metric } = input;
   
+  console.log(`[growthCalculator] calculateGrowth called for metric: ${metric}`);
+  console.log(`[growthCalculator] financialData.financials type:`, typeof financialData.financials);
+  console.log(`[growthCalculator] financialData.financials is array:`, Array.isArray(financialData.financials));
+  
   // Handle both old format (quarterlyFinancials/financials arrays) and new format (financials.quarterlyReports/annualReports)
-  let quarterlyData = (financialData as any).quarterlyFinancials || [];
-  let annualData = financialData.financials || [];
+  let quarterlyData: any[] = [];
+  let annualData: any[] = [];
   
-  // Ensure both are arrays (not objects)
-  if (!Array.isArray(quarterlyData)) {
-    quarterlyData = [];
+  // Try old format first (flat arrays)
+  const oldQuarterly = (financialData as any).quarterlyFinancials;
+  const oldAnnual = financialData.financials;
+  
+  if (Array.isArray(oldQuarterly)) {
+    quarterlyData = oldQuarterly;
   }
-  if (!Array.isArray(annualData)) {
-    annualData = [];
+  if (Array.isArray(oldAnnual)) {
+    annualData = oldAnnual;
   }
   
-  // If using new Alpha Vantage format, extract from nested structure
+  // If old format didn't work, try new format (nested structure)
   if (quarterlyData.length === 0) {
     const qReports = (financialData as any).financials?.quarterlyReports;
     quarterlyData = Array.isArray(qReports) ? qReports : [];
@@ -62,6 +69,8 @@ export function calculateGrowth(input: GrowthCalculationInput): GrowthCalculatio
     const aReports = (financialData as any).financials?.annualReports;
     annualData = Array.isArray(aReports) ? aReports : [];
   }
+  
+  console.log(`[growthCalculator] Data extraction: quarterly=${quarterlyData.length}, annual=${annualData.length}`);
   
 
 

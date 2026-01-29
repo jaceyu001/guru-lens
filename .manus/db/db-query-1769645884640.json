@@ -1,0 +1,14 @@
+{
+  "query": "SELECT ticker, JSON_EXTRACT(financialDataJson, '$.financials.quarterlyReports[0]') as first_quarterly FROM stockFinancialCache WHERE ticker = 'BIDU' LIMIT 1;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user UUbFzi3je6DVETn.root --database fYeU4CZLQAgsjxQh24yAiF --execute SELECT ticker, JSON_EXTRACT(financialDataJson, '$.financials.quarterlyReports[0]') as first_quarterly FROM stockFinancialCache WHERE ticker = 'BIDU' LIMIT 1;",
+  "rows": [
+    {
+      "ticker": "BIDU",
+      "first_quarterly": "{\"basicAverageShares\": null, \"basicEps\": null, \"capitalExpenditure\": 3401000000, \"dilutedAverageShares\": null, \"dilutedEps\": null, \"fiscalDateEnding\": \"2025-09-30\", \"freeCashFlow\": -2145000000, \"grossProfit\": 12859000000, \"interestExpense\": 631000000, \"netIncome\": -11232000000, \"operatingCashFlow\": 1256000000, \"operatingIncome\": -15091000000, \"revenue\": 31174000000, \"totalAssets\": 444072000000, \"totalEquity\": 0, \"totalLiabilities\": 156473000000}"
+    }
+  ],
+  "messages": [],
+  "stdout": "ticker\tfirst_quarterly\nBIDU\t{\"basicAverageShares\": null, \"basicEps\": null, \"capitalExpenditure\": 3401000000, \"dilutedAverageShares\": null, \"dilutedEps\": null, \"fiscalDateEnding\": \"2025-09-30\", \"freeCashFlow\": -2145000000, \"grossProfit\": 12859000000, \"interestExpense\": 631000000, \"netIncome\": -11232000000, \"operatingCashFlow\": 1256000000, \"operatingIncome\": -15091000000, \"revenue\": 31174000000, \"totalAssets\": 444072000000, \"totalEquity\": 0, \"totalLiabilities\": 156473000000}\n",
+  "stderr": "",
+  "execution_time_ms": 52
+}
