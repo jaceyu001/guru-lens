@@ -118,6 +118,83 @@ def get_stock_data(symbol, retry_count=0, max_retries=2):
         
         latest_bar = hist.iloc[-1] if len(hist) > 0 else None
         
+        # Fetch financial statements
+        print(f"[DEBUG] Fetching income statement for {symbol}", file=sys.stderr)
+        income_stmt = ticker.income_stmt
+        quarterly_income = ticker.quarterly_income_stmt
+        
+        print(f"[DEBUG] Fetching balance sheet for {symbol}", file=sys.stderr)
+        balance_sheet = ticker.balance_sheet
+        quarterly_balance = ticker.quarterly_balance_sheet
+        
+        print(f"[DEBUG] Fetching cash flow for {symbol}", file=sys.stderr)
+        cash_flow = ticker.cashflow
+        quarterly_cash_flow = ticker.quarterly_cashflow
+        
+        # Process annual financials
+        annual_financials = []
+        if income_stmt is not None and not income_stmt.empty:
+            for col_idx, date_col in enumerate(income_stmt.columns):
+                try:
+                    fiscal_year = int(date_col.year)
+                    revenue = float(income_stmt.loc['Total Revenue', date_col]) if 'Total Revenue' in income_stmt.index else 0
+                    net_income = float(income_stmt.loc['Net Income', date_col]) if 'Net Income' in income_stmt.index else 0
+                    operating_income = float(income_stmt.loc['Operating Income', date_col]) if 'Operating Income' in income_stmt.index else 0
+                    
+                    # Get cash flow data
+                    operating_cf = 0
+                    free_cf = 0
+                    if cash_flow is not None and not cash_flow.empty and col_idx < len(cash_flow.columns):
+                        cf_col = cash_flow.columns[col_idx]
+                        operating_cf = float(cash_flow.loc['Operating Cash Flow', cf_col]) if 'Operating Cash Flow' in cash_flow.index else 0
+                        free_cf = operating_cf - float(cash_flow.loc['Capital Expenditure', cf_col]) if 'Capital Expenditure' in cash_flow.index else operating_cf
+                    
+                    annual_financials.append({
+                        "fiscalYear": fiscal_year,
+                        "period": f"{fiscal_year}-12-31",
+                        "revenue": revenue,
+                        "netIncome": net_income,
+                        "operatingIncome": operating_income,
+                        "operatingCashFlow": operating_cf,
+                        "freeCashFlow": free_cf
+                    })
+                except Exception as e:
+                    print(f"[WARNING] Error processing annual financials for {symbol}: {e}", file=sys.stderr)
+        
+        # Process quarterly financials
+        quarterly_financials = []
+        if quarterly_income is not None and not quarterly_income.empty:
+            for col_idx, date_col in enumerate(quarterly_income.columns[:8]):  # Last 8 quarters
+                try:
+                    fiscal_year = int(date_col.year)
+                    month = int(date_col.month)
+                    quarter = (month - 1) // 3 + 1
+                    
+                    revenue = float(quarterly_income.loc['Total Revenue', date_col]) if 'Total Revenue' in quarterly_income.index else 0
+                    net_income = float(quarterly_income.loc['Net Income', date_col]) if 'Net Income' in quarterly_income.index else 0
+                    operating_income = float(quarterly_income.loc['Operating Income', date_col]) if 'Operating Income' in quarterly_income.index else 0
+                    
+                    # Get quarterly cash flow
+                    operating_cf = 0
+                    free_cf = 0
+                    if quarterly_cash_flow is not None and not quarterly_cash_flow.empty and col_idx < len(quarterly_cash_flow.columns):
+                        qcf_col = quarterly_cash_flow.columns[col_idx]
+                        operating_cf = float(quarterly_cash_flow.loc['Operating Cash Flow', qcf_col]) if 'Operating Cash Flow' in quarterly_cash_flow.index else 0
+                        free_cf = operating_cf - float(quarterly_cash_flow.loc['Capital Expenditure', qcf_col]) if 'Capital Expenditure' in quarterly_cash_flow.index else operating_cf
+                    
+                    quarterly_financials.append({
+                        "fiscalYear": fiscal_year,
+                        "period": date_col.isoformat(),
+                        "quarter": f"Q{quarter}",
+                        "revenue": revenue,
+                        "netIncome": net_income,
+                        "operatingIncome": operating_income,
+                        "operatingCashFlow": operating_cf,
+                        "freeCashFlow": free_cf
+                    })
+                except Exception as e:
+                    print(f"[WARNING] Error processing quarterly financials for {symbol}: {e}", file=sys.stderr)
+        
         result = {
             "symbol": symbol,
             "price": {
@@ -159,8 +236,8 @@ def get_stock_data(symbol, retry_count=0, max_retries=2):
                 "revenueGrowth": (float(info.get('revenueGrowth', 0)) or 0),
                 "earningsGrowth": (float(info.get('earningsGrowth', 0)) or 0)
             },
-            "financials": [],
-            "quarterlyFinancials": [],
+            "financials": annual_financials,
+            "quarterlyFinancials": quarterly_financials,
             "balanceSheet": {
                 "totalAssets": 0,
                 "totalLiabilities": 0,
