@@ -17,7 +17,6 @@ export default function Ticker() {
   const { symbol } = useParams<{ symbol: string }>();
   const [, setLocation] = useLocation();
   const { isAuthenticated } = useAuth();
-  const utils = trpc.useUtils();
   
   const [selectedAnalysis, setSelectedAnalysis] = useState<AnalysisOutput | null>(null);
   const [isRunning, setIsRunning] = useState(false);
@@ -49,18 +48,12 @@ export default function Ticker() {
 
   const runAnalysisMutation = trpc.analyses.runAnalysis.useMutation({
     onSuccess: () => {
-      // Add delay to ensure database is updated before invalidating cache
-      setTimeout(() => {
-        // Invalidate the analyses query cache to force a fresh fetch
-        utils.analyses.getLatestForTicker.invalidate({ symbol: symbol?.toUpperCase() || "" });
-        setIsRunning(false);
-      }, 500);
+      analyses.refetch();
+      setIsRunning(false);
     },
     onError: (error) => {
       console.error("Analysis failed:", error);
       setIsRunning(false);
-      // Still invalidate to show any partial results
-      utils.analyses.getLatestForTicker.invalidate({ symbol: symbol?.toUpperCase() || "" });
     },
   });
 
@@ -167,9 +160,9 @@ export default function Ticker() {
     );
   }
 
-  const price = financialData.data?.quote;  // quote contains price, volume, change, changePercent
-  const profile = financialData.data?.profile;
-  const ratios = financialData.data?.ratios;
+  const price = financialData.data.price;
+  const profile = financialData.data.profile;
+  const ratios = financialData.data.ratios;
 
   return (
     <div className="min-h-screen bg-background py-8">
@@ -224,162 +217,85 @@ export default function Ticker() {
               </div>
             </div>
             
-            {price && price.price !== undefined && price.change !== undefined && price.changePercent !== undefined && (
+            {price && (
               <div className="text-right">
                 <div className="text-3xl font-bold font-mono-numbers text-foreground">
-                  {price && price.price !== undefined && price.price !== null ? `$${Number(price.price).toFixed(2)}` : "N/A"}
+                  ${price.current.toFixed(2)}
                 </div>
-                <div className={`flex items-center justify-end gap-1 text-sm font-semibold ${price && price.change >= 0 ? "text-positive" : "text-negative"}`}>
-                  {price && price.change >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-                  {price && price.change >= 0 ? "+" : ""}{price && price.change !== undefined ? Number(price.change).toFixed(2) : "N/A"} ({price && price.changePercent !== undefined ? Number(price.changePercent).toFixed(2) : "N/A"}%)
+                <div className={`flex items-center justify-end gap-1 text-sm font-semibold ${price.change >= 0 ? "text-positive" : "text-negative"}`}>
+                  {price.change >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                  {price.change >= 0 ? "+" : ""}{price.change.toFixed(2)} ({price.changePercent.toFixed(2)}%)
                 </div>
                 <div className="text-xs text-muted-foreground mt-1 flex items-center justify-end gap-1">
                   <Clock className="h-3 w-3" />
-                  {price && price.timestamp ? new Date(price.timestamp).toLocaleString() : new Date().toLocaleString()}
+                  {new Date(price.timestamp).toLocaleString()}
                 </div>
               </div>
             )}
           </div>
 
           {/* Key Metrics */}
-          {price || ratios ? (
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 mt-6 pt-6 border-t">
-              {price && price.price !== undefined && (
-                <div>
-                  <div className="text-xs text-muted-foreground mb-1">Price</div>
-                  <div className="font-semibold font-mono-numbers">
-                    ${Number(price.price).toFixed(2)}
-                  </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mt-6 pt-6 border-t">
+            {/* Market cap calculation based on price and shares */}
+            {price?.current && (
+              <div>
+                <div className="text-xs text-muted-foreground mb-1">Price</div>
+                <div className="font-semibold font-mono-numbers">
+                  ${price.current.toFixed(2)}
                 </div>
-              )}
-              {profile?.marketCap !== null && profile?.marketCap !== undefined && (
-                <div>
-                  <div className="text-xs text-muted-foreground mb-1">Market Cap</div>
-                  <div className="font-semibold font-mono-numbers">
-                    ${(Number(profile.marketCap) / 1e9).toFixed(2)}B
-                  </div>
-                </div>
-              )}
-              {price && price.volume !== undefined && (
-                <div>
-                  <div className="text-xs text-muted-foreground mb-1">Volume</div>
-                  <div className="font-semibold font-mono-numbers">
-                    {(Number(price.volume) / 1e6).toFixed(2)}M
-                  </div>
-                </div>
-              )}
-              {ratios && ratios.pe !== null && ratios.pe !== undefined && (
-                <div>
-                  <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-                    P/E Ratio
-                    {isMetricAnomalous("P/E Ratio") && <Badge variant="destructive" className="text-xs">TBC</Badge>}
-                  </div>
-                  <div className={`font-semibold font-mono-numbers ${isMetricAnomalous("P/E Ratio") ? "text-yellow-600" : ""}`}>
-                    {ratios.pe?.toFixed(2)}
-                  </div>
-                </div>
-              )}
-              {ratios && ratios.pb !== null && ratios.pb !== undefined && (
-                <div>
-                  <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-                    P/B Ratio
-                    {isMetricAnomalous("P/B Ratio") && <Badge variant="destructive" className="text-xs">TBC</Badge>}
-                  </div>
-                  <div className={`font-semibold font-mono-numbers ${isMetricAnomalous("P/B Ratio") ? "text-yellow-600" : ""}`}>
-                    {ratios.pb?.toFixed(2)}
-                  </div>
-                </div>
-              )}
-              {ratios && ratios.ps !== null && ratios.ps !== undefined && (
-                <div>
-                  <div className="text-xs text-muted-foreground mb-1">P/S Ratio</div>
-                  <div className="font-semibold font-mono-numbers">
-                    {ratios.ps?.toFixed(2)}
-                  </div>
-                </div>
-              )}
-              {ratios && ratios.roe !== null && ratios.roe !== undefined && (
-                <div>
-                  <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-                    ROE
-                    {isMetricAnomalous("ROE") && <Badge variant="destructive" className="text-xs">TBC</Badge>}
-                  </div>
-                  <div className={`font-semibold font-mono-numbers ${isMetricAnomalous("ROE") ? "text-yellow-600" : ""}`}>
-                    {ratios.roe?.toFixed(2)}%
-                  </div>
-                </div>
-              )}
-              {ratios && ratios.roa !== null && ratios.roa !== undefined && (
-                <div>
-                  <div className="text-xs text-muted-foreground mb-1">ROA</div>
-                  <div className="font-semibold font-mono-numbers">
-                    {ratios.roa?.toFixed(2)}%
-                  </div>
-                </div>
-              )}
-              {ratios && ratios.roic !== null && ratios.roic !== undefined && (
-                <div>
-                  <div className="text-xs text-muted-foreground mb-1">ROIC</div>
-                  <div className="font-semibold font-mono-numbers">
-                    {ratios.roic?.toFixed(2)}%
-                  </div>
-                </div>
-              )}
-              {ratios?.debtToEquity !== null && ratios?.debtToEquity !== undefined && (
-                <div>
-                  <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-                    Debt/Equity
-                    {isMetricAnomalous("Debt/Equity") && <Badge variant="destructive" className="text-xs">TBC</Badge>}
-                  </div>
-                  <div className={`font-semibold font-mono-numbers ${isMetricAnomalous("Debt/Equity") ? "text-yellow-600" : ""}`}>
-                    {((ratios.debtToEquity ?? 0) * 100).toFixed(2)}%
-                  </div>
-                </div>
-              )}
-              {ratios?.currentRatio !== null && ratios?.currentRatio !== undefined && (
-                <div>
-                  <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-                    Current Ratio
-                    {isMetricAnomalous("Current Ratio") && <Badge variant="destructive" className="text-xs">TBC</Badge>}
-                  </div>
-                  <div className="font-semibold font-mono-numbers">
-                    {(ratios.currentRatio ?? 0).toFixed(2)}
-                  </div>
-                </div>
-              )}
-              {ratios?.grossMargin !== null && ratios?.grossMargin !== undefined && (
-                <div>
-                  <div className="text-xs text-muted-foreground mb-1">Gross Margin</div>
-                  <div className="font-semibold font-mono-numbers">{(ratios.grossMargin ?? 0).toFixed(2)}%</div>
-                </div>
-              )}
-              {ratios?.operatingMargin !== null && ratios?.operatingMargin !== undefined && (
-                <div>
-                  <div className="text-xs text-muted-foreground mb-1">Operating Margin</div>
-                  <div className="font-semibold font-mono-numbers">{(ratios.operatingMargin ?? 0).toFixed(2)}%</div>
-                </div>
-              )}
-              {ratios?.netMargin !== null && ratios?.netMargin !== undefined && (
-                <div>
-                  <div className="text-xs text-muted-foreground mb-1">Net Margin</div>
-                  <div className="font-semibold font-mono-numbers">{(ratios.netMargin ?? 0).toFixed(2)}%</div>
-                </div>
-              )}
-              {ratios?.dividendYield !== null && ratios?.dividendYield !== undefined && (
-                <div>
-                  <div className="text-xs text-muted-foreground mb-1">Dividend Yield</div>
-                  <div className="font-semibold font-mono-numbers">{(ratios.dividendYield ?? 0).toFixed(2)}%</div>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="mt-6 pt-6 border-t">
-              <div className="p-4 bg-muted/50 rounded-lg text-center">
-                <AlertCircle className="mx-auto h-5 w-5 text-muted-foreground mb-2" />
-                <p className="text-sm text-muted-foreground">Financial metrics data is currently unavailable for this ticker.</p>
               </div>
-            </div>
-          )}
+            )}
+            {ratios?.pe !== undefined && (
+              <div>
+                <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                  P/E Ratio
+                  {isMetricAnomalous("P/E Ratio") && <Badge variant="destructive" className="text-xs">TBC</Badge>}
+                </div>
+                <div className={`font-semibold font-mono-numbers ${isMetricAnomalous("P/E Ratio") ? "text-yellow-600" : ""}`}>
+                  {ratios.pe.toFixed(2)}
+                </div>
+              </div>
+            )}
+            {ratios?.pb !== undefined && (
+              <div>
+                <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                  P/B Ratio
+                  {isMetricAnomalous("P/B Ratio") && <Badge variant="destructive" className="text-xs">TBC</Badge>}
+                </div>
+                <div className={`font-semibold font-mono-numbers ${isMetricAnomalous("P/B Ratio") ? "text-yellow-600" : ""}`}>
+                  {ratios.pb.toFixed(2)}
+                </div>
+              </div>
+            )}
+            {ratios?.roe !== undefined && (
+              <div>
+                <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                  ROE
+                  {isMetricAnomalous("ROE") && <Badge variant="destructive" className="text-xs">TBC</Badge>}
+                </div>
+                <div className={`font-semibold font-mono-numbers ${isMetricAnomalous("ROE") ? "text-yellow-600" : ""}`}>
+                  {ratios.roe.toFixed(2)}%
+                </div>
+              </div>
+            )}
+            {ratios?.debtToEquity !== undefined && (
+              <div>
+                <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                  Debt/Equity
+                  {isMetricAnomalous("Debt/Equity") && <Badge variant="destructive" className="text-xs">TBC</Badge>}
+                </div>
+                <div className={`font-semibold font-mono-numbers ${isMetricAnomalous("Debt/Equity") ? "text-yellow-600" : ""}`}>
+                  {(ratios.debtToEquity * 100).toFixed(2)}%
+                </div>
+              </div>
+            )}
+            {ratios?.netMargin !== undefined && (
+              <div>
+                <div className="text-xs text-muted-foreground mb-1">Net Margin</div>
+                <div className="font-semibold font-mono-numbers">{ratios.netMargin.toFixed(2)}%</div>
+              </div>
+            )}
+          </div>
         </Card>
 
         {/* Agent Analysis Cards */}
@@ -423,127 +339,206 @@ export default function Ticker() {
               {analyses.data.map((analysis) => (
                 <Card
                   key={analysis.id}
-                  className={`p-6 cursor-pointer hover:shadow-lg transition-all border-l-4 ${getVerdictColor(analysis.verdict)}`}
+                  className="persona-card cursor-pointer"
                   onClick={() => setSelectedAnalysis(analysis)}
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div>
                       <h3 className="font-bold text-lg">{analysis.personaName}</h3>
-                      <Badge variant="outline" className="mt-1">{analysis.verdict}</Badge>
+                      <Badge className={`mt-2 ${getVerdictColor(analysis.verdict)}`}>
+                        {analysis.verdict}
+                      </Badge>
                     </div>
-                    <div className={`text-3xl font-bold font-mono-numbers ${getScoreColor(analysis.score)}`}>
-                      {analysis.score}
+                    <div className="text-right">
+                      <div className={`text-3xl font-bold font-mono-numbers ${getScoreColor(analysis.score)}`}>
+                        {analysis.score}
+                      </div>
+                      <div className="text-xs text-muted-foreground">/ 100</div>
                     </div>
                   </div>
                   
-                  <div className="mb-3">
-                    <div className="text-xs text-muted-foreground mb-1">Confidence</div>
-                    <Progress value={Number(analysis.confidence) * 100} className="h-2" />
-                    <div className="text-xs text-muted-foreground mt-1">{(Number(analysis.confidence) * 100).toFixed(0)}%</div>
+                  <Progress value={analysis.score} className="mb-4" />
+                  
+                  <div className="space-y-2">
+                    {analysis.summaryBullets.slice(0, 2).map((bullet, idx) => (
+                      <p key={idx} className="text-sm text-muted-foreground">
+                        • {bullet}
+                      </p>
+                    ))}
                   </div>
-
-                  {analysis.summaryBullets && analysis.summaryBullets.length > 0 && (
-                    <div className="space-y-2">
-                      {analysis.summaryBullets.slice(0, 2).map((bullet, idx) => (
-                        <div key={idx} className="text-sm text-foreground">
-                          • {bullet}
-                        </div>
-                      ))}
+                  
+                  <div className="mt-4 pt-4 border-t space-y-2">
+                    <div className="text-xs text-muted-foreground">
+                      Confidence: {(analysis.confidence * 100).toFixed(0)}%
+                      {analysis.baseConfidence && analysis.baseConfidence !== analysis.confidence && (
+                        <span className="ml-2 text-yellow-600 dark:text-yellow-400">
+                          (base: {(analysis.baseConfidence * 100).toFixed(0)}%)
+                        </span>
+                      )}
                     </div>
-                  )}
+                    {analysis.missingMetricsImpact && analysis.missingMetricsImpact.length > 0 && (
+                      <div className="text-xs bg-orange-50 dark:bg-orange-950 text-orange-800 dark:text-orange-200 p-2 rounded">
+                        <div className="font-semibold mb-1">Missing Critical Data:</div>
+                        {analysis.missingMetricsImpact.map((impact, idx) => (
+                          <div key={idx} className="mb-1">
+                            <div className="font-medium">{impact.metric}</div>
+                            <div className="text-xs opacity-90">Affects: {impact.affectedCriteria.join(", ")}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {analysis.dataQualityIssues && analysis.dataQualityIssues.length > 0 && (
+                      <div className="text-xs bg-yellow-50 dark:bg-yellow-950 text-yellow-800 dark:text-yellow-200 p-2 rounded">
+                        <div className="font-semibold mb-1">⚠️ Data Quality Issues:</div>
+                        <div className="text-xs">{analysis.dataQualityIssues.join(', ')} unavailable</div>
+                      </div>
+                    )}
+                  </div>
                 </Card>
               ))}
             </div>
           ) : (
             <Card className="p-12 text-center">
               <AlertCircle className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-xl font-semibold mb-2">No Analyses Yet</h3>
+              <h3 className="text-xl font-semibold mb-2">No Analysis Available</h3>
               <p className="text-muted-foreground mb-6">
-                Run an analysis to see how legendary investors would rate this stock.
+                Run an analysis to see how different investor personas rate this stock.
               </p>
-              <Button onClick={handleRunAnalysis} disabled={isRunning || runAnalysisMutation.isPending}>
+              <Button onClick={handleRunAnalysis} disabled={isRunning}>
                 <RefreshCw className={`mr-2 h-4 w-4 ${isRunning ? "animate-spin" : ""}`} />
-                {isRunning ? "Running..." : "Run Analysis"}
+                Run Analysis
               </Button>
             </Card>
           )}
         </div>
 
         {/* Analysis Detail Dialog */}
-        {selectedAnalysis && (
-          <Dialog open={!!selectedAnalysis} onOpenChange={() => setSelectedAnalysis(null)}>
-            <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>{selectedAnalysis.personaName} Analysis</DialogTitle>
-              </DialogHeader>
-              
-              <Tabs defaultValue="summary" className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="summary">Summary</TabsTrigger>
-                  <TabsTrigger value="criteria">Criteria</TabsTrigger>
-                  <TabsTrigger value="risks">Risks</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="summary" className="space-y-4">
-                  <div>
-                    <h4 className="font-semibold mb-2">Score: {selectedAnalysis.score}/100</h4>
-                    <Progress value={selectedAnalysis.score} className="h-3" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold mb-2">Verdict</h4>
-                    <Badge className="mb-4">{selectedAnalysis.verdict}</Badge>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold mb-2">Summary</h4>
-                    <ul className="space-y-2">
-                      {selectedAnalysis.summaryBullets?.map((bullet, idx) => (
-                        <li key={idx} className="text-sm">• {bullet}</li>
-                      ))}
-                    </ul>
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="criteria" className="space-y-4">
-                  {selectedAnalysis.criteria?.map((criterion, idx) => (
-                    <div key={idx} className="border rounded-lg p-4">
-                      <div className="flex items-start justify-between mb-2">
-                        <h4 className="font-semibold">{criterion.name}</h4>
-                        <Badge variant={criterion.status === "pass" ? "default" : criterion.status === "partial" ? "secondary" : "destructive"}>
-                          {criterion.status}
-                        </Badge>
+        <Dialog open={!!selectedAnalysis} onOpenChange={() => setSelectedAnalysis(null)}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            {selectedAnalysis && (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="text-2xl">
+                    {selectedAnalysis.personaName}'s Analysis of {symbol}
+                  </DialogTitle>
+                </DialogHeader>
+                
+                <div className="space-y-6">
+                  {/* Score & Verdict */}
+                  <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                    <div>
+                      <div className="text-sm text-muted-foreground mb-1">Overall Score</div>
+                      <div className={`text-4xl font-bold font-mono-numbers ${getScoreColor(selectedAnalysis.score)}`}>
+                        {selectedAnalysis.score} / 100
                       </div>
-                      <p className="text-sm text-muted-foreground mb-2">{criterion.explanation}</p>
-                      {criterion.metricsUsed && criterion.metricsUsed.length > 0 && (
-                        <div className="text-xs text-muted-foreground">
-                          Metrics: {criterion.metricsUsed.join(", ")}
-                        </div>
-                      )}
                     </div>
-                  ))}
-                </TabsContent>
+                    <Badge className={`text-lg px-4 py-2 ${getVerdictColor(selectedAnalysis.verdict)}`}>
+                      {selectedAnalysis.verdict}
+                    </Badge>
+                  </div>
 
-                <TabsContent value="risks" className="space-y-4">
+                  {/* Data Quality Warnings */}
+                  {(selectedAnalysis.missingMetricsImpact?.length || 0) > 0 && (
+                    <Card className="p-4 bg-orange-50 dark:bg-orange-950 border-orange-200 dark:border-orange-800">
+                      <h3 className="font-semibold text-orange-900 dark:text-orange-100 mb-3">Missing Critical Data</h3>
+                      <div className="space-y-3">
+                        {selectedAnalysis.missingMetricsImpact?.map((impact: any, idx: number) => (
+                          <div key={idx} className="text-sm">
+                            <div className="font-medium text-orange-900 dark:text-orange-100">{impact.metric}</div>
+                            <div className="text-orange-800 dark:text-orange-200 text-xs mt-1">{impact.description}</div>
+                            <div className="text-orange-700 dark:text-orange-300 text-xs mt-1">
+                              <strong>Impacts:</strong> {impact.affectedCriteria.join(", ")}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="text-xs text-orange-700 dark:text-orange-300 mt-3 pt-3 border-t border-orange-200 dark:border-orange-800">
+                        Analysis based on available metrics only. Results may be incomplete.
+                      </div>
+                    </Card>
+                  )}
+
+                  {/* Summary */}
                   <div>
-                    <h4 className="font-semibold mb-2">Key Risks</h4>
+                    <h3 className="font-semibold text-lg mb-3">Summary</h3>
                     <ul className="space-y-2">
-                      {selectedAnalysis.keyRisks?.map((risk, idx) => (
-                        <li key={idx} className="text-sm">• {risk}</li>
+                      {selectedAnalysis.summaryBullets.map((bullet, idx) => (
+                        <li key={idx} className="flex gap-2">
+                          <span className="text-primary mt-1">•</span>
+                          <span>{bullet}</span>
+                        </li>
                       ))}
                     </ul>
                   </div>
+
+                  {/* Criteria Breakdown */}
                   <div>
-                    <h4 className="font-semibold mb-2">What Would Change Mind</h4>
+                    <h3 className="font-semibold text-lg mb-3">Criteria Breakdown</h3>
+                    <div className="space-y-4">
+                      {selectedAnalysis.criteria.map((criterion, idx) => (
+                        <Card key={idx} className="p-4">
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="font-semibold">{criterion.name}</div>
+                            <Badge
+                              variant={criterion.status === "pass" ? "default" : criterion.status === "partial" ? "secondary" : "destructive"}
+                            >
+                              {criterion.status}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground mb-2">{criterion.explanation}</p>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span>Weight: {(criterion.weight * 100).toFixed(0)}%</span>
+                            <span>•</span>
+                            <span>Metrics: {criterion.metricsUsed.join(", ")}</span>
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Key Risks */}
+                  <div>
+                    <h3 className="font-semibold text-lg mb-3">Key Risks</h3>
                     <ul className="space-y-2">
-                      {selectedAnalysis.whatWouldChangeMind?.map((item, idx) => (
-                        <li key={idx} className="text-sm">• {item}</li>
+                      {selectedAnalysis.keyRisks.map((risk, idx) => (
+                        <li key={idx} className="flex gap-2 text-sm">
+                          <AlertCircle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
+                          <span>{risk}</span>
+                        </li>
                       ))}
                     </ul>
                   </div>
-                </TabsContent>
-              </Tabs>
-            </DialogContent>
-          </Dialog>
-        )}
+
+                  {/* What Would Change My Mind */}
+                  <div>
+                    <h3 className="font-semibold text-lg mb-3">What Would Change My Mind</h3>
+                    <ul className="space-y-2">
+                      {selectedAnalysis.whatWouldChangeMind.map((item, idx) => (
+                        <li key={idx} className="flex gap-2 text-sm">
+                          <span className="text-primary mt-1">•</span>
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* Run Metadata */}
+                  <div className="pt-4 border-t text-xs text-muted-foreground">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>Model: {selectedAnalysis.runMetadata.model}</div>
+                      <div>Version: {selectedAnalysis.runMetadata.version}</div>
+                      <div>Run Time: {selectedAnalysis.runMetadata.runTime}ms</div>
+                      <div>Mode: {selectedAnalysis.runMetadata.mode}</div>
+                      <div className="col-span-2">
+                        Analyzed: {new Date(selectedAnalysis.runTimestamp).toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

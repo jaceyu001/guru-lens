@@ -10,7 +10,6 @@ import TickerTest from "./pages/TickerTest";
 import Opportunities from "./pages/Opportunities";
 import Watchlist from "./pages/Watchlist";
 import OpportunityScannerPage from "./pages/OpportunityScannerPage";
-import { CacheManagement } from "./pages/CacheManagement";
 
 function Router() {
   return (
@@ -22,7 +21,6 @@ function Router() {
       <Route path={"/opportunities/:personaId"} component={Opportunities} />
       <Route path={"/scanner"} component={OpportunityScannerPage} />
       <Route path={"/watchlist"} component={Watchlist} />
-      <Route path={"/cache"} component={CacheManagement} />
       <Route path={"/404"} component={NotFound} />
       <Route component={NotFound} />
     </Switch>

@@ -202,28 +202,18 @@ Free Cash Flow: $${(latestFinancials.freeCashFlow / 1e9).toFixed(2)}B`
       ? `(${fund.growth.currentPeriod} vs ${fund.growth.priorPeriod} - Q1 data only)`
       : '';
     
-    if (fund.growth && fund.growth.revenueGrowth !== undefined && fund.growth.earningsGrowth !== undefined && fund.growth.fcfGrowth !== undefined) {
-      agentFindingsSummary += `- Growth: ${fund.growth.assessment} ${growthPeriodInfo} (Revenue: ${Number(fund.growth.revenueGrowth).toFixed(1)}%, Earnings: ${Number(fund.growth.earningsGrowth).toFixed(1)}%, FCF: ${Number(fund.growth.fcfGrowth).toFixed(1)}%)\n`;
-    }
-    if (fund.profitability && fund.profitability.netMargin !== undefined && fund.profitability.operatingMargin !== undefined) {
-      agentFindingsSummary += `- Profitability: ${fund.profitability.assessment} (Net Margin: ${Number(fund.profitability.netMargin).toFixed(1)}%, Operating: ${Number(fund.profitability.operatingMargin).toFixed(1)}%)\n`;
-    }
-    if (fund.capitalEfficiency) {
-      const roeStr = fund.capitalEfficiency.roe !== null && fund.capitalEfficiency.roe !== undefined ? `${Number(fund.capitalEfficiency.roe).toFixed(1)}%` : 'N/A';
-      const roicStr = fund.capitalEfficiency.roic !== null && fund.capitalEfficiency.roic !== undefined ? `${Number(fund.capitalEfficiency.roic).toFixed(1)}%` : 'N/A';
-      agentFindingsSummary += `- Capital Efficiency: ${fund.capitalEfficiency.assessment} (ROE: ${roeStr}, ROIC: ${roicStr})\n`;
-    }
-    if (fund.financialHealth) {
-      const deStr = fund.financialHealth.debtToEquity !== null && fund.financialHealth.debtToEquity !== undefined ? `${Number(fund.financialHealth.debtToEquity).toFixed(1)}%` : 'N/A';
-      const crStr = fund.financialHealth.currentRatio !== null && fund.financialHealth.currentRatio !== undefined ? `${Number(fund.financialHealth.currentRatio).toFixed(2)}x` : 'N/A';
-      agentFindingsSummary += `- Financial Health: ${fund.financialHealth.assessment} (D/E: ${deStr}, Current Ratio: ${crStr})\n`;
-    }
-    if (fund.cashFlow && fund.cashFlow.fcfMargin !== undefined && fund.cashFlow.fcfGrowth !== undefined) {
-      agentFindingsSummary += `- Cash Flow: ${fund.cashFlow.assessment} (FCF Margin: ${Number(fund.cashFlow.fcfMargin).toFixed(1)}%, Growth: ${Number(fund.cashFlow.fcfGrowth).toFixed(1)}%)\n`;
-    }
+    agentFindingsSummary += `- Growth: ${fund.growth.assessment} ${growthPeriodInfo} (Revenue: ${fund.growth.revenueGrowth.toFixed(1)}%, Earnings: ${fund.growth.earningsGrowth.toFixed(1)}%, FCF: ${fund.growth.fcfGrowth.toFixed(1)}%)\n`;
+    agentFindingsSummary += `- Profitability: ${fund.profitability.assessment} (Net Margin: ${fund.profitability.netMargin.toFixed(1)}%, Operating: ${fund.profitability.operatingMargin.toFixed(1)}%)\n`;
+    const roeStr = fund.capitalEfficiency.roe !== null ? `${fund.capitalEfficiency.roe.toFixed(1)}%` : 'N/A';
+    const roicStr = fund.capitalEfficiency.roic !== null ? `${fund.capitalEfficiency.roic.toFixed(1)}%` : 'N/A';
+    agentFindingsSummary += `- Capital Efficiency: ${fund.capitalEfficiency.assessment} (ROE: ${roeStr}, ROIC: ${roicStr})\n`;
+    const deStr = fund.financialHealth.debtToEquity !== null ? `${fund.financialHealth.debtToEquity.toFixed(1)}%` : 'N/A';
+    const crStr = fund.financialHealth.currentRatio !== null ? `${fund.financialHealth.currentRatio.toFixed(2)}x` : 'N/A';
+    agentFindingsSummary += `- Financial Health: ${fund.financialHealth.assessment} (D/E: ${deStr}, Current Ratio: ${crStr})\n`;
+    agentFindingsSummary += `- Cash Flow: ${fund.cashFlow.assessment} (FCF Margin: ${fund.cashFlow.fcfMargin.toFixed(1)}%, Growth: ${fund.cashFlow.fcfGrowth.toFixed(1)}%)\n`;
     
     // Add data quality flags if present
-    if (fund.growth && fund.growth.dataQualityFlags && Object.values(fund.growth.dataQualityFlags).some(v => v)) {
+    if (fund.growth.dataQualityFlags && Object.values(fund.growth.dataQualityFlags).some(v => v)) {
       agentFindingsSummary += `\nGrowth Data Quality Notes:\n`;
       if (fund.growth.dataQualityFlags.onlyQ1Available) {
         agentFindingsSummary += `- Only Q1 data available; using FY vs FY comparison for stability\n`;
@@ -239,24 +229,12 @@ Free Cash Flow: $${(latestFinancials.freeCashFlow / 1e9).toFixed(2)}B`
   if (input.valuationFindings) {
     const val = input.valuationFindings;
     agentFindingsSummary += `\nVALUATION AGENT FINDINGS:\n`;
-    if (val.currentPrice !== undefined && val.currentPrice !== null) {
-      agentFindingsSummary += `- Current Price: $${Number(val.currentPrice).toFixed(2)}\n`;
-    }
-    if (val.consensusValuation && val.consensusValuation.low !== undefined && val.consensusValuation.high !== undefined && val.consensusValuation.midpoint !== undefined) {
-      agentFindingsSummary += `- Consensus Valuation: $${Number(val.consensusValuation.low).toFixed(2)} - $${Number(val.consensusValuation.high).toFixed(2)} (Midpoint: $${Number(val.consensusValuation.midpoint).toFixed(2)})\n`;
-    }
-    if (val.overallAssessment) {
-      agentFindingsSummary += `- Assessment: ${val.overallAssessment.replace(/_/g, ' ')}\n`;
-    }
-    if (val.consensusUpside !== undefined && val.consensusUpside !== null) {
-      agentFindingsSummary += `- Upside Potential: ${Number(val.consensusUpside).toFixed(1)}%\n`;
-    }
-    if (val.marginOfSafety !== undefined && val.marginOfSafety !== null) {
-      agentFindingsSummary += `- Margin of Safety: ${Number(val.marginOfSafety).toFixed(1)}%\n`;
-    }
-    if (val.methodAgreement) {
-      agentFindingsSummary += `- Method Agreement: ${val.methodAgreement}\n`;
-    }
+    agentFindingsSummary += `- Current Price: $${val.currentPrice.toFixed(2)}\n`;
+    agentFindingsSummary += `- Consensus Valuation: $${val.consensusValuation.low.toFixed(2)} - $${val.consensusValuation.high.toFixed(2)} (Midpoint: $${val.consensusValuation.midpoint.toFixed(2)})\n`;
+    agentFindingsSummary += `- Assessment: ${val.overallAssessment.replace(/_/g, ' ')}\n`;
+    agentFindingsSummary += `- Upside Potential: ${val.consensusUpside.toFixed(1)}%\n`;
+    agentFindingsSummary += `- Margin of Safety: ${val.marginOfSafety.toFixed(1)}%\n`;
+    agentFindingsSummary += `- Method Agreement: ${val.methodAgreement}\n`;
   }
 
   // Fill in the analysis template
@@ -267,27 +245,27 @@ Free Cash Flow: $${(latestFinancials.freeCashFlow / 1e9).toFixed(2)}B`
     .replace('{industry}', input.profile.industry)
     .replace('{marketCap}', getSafeMetricValue(`$${(input.profile.marketCap / 1e9).toFixed(2)}B`, input.dataQualityFlags?.marketCapZero, 'Market Cap'))
     .replace('{description}', input.profile.description)
-    .replace('{price}', input.price && input.price.current !== undefined ? `$${Number(input.price.current).toFixed(2)}` : 'N/A')
-    .replace('{peRatio}', input.ratios.peRatio !== undefined ? getSafeMetricValue(Number(input.ratios.peRatio).toFixed(1), input.dataQualityFlags?.peAnomalous || input.dataQualityFlags?.peNegative, 'P/E Ratio') : 'N/A')
+    .replace('{price}', `$${input.price.current.toFixed(2)}`)
+    .replace('{peRatio}', getSafeMetricValue(input.ratios.peRatio.toFixed(1), input.dataQualityFlags?.peAnomalous || input.dataQualityFlags?.peNegative, 'P/E Ratio'))
     .replace('{pegRatio}', (() => {
       // PEG is undefined (0) for unprofitable or non-growing companies
-      if (!input.ratios.pegRatio || input.ratios.pegRatio === 0) {
+      if (input.ratios.pegRatio === 0) {
         return 'N/A (Company is unprofitable or earnings not growing)';
       }
-      return getSafeMetricValue(Number(input.ratios.pegRatio).toFixed(2), input.dataQualityFlags?.peAnomalous, 'PEG Ratio');
+      return getSafeMetricValue(input.ratios.pegRatio.toFixed(2), input.dataQualityFlags?.peAnomalous, 'PEG Ratio');
     })())
-    .replace('{pbRatio}', input.ratios.pbRatio !== undefined ? getSafeMetricValue(Number(input.ratios.pbRatio).toFixed(2), input.dataQualityFlags?.pbAnomalous, 'P/B Ratio') : 'N/A')
-    .replace('{roe}', input.ratios.roe !== undefined ? getSafeMetricValue(Number(input.ratios.roe).toFixed(1), input.dataQualityFlags?.roeNegative, 'ROE') : 'N/A')
-    .replace('{roic}', input.ratios.roic !== undefined ? getSafeMetricValue(Number(input.ratios.roic).toFixed(1), input.dataQualityFlags?.roicZero, 'ROIC') : 'N/A')
-    .replace('{netMargin}', input.ratios.netMargin !== undefined ? Number(input.ratios.netMargin).toFixed(1) : 'N/A')
-    .replace('{operatingMargin}', input.ratios.operatingMargin !== undefined ? Number(input.ratios.operatingMargin).toFixed(1) : 'N/A')
-    .replace('{debtToEquity}', input.ratios.debtToEquity !== undefined ? getSafeMetricValue(Number(input.ratios.debtToEquity).toFixed(2), input.dataQualityFlags?.debtToEquityAnomalous, 'Debt/Equity') : 'N/A')
-    .replace('{currentRatio}', input.ratios.currentRatio !== undefined ? getSafeMetricValue(Number(input.ratios.currentRatio).toFixed(2), input.dataQualityFlags?.currentRatioAnomalous, 'Current Ratio') : 'N/A')
-    .replace('{interestCoverage}', input.ratios.interestCoverage !== undefined && input.ratios.interestCoverage ? getSafeMetricValue(Number(input.ratios.interestCoverage).toFixed(1), input.dataQualityFlags?.interestCoverageZero, 'Interest Coverage') : 'N/A')
-    .replace('{dividendYield}', input.ratios.dividendYield !== undefined ? Number(input.ratios.dividendYield).toFixed(2) : 'N/A')
+    .replace('{pbRatio}', getSafeMetricValue(input.ratios.pbRatio.toFixed(2), input.dataQualityFlags?.pbAnomalous, 'P/B Ratio'))
+    .replace('{roe}', getSafeMetricValue(input.ratios.roe.toFixed(1), input.dataQualityFlags?.roeNegative, 'ROE'))
+    .replace('{roic}', getSafeMetricValue(input.ratios.roic.toFixed(1), input.dataQualityFlags?.roicZero, 'ROIC'))
+    .replace('{netMargin}', input.ratios.netMargin.toFixed(1))
+    .replace('{operatingMargin}', input.ratios.operatingMargin.toFixed(1))
+    .replace('{debtToEquity}', getSafeMetricValue(input.ratios.debtToEquity.toFixed(2), input.dataQualityFlags?.debtToEquityAnomalous, 'Debt/Equity'))
+    .replace('{currentRatio}', getSafeMetricValue(input.ratios.currentRatio.toFixed(2), input.dataQualityFlags?.currentRatioAnomalous, 'Current Ratio'))
+    .replace('{interestCoverage}', input.ratios.interestCoverage ? getSafeMetricValue(input.ratios.interestCoverage.toFixed(1), input.dataQualityFlags?.interestCoverageZero, 'Interest Coverage') : 'N/A')
+    .replace('{dividendYield}', input.ratios.dividendYield.toFixed(2))
     .replace('{financials}', financialSummary)
     .replace('{revenueGrowth}', (() => {
-      const growth = input.fundamentalsFindings?.growth?.revenueGrowth !== undefined ? Number(input.fundamentalsFindings.growth.revenueGrowth).toFixed(1) + '%' : 'N/A';
+      const growth = input.fundamentalsFindings?.growth?.revenueGrowth?.toFixed(1) || 'N/A';
       const period = input.fundamentalsFindings?.growth?.comparisonType === 'TTM_VS_FY' ? ' (TTM vs FY)' : input.fundamentalsFindings?.growth?.comparisonType === 'FY_VS_FY' ? ' (FY vs FY)' : '';
       return growth === 'N/A' ? 'N/A' : `${growth}%${period}`;
     })()) // Use actual revenue growth from fundamentals with period info

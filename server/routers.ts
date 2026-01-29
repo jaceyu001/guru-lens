@@ -4,9 +4,8 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
-import { cacheRouter } from "./routers/cacheRouter";
 import * as db from "./db";
-import { getFinancialDataWithFallback, getFinancialDataBatchWithFallback } from './services/cacheFirstDataFetcher';
+import * as realFinancialData from './services/realFinancialData';
 import * as aiAnalysisEngine from "./services/aiAnalysisEngine";
 import * as fundamentalsAgent from "./services/fundamentalsAgent";
 import * as valuationAgent from "./services/valuationAgent";
@@ -14,7 +13,6 @@ import type { AnalysisOutput, OpportunityOutput, TickerSnapshot, FundamentalsFin
 
 export const appRouter = router({
   system: systemRouter,
-  cache: cacheRouter,
   
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
@@ -49,10 +47,8 @@ export const appRouter = router({
           return dbResults;
         }
         
-        // Search in financial data service (using cache-first strategy)
-        // For now, return empty array and suggest user enter known tickers
-        // Full ticker search would require Alpha Vantage Symbol Search API
-        const serviceResults: any[] = [];
+        // Search in financial data service
+        const serviceResults = await realFinancialData.searchTickers(input.query);
         
         // Upsert found tickers to database
         for (const ticker of serviceResults) {
@@ -78,12 +74,8 @@ export const appRouter = router({
         let ticker = await db.getTickerBySymbol(input.symbol);
         
         if (!ticker) {
-          // Try to fetch from cache-first financial data service
-          const cacheResult = await getFinancialDataWithFallback(input.symbol, true); // forceRefresh=true for live data
-          if (!cacheResult.success || !cacheResult.data) {
-            throw new Error(`Failed to fetch financial data for ${input.symbol}`);
-          }
-          const financialData = cacheResult.data;
+          // Try to fetch from financial data service
+          const financialData = await realFinancialData.getStockData(input.symbol);
           const snapshot = {
             symbol: input.symbol,
             companyName: input.symbol,
@@ -118,17 +110,11 @@ export const appRouter = router({
       .query(async ({ input }) => {
         try {
           console.log(`[getFinancialData] Fetching data for ${input.symbol}`);
-          const cacheResult = await getFinancialDataWithFallback(input.symbol, true); // forceRefresh=true for live data
-          if (!cacheResult.success || !cacheResult.data) {
-            throw new Error(`Failed to fetch financial data for ${input.symbol}`);
-          }
-          const financialData = cacheResult.data;
-          console.log(`[getFinancialData] Success for ${input.symbol} (source: ${cacheResult.source})`);
-          console.log(`[getFinancialData] Returning data:`, {
-            quote: financialData.quote,
-            ratios: financialData.ratios,
-            profile: financialData.profile,
-          });
+          const financialData = await realFinancialData.getStockData(input.symbol);
+          console.log(`[getFinancialData] Success for ${input.symbol}`);
+          
+          
+          
           
           return financialData;
         } catch (error) {
@@ -150,11 +136,7 @@ export const appRouter = router({
         // Get or create ticker
         let ticker = await db.getTickerBySymbol(input.symbol);
         if (!ticker) {
-          const cacheResult = await getFinancialDataWithFallback(input.symbol, true); // forceRefresh=true for live data
-          if (!cacheResult.success || !cacheResult.data) {
-            throw new Error(`Failed to fetch financial data for ${input.symbol}`);
-          }
-          const financialData = cacheResult.data;
+          const financialData = await realFinancialData.getStockData(input.symbol);
           const snapshot = {
             symbol: input.symbol,
             companyName: input.symbol,
@@ -183,17 +165,11 @@ export const appRouter = router({
         
         if (!ticker) throw new Error("Failed to create ticker");
         
-        // Get financial data using API-first strategy for live analysis
-        const cacheResult = await getFinancialDataWithFallback(input.symbol, true); // forceRefresh=true for live data
-        if (!cacheResult.success || !cacheResult.data) {
+        // Get financial data
+        const financialData = await realFinancialData.getStockData(input.symbol);
+        if (!financialData) {
           throw new Error(`No financial data available for ${input.symbol}`);
         }
-        const financialData = cacheResult.data;
-        console.log(`[analyzeTicker] Financial data for ${input.symbol}:`, {
-          quote: financialData.quote,
-          price: financialData.price,
-          currentPrice: financialData.quote?.price || financialData.price?.current || 0,
-        });
         
         // Get personas to analyze
         const personas = input.personaIds && input.personaIds.length > 0
@@ -203,42 +179,30 @@ export const appRouter = router({
         const validPersonas = personas.filter((p): p is NonNullable<typeof p> => p !== undefined);
         
         // Fetch agent findings in parallel
-        console.log('[analyzeTicker] financialData.quote:', JSON.stringify(financialData.quote, null, 2));
-        const extractedPrice = financialData.quote?.price || financialData.price?.current || 0;
-        console.log('[analyzeTicker] Extracted price:', extractedPrice);
-        console.log('[analyzeTicker] financialData.quote?.price:', financialData.quote?.price);
-        console.log('[analyzeTicker] financialData.price?.current:', financialData.price?.current);
-        console.log('[analyzeTicker] Full financialData keys:', Object.keys(financialData));
         const [fundamentalsFindings, valuationFindings] = await Promise.all([
           fundamentalsAgent.analyzeFundamentals(financialData, financialData.dataQualityFlags || {}),
           valuationAgent.analyzeValuation({
             ticker: input.symbol,
-            currentPrice: extractedPrice,
+            currentPrice: financialData.price?.current || 0,
             financialData,
             dataQualityFlags: financialData.dataQualityFlags || {},
           } as any),
         ]).catch(() => [undefined, undefined]);
         
-        console.log('[analyzeTicker] fundamentalsFindings:', fundamentalsFindings ? 'exists' : 'undefined');
-        console.log('[analyzeTicker] valuationFindings:', valuationFindings ? 'exists' : 'undefined');
-        if (valuationFindings) {
-          console.log('[analyzeTicker] valuationFindings.currentPrice:', valuationFindings.currentPrice);
-        }
-        
         // PHASE 1 OPTIMIZATION: Pre-compute shared data (computed once, not per persona)
-        const quote = financialData.quote!;
+        const price = financialData.price!;
         const stockPrice = {
           symbol: input.symbol,
-          current: quote.price,
-          open: quote.price,
-          high: quote.price,
-          low: quote.price,
-          close: quote.price,
-          volume: quote.volume,
-          previousClose: quote.price - quote.change,
-          change: quote.change,
-          changePercent: quote.changePercent,
-          timestamp: quote.timestamp,
+          current: price.current,
+          open: price.open,
+          high: price.high,
+          low: price.low,
+          close: price.current,
+          volume: price.volume,
+          previousClose: price.current - price.change,
+          change: price.change,
+          changePercent: price.changePercent,
+          timestamp: price.timestamp,
         };
         
         const profile = financialData.profile!;
@@ -298,7 +262,7 @@ export const appRouter = router({
           inventoryTurnover: 8.0,
         };
         
-        const financials = (Array.isArray(financialData.financials) ? financialData.financials : (financialData.financials?.annualReports || [])).map((f: any) => ({
+        const financials = (financialData.financials || []).map(f => ({
           period: f.period,
           periodType: "quarterly" as const,
           fiscalYear: f.fiscalYear,
@@ -558,9 +522,8 @@ export const appRouter = router({
         const persona = await db.getPersonaByPersonaId(input.personaId);
         if (!persona) throw new Error("Persona not found");
         
-        // Use stockUniverse from cache-first system
-        const { getStockUniverse } = await import('./services/stockUniverse');
-        const availableTickers = getStockUniverse().slice(0, 10); // Sample first 10 for quick scan
+        const tickers = await realFinancialData.searchTickers('');
+        const availableTickers = tickers.map(t => t.symbol);
         const scanDate = new Date();
         scanDate.setHours(0, 0, 0, 0);
         
@@ -571,8 +534,7 @@ export const appRouter = router({
           const ticker = await db.getTickerBySymbol(symbol);
           if (!ticker) continue;
           
-          const cacheResult = await getFinancialDataWithFallback(symbol);
-          const financialData = cacheResult.success ? cacheResult.data : null;
+          const financialData = await realFinancialData.getStockData(symbol);
           if (!financialData) continue;
           
           // Prepare analysis input (similar to runAnalysis)
@@ -626,7 +588,7 @@ export const appRouter = router({
             inventoryTurnover: 8.0,
           };
           
-          const financials = (Array.isArray(financialData.financials) ? financialData.financials : (financialData.financials?.annualReports || [])).map((f: any) => ({
+          const financials = (financialData.financials || []).map(f => ({
             period: f.period,
             periodType: "quarterly" as const,
             fiscalYear: f.fiscalYear,
@@ -829,11 +791,7 @@ export const appRouter = router({
     fundamentals: publicProcedure
       .input(z.object({ symbol: z.string() }))
       .query(async ({ input }) => {
-        const cacheResult = await getFinancialDataWithFallback(input.symbol, true); // forceRefresh=true for live data
-        if (!cacheResult.success || !cacheResult.data) {
-          throw new Error(`Failed to fetch financial data for ${input.symbol}`);
-        }
-        const financialData = cacheResult.data;
+        const financialData = await realFinancialData.getStockData(input.symbol);
         const dataQualityFlags = financialData.dataQualityFlags || {};
         
         const findings = await fundamentalsAgent.analyzeFundamentals(
@@ -847,12 +805,8 @@ export const appRouter = router({
     valuation: publicProcedure
       .input(z.object({ symbol: z.string() }))
       .query(async ({ input }) => {
-        const cacheResult = await getFinancialDataWithFallback(input.symbol, true); // forceRefresh=true for live data
-        if (!cacheResult.success || !cacheResult.data) {
-          throw new Error(`Failed to fetch financial data for ${input.symbol}`);
-        }
-        const financialData = cacheResult.data;
-        const currentPrice = financialData.quote?.price || financialData.price?.current || 0;
+        const financialData = await realFinancialData.getStockData(input.symbol);
+        const currentPrice = financialData.price?.current || 0;
         const dataQualityFlags = financialData.dataQualityFlags || {};
         
         const findings = await valuationAgent.analyzeValuation({

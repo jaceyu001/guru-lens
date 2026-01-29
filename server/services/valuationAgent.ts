@@ -117,10 +117,6 @@ export async function analyzeValuation(input: ValuationInput): Promise<Valuation
     const conservativeIntrinsicValue = epvValuation.scenarios.conservative.intrinsicValuePerShare;
 
     // Calculate upside based on base case
-    // Guard against zero or negative currentPrice
-    if (currentPrice <= 0) {
-      throw new Error(`Invalid currentPrice: ${currentPrice}. Cannot perform valuation with zero or negative price.`);
-    }
     const upside = primaryIntrinsicValue > 0
       ? ((primaryIntrinsicValue - currentPrice) / currentPrice) * 100
       : 0;

@@ -128,45 +128,6 @@ export default function Watchlist() {
                       </div>
                     )}
 
-                    {item.cache && (
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 py-4 border-y">
-                        <div>
-                          <div className="text-xs text-muted-foreground mb-1">Price</div>
-                          <div className="text-lg font-semibold">${item.cache.currentPrice || 'N/A'}</div>
-                        </div>
-                        <div>
-                          <div className="text-xs text-muted-foreground mb-1">Market Cap</div>
-                          <div className="text-lg font-semibold">
-                            {item.cache.marketCap ? `$${(Number(item.cache.marketCap) / 1e9).toFixed(2)}B` : 'N/A'}
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-xs text-muted-foreground mb-1">P/E Ratio</div>
-                          <div className="text-lg font-semibold">{item.cache.peRatio || 'N/A'}</div>
-                        </div>
-                        <div>
-                          <div className="text-xs text-muted-foreground mb-1">Dividend Yield</div>
-                          <div className="text-lg font-semibold">{item.cache.dividendYield ? `${item.cache.dividendYield}%` : 'N/A'}</div>
-                        </div>
-                        <div>
-                          <div className="text-xs text-muted-foreground mb-1">Debt/Equity</div>
-                          <div className="text-lg font-semibold">{item.cache.debtToEquity || 'N/A'}</div>
-                        </div>
-                        <div>
-                          <div className="text-xs text-muted-foreground mb-1">ROE</div>
-                          <div className="text-lg font-semibold">{item.cache.roe ? `${item.cache.roe}%` : 'N/A'}</div>
-                        </div>
-                        <div>
-                          <div className="text-xs text-muted-foreground mb-1">ROIC</div>
-                          <div className="text-lg font-semibold">{item.cache.roic ? `${item.cache.roic}%` : 'N/A'}</div>
-                        </div>
-                        <div>
-                          <div className="text-xs text-muted-foreground mb-1">Net Margin</div>
-                          <div className="text-lg font-semibold">{item.cache.netMargin ? `${item.cache.netMargin}%` : 'N/A'}</div>
-                        </div>
-                      </div>
-                    )}
-
                     <div className="flex items-center justify-between pt-4 border-t">
                       <div className="text-xs text-muted-foreground">
                         Added: {new Date(item.watchlistItem.createdAt).toLocaleDateString()}

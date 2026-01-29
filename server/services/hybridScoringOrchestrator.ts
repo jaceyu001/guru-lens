@@ -10,7 +10,7 @@ import { calculatePersonaScore } from "./personaScoringEngine";
 import * as aiAnalysisEngine from "./aiAnalysisEngine";
 import * as fundamentalsAgent from "./fundamentalsAgent";
 import * as valuationAgent from "./valuationAgent";
-import { getFinancialDataWithFallback, getFinancialDataBatchWithFallback } from "./cacheFirstDataFetcher";
+import * as realFinancialData from "./realFinancialData";
 import { analyzeBatchOptimized } from "./batchLLMAnalysis";
 import type { KeyRatios, FinancialData } from "../../shared/types";
 import type { AnalysisOutput, AnalysisInput } from "./aiAnalysisEngine";
@@ -62,23 +62,13 @@ export async function preFilterStocks(
 
   const results: StockPreFilterResult[] = [];
 
-  // Batch fetch all financial data with cache-first strategy
-  console.log(`[PreFilter] Batch fetching data for ${tickers.length} stocks...`);
-  const dataMap = await getFinancialDataBatchWithFallback(tickers);
-
   for (const ticker of tickers) {
     try {
-      // Get cached or fresh financial data
-      const result = dataMap[ticker];
+      // Fetch real financial data
+      const financialData = await realFinancialData.getStockData(ticker);
       
-      if (!result || !result.success || !result.data) {
+      if (!financialData || !financialData.ratios) {
         console.warn(`[PreFilter] Skipping ${ticker}: No financial data`);
-        continue;
-      }
-      
-      const financialData = result.data;
-      if (!financialData.ratios) {
-        console.warn(`[PreFilter] Skipping ${ticker}: No ratios data`);
         continue;
       }
 
@@ -195,7 +185,7 @@ export async function applyLLMFinalScoring(
         revenueGrowth: ratios.revenueGrowth || 0,
       };
 
-      const financials = (Array.isArray(financialData.financials) ? financialData.financials : ((financialData.financials as any)?.annualReports || [])).map((f: any) => ({
+      const financials = (financialData.financials || []).map(f => ({
         period: f.period,
         periodType: "quarterly" as const,
         fiscalYear: f.fiscalYear,

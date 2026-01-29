@@ -1,9 +1,0 @@
-{
-  "query": "DELETE FROM stockFinancialCache WHERE ticker = 'AAPL'",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user UUbFzi3je6DVETn.root --database fYeU4CZLQAgsjxQh24yAiF --execute DELETE FROM stockFinancialCache WHERE ticker = 'AAPL'",
-  "rows": [],
-  "messages": [],
-  "stdout": "",
-  "stderr": "",
-  "execution_time_ms": 61
-}
